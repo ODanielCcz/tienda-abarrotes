@@ -1,0 +1,169 @@
+name: tienda-abarrotes
+
+services:
+  database:
+    build:
+      context: .
+      dockerfile: deploy/postgres/Dockerfile
+    image: tienda-postgres:18.4-pgaudit18.0
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tienda_abarrotes}
+      POSTGRES_USER: ${POSTGRES_USER:-tienda_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      TZ: ${TZ:-UTC}
+      PGTZ: UTC
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pgaudit
+      - -c
+      - pgaudit.log=role,ddl
+      - -c
+      - pgaudit.log_statement=off
+      - -c
+      - pgaudit.log_parameter=off
+      - -c
+      - logging_collector=on
+      - -c
+      - log_destination=jsonlog
+      - -c
+      - log_directory=/var/log/postgresql
+      - -c
+      - log_filename=postgresql-%Y-%m-%d_%H%M%S.json
+      - -c
+      - log_rotation_age=1d
+      - -c
+      - log_rotation_size=100MB
+      - -c
+      - log_connections=all
+      - -c
+      - log_disconnections=on
+      - -c
+      - log_lock_waits=on
+      - -c
+      - log_line_prefix=%m [%p] %q%u@%d/%a
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - postgres_audit_logs:/var/log/postgresql
+      - ./database/tests:/workspace/tests:ro
+      - ./database/admin:/workspace/admin:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tienda_owner} -d ${POSTGRES_DB:-tienda_abarrotes}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    networks: [tienda_data]
+
+
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/backend/Dockerfile
+    image: tienda-backend:local
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      POSTGRES_HOST: database
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-tienda_abarrotes}
+      POSTGRES_USER: ${POSTGRES_USER:-tienda_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-bG9jYWwtb25seS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
+      BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-false}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:8100}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    networks: [tienda_data]
+
+  flyway:
+    image: redgate/flyway:12.11.0-alpine
+    profiles: [migrate]
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      FLYWAY_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-tienda_abarrotes}
+      FLYWAY_USER: ${POSTGRES_USER:-tienda_owner}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+      FLYWAY_CONNECT_RETRIES: 30
+      FLYWAY_VALIDATE_MIGRATION_NAMING: "true"
+      FLYWAY_LOCATIONS: filesystem:/flyway/migrations
+    volumes:
+      - ./database/migrations:/flyway/migrations:ro
+    networks: [tienda_data]
+
+  db-seed:
+    image: postgres:18.4
+    profiles: [seed]
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      PGHOST: database
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-tienda_abarrotes}
+      PGUSER: ${POSTGRES_USER:-tienda_owner}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./database/seeds:/seeds:ro
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/seeds/development/development_seed.sql"]
+    networks: [tienda_data]
+
+  db-test:
+    image: postgres:18.4
+    profiles: [test]
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      PGHOST: database
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-tienda_abarrotes}
+      PGUSER: ${POSTGRES_USER:-tienda_owner}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./database/tests:/tests:ro
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/tests/run_all.sql"]
+    networks: [tienda_data]
+
+  pgadmin:
+    image: dpage/pgadmin4:9.16
+    profiles: [tools]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@tienda-abarrotes.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Define PGADMIN_DEFAULT_PASSWORD in .env}
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [tienda_data]
+
+networks:
+  tienda_data:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  postgres_audit_logs:
+  pgadmin_data:
+
