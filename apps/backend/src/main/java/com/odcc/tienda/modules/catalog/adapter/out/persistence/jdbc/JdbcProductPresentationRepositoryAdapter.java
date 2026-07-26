@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -122,7 +123,8 @@ public class JdbcProductPresentationRepositoryAdapter implements ProductPresenta
             .addValue("netContent", presentation.getNetContent())
             .addValue("minimumStock", presentation.getMinimumStock())
             .addValue("status", presentation.getStatus().name())
-            .addValue("createdAt", presentation.getCreatedAt())
-            .addValue("updatedAt", presentation.getUpdatedAt());
+            .addValue("createdAt", Timestamp.from(presentation.getCreatedAt()))
+            .addValue("updatedAt", Timestamp.from(presentation.getUpdatedAt()));
     }
 }
+
