@@ -48,8 +48,8 @@ public class JdbcInventoryQueryRepositoryAdapter implements InventoryQueryReposi
             FROM inventory.stock_balances sb
             JOIN catalog.product_presentations pp ON pp.product_presentation_id = sb.product_presentation_id
             JOIN catalog.products p ON p.product_id = pp.product_id
-            WHERE (:warehouseId IS NULL OR sb.warehouse_id = :warehouseId)
-              AND (:presentationId IS NULL OR sb.product_presentation_id = :presentationId)
+            WHERE (CAST(:warehouseId AS uuid) IS NULL OR sb.warehouse_id = CAST(:warehouseId AS uuid))
+              AND (CAST(:presentationId AS uuid) IS NULL OR sb.product_presentation_id = CAST(:presentationId AS uuid))
             ORDER BY p.name, pp.name, sb.warehouse_id
             """, params, this::mapStock);
     }
@@ -68,11 +68,11 @@ public class JdbcInventoryQueryRepositoryAdapter implements InventoryQueryReposi
                    lb.warehouse_id, lb.on_hand_quantity, lb.available_quantity
             FROM inventory.lots lot
             LEFT JOIN inventory.lot_balances lb ON lb.lot_id = lot.lot_id
-            WHERE (:warehouseId IS NULL OR lb.warehouse_id = :warehouseId)
-              AND (:presentationId IS NULL OR lot.product_presentation_id = :presentationId)
-              AND (:status IS NULL OR lot.status = :status)
-              AND (:expiresBefore IS NULL OR lot.expires_at <= :expiresBefore)
-              AND (:expiresAfter IS NULL OR lot.expires_at >= :expiresAfter)
+            WHERE (CAST(:warehouseId AS uuid) IS NULL OR lb.warehouse_id = CAST(:warehouseId AS uuid))
+              AND (CAST(:presentationId AS uuid) IS NULL OR lot.product_presentation_id = CAST(:presentationId AS uuid))
+              AND (CAST(:status AS text) IS NULL OR lot.status = CAST(:status AS text))
+              AND (CAST(:expiresBefore AS date) IS NULL OR lot.expires_at <= CAST(:expiresBefore AS date))
+              AND (CAST(:expiresAfter AS date) IS NULL OR lot.expires_at >= CAST(:expiresAfter AS date))
             ORDER BY lot.expires_at NULLS LAST, lot.lot_number
             """, params, this::mapLot);
     }
@@ -97,8 +97,8 @@ public class JdbcInventoryQueryRepositoryAdapter implements InventoryQueryReposi
             .addValue("warehouseId", query == null ? null : query.warehouseId())
             .addValue("status", normalize(query == null ? null : query.status()));
         return palletRows("""
-            WHERE (:warehouseId IS NULL OR pallet.warehouse_id = :warehouseId)
-              AND (:status IS NULL OR pallet.status = :status)
+            WHERE (CAST(:warehouseId AS uuid) IS NULL OR pallet.warehouse_id = CAST(:warehouseId AS uuid))
+              AND (CAST(:status AS text) IS NULL OR pallet.status = CAST(:status AS text))
             ORDER BY pallet.received_at DESC, pallet.pallet_code
             """, params);
     }
@@ -122,9 +122,9 @@ public class JdbcInventoryQueryRepositoryAdapter implements InventoryQueryReposi
             SELECT stock_movement_id, branch_id, warehouse_id, movement_type, status,
                    source_type, source_id, reason, idempotency_key, created_at, confirmed_at
             FROM inventory.stock_movements
-            WHERE (:warehouseId IS NULL OR warehouse_id = :warehouseId)
-              AND (:movementType IS NULL OR movement_type = :movementType)
-              AND (:status IS NULL OR status = :status)
+            WHERE (CAST(:warehouseId AS uuid) IS NULL OR warehouse_id = CAST(:warehouseId AS uuid))
+              AND (CAST(:movementType AS text) IS NULL OR movement_type = CAST(:movementType AS text))
+              AND (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
             ORDER BY created_at DESC
             LIMIT 200
             """, params, this::mapMovementWithoutItems);
@@ -298,4 +298,5 @@ public class JdbcInventoryQueryRepositoryAdapter implements InventoryQueryReposi
         return value == null || value.isBlank() ? null : value.trim().toUpperCase();
     }
 }
+
 
