@@ -1,0 +1,166 @@
+:root {
+  color-scheme: dark;
+}
+
+body,
+.swagger-ui,
+.swagger-ui .scheme-container,
+.swagger-ui .information-container.wrapper,
+.swagger-ui .wrapper,
+.swagger-ui .opblock-tag-section,
+.swagger-ui .model-box,
+.swagger-ui section.models {
+  background: #0f172a !important;
+}
+
+.swagger-ui,
+.swagger-ui .info .title,
+.swagger-ui .info p,
+.swagger-ui .info li,
+.swagger-ui .info table,
+.swagger-ui .opblock-tag,
+.swagger-ui .opblock .opblock-summary-description,
+.swagger-ui .opblock .opblock-summary-path,
+.swagger-ui .opblock .opblock-summary-path__deprecated,
+.swagger-ui .opblock-description-wrapper p,
+.swagger-ui .response-col_status,
+.swagger-ui .response-col_description,
+.swagger-ui .tab li,
+.swagger-ui label,
+.swagger-ui table thead tr td,
+.swagger-ui table thead tr th,
+.swagger-ui .parameter__name,
+.swagger-ui .parameter__type,
+.swagger-ui .parameter__deprecated,
+.swagger-ui .model-title,
+.swagger-ui .model,
+.swagger-ui .prop-format,
+.swagger-ui .property-row,
+.swagger-ui .renderedMarkdown p,
+.swagger-ui .renderedMarkdown li {
+  color: #e5e7eb !important;
+}
+
+.swagger-ui .info .title small,
+.swagger-ui .info .title small pre,
+.swagger-ui .version-stamp,
+.swagger-ui .servers-title,
+.swagger-ui .parameter__in,
+.swagger-ui .model-toggle,
+.swagger-ui .model .property.primitive,
+.swagger-ui .model .property {
+  color: #cbd5e1 !important;
+}
+
+.swagger-ui .topbar {
+  background: #020617 !important;
+  border-bottom: 1px solid #1e293b;
+}
+
+.swagger-ui .scheme-container,
+.swagger-ui section.models,
+.swagger-ui .opblock,
+.swagger-ui .dialog-ux .modal-ux,
+.swagger-ui .responses-inner,
+.swagger-ui .parameters-container,
+.swagger-ui .opblock-section-header {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  box-shadow: none !important;
+}
+
+.swagger-ui .opblock.opblock-get,
+.swagger-ui .opblock.opblock-post,
+.swagger-ui .opblock.opblock-put,
+.swagger-ui .opblock.opblock-patch,
+.swagger-ui .opblock.opblock-delete {
+  background: #111827 !important;
+}
+
+.swagger-ui .opblock .opblock-summary {
+  border-color: #334155 !important;
+}
+
+.swagger-ui input,
+.swagger-ui select,
+.swagger-ui textarea,
+.swagger-ui .parameters-col_description input,
+.swagger-ui .download-contents,
+.swagger-ui .copy-to-clipboard,
+.swagger-ui .btn,
+.swagger-ui .try-out__btn,
+.swagger-ui .execute-wrapper .btn {
+  background: #020617 !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+.swagger-ui textarea.curl,
+.swagger-ui textarea {
+  background: #020617 !important;
+  color: #d1d5db !important;
+}
+
+.swagger-ui .highlight-code,
+.swagger-ui .microlight,
+.swagger-ui pre,
+.swagger-ui code {
+  background: #020617 !important;
+  color: #d1d5db !important;
+}
+
+.swagger-ui .response-control-media-type__accept-message,
+.swagger-ui .markdown code,
+.swagger-ui .renderedMarkdown code {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+.swagger-ui a,
+.swagger-ui .info a,
+.swagger-ui .response-col_links a {
+  color: #38bdf8 !important;
+}
+
+.swagger-ui .btn.authorize {
+  border-color: #22c55e !important;
+  color: #bbf7d0 !important;
+}
+
+.swagger-ui .btn.authorize svg {
+  fill: #22c55e !important;
+}
+
+.swagger-ui .opblock.opblock-get .opblock-summary-method {
+  background: #2563eb !important;
+}
+
+.swagger-ui .opblock.opblock-post .opblock-summary-method {
+  background: #16a34a !important;
+}
+
+.swagger-ui .opblock.opblock-put .opblock-summary-method {
+  background: #ca8a04 !important;
+}
+
+.swagger-ui .opblock.opblock-patch .opblock-summary-method {
+  background: #9333ea !important;
+}
+
+.swagger-ui .opblock.opblock-delete .opblock-summary-method {
+  background: #dc2626 !important;
+}
+
+.swagger-ui section.models h4,
+.swagger-ui section.models h5,
+.swagger-ui .model-container {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e5e7eb !important;
+}
+
+.swagger-ui .errors-wrapper {
+  background: #450a0a !important;
+  border-color: #991b1b !important;
+  color: #fecaca !important;
+}

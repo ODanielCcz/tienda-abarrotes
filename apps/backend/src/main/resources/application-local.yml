@@ -1,0 +1,30 @@
+spring:
+  config:
+    import: optional:file:../../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:tienda_abarrotes}
+    username: ${POSTGRES_USER:tienda_owner}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.odcc.tienda: DEBUG
+
+app:
+  security:
+    jwt:
+      secret-base64: ${JWT_SECRET_BASE64:bG9jYWwtb25seS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
+    bootstrap-admin:
+      enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+      username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+      display-name: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:Administrador local}

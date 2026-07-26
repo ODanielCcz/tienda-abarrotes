@@ -1,0 +1,25 @@
+spring:
+  flyway:
+    enabled: true
+    locations: filesystem:../../database/migrations
+    validate-migration-naming: true
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+logging:
+  level:
+    org.flywaydb: INFO
+    org.testcontainers: INFO
+    org.hibernate.SQL: WARN
+
+app:
+  security:
+    jwt:
+      secret-base64: dGVzdC1vbmx5LWp3dC1zZWNyZXQta2V5LTMya2VlcCE=
