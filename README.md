@@ -1,8 +1,49 @@
 # Tienda de Abarrotes
 
-Repositorio monorepo para el sistema de gestión de una tienda de abarrotes. Actualmente incluye la plataforma de datos PostgreSQL y un backend Spring Boot con administración de marcas y fundación transversal de seguridad, auditoría y observabilidad. Las aplicaciones Angular y móvil permanecen vacías.
+Sistema modular para administrar una tienda de abarrotes. El repositorio está preparado como monorepo para backend, futura web Angular y futura app móvil.
 
-## Componentes Disponibles
+## Stack
+
+- Java 21
+- Spring Boot
+- Gradle Kotlin DSL
+- PostgreSQL
+- Flyway
+- Docker Compose
+- JWT
+- Arquitectura hexagonal
+- Clean Architecture
+
+## Módulos actuales
+
+- Autenticación y seguridad
+- Usuarios, roles y permisos base
+- Auditoría funcional
+- Catálogo
+  - Marcas
+  - Categorías
+  - Árbol de categorías
+  - Productos
+  - Presentaciones
+- Inventario
+  - Stock
+  - Lotes
+  - Pallets
+  - Movimientos
+  - Recepción de mercancía
+- Compras
+  - Proveedores
+  - Órdenes de compra
+  - Confirmación
+  - Recepción conectada a inventario
+- Ventas
+  - Creación de venta
+  - Descuento real de stock
+  - FEFO para lotes
+  - Idempotencia
+  - Cancelación y reposición de stock
+
+## Componentes disponibles
 
 - PostgreSQL 18 con pgAudit.
 - Migraciones SQL versionadas con Flyway.
@@ -10,48 +51,60 @@ Repositorio monorepo para el sistema de gestión de una tienda de abarrotes. Act
 - Seeds ficticios para desarrollo.
 - Pruebas SQL de integridad, transacciones y auditoría.
 - Scripts PowerShell para operación local.
-- Backend Java 21 y Spring Boot con arquitectura hexagonal modular.
-- Marcas con paginación, filtros, actualización y cambio de estado auditable.
-- Login JWT, BCrypt, roles, permisos y respuestas 401/403 uniformes.
-- OpenAPI/Swagger, CORS configurable, Prometheus y OpenTelemetry.
+- Backend Spring Boot con arquitectura hexagonal modular.
+- OpenAPI/Swagger con modo oscuro.
+- CORS configurable.
+- Actuator, Prometheus y OpenTelemetry.
 
-## Inicio Rápido
+## Inicio rápido
 
 ```powershell
 Copy-Item .env.example .env
 .\scripts\db-up.ps1
 .\scripts\db-migrate.ps1
 .\scripts\db-seed.ps1
-.\scripts\db-test.ps1
 
 Set-Location .\apps\backend
 .\gradlew.bat bootRun --args="--spring.profiles.active=local" --no-daemon
 ```
 
-Para abrir pgAdmin:
+También se puede levantar con Docker Compose:
 
 ```powershell
-.\scripts\db-tools.ps1
+docker compose up -d database backend
 ```
 
-La operación de datos está en `docs/operations/database-docker.md` y el contrato del backend en `docs/api/backend-api-v1.md`. No almacenes secretos ni datos productivos en este repositorio.
+Swagger:
 
-## Rutas Principales
+```text
+http://localhost:8080/swagger-ui/index.html
+```
 
-- `apps/backend`: backend Spring Boot con identidad, marcas y capacidades transversales.
+Health:
+
+```text
+http://localhost:8080/actuator/health
+```
+
+## Rutas principales
+
+- `apps/backend`: backend Spring Boot.
 - `apps/web`: futura aplicación Angular.
 - `apps/mobile`: futura aplicación móvil.
 - `database/migrations`: fuente canónica del esquema.
 - `database/seeds`: datos ficticios y catálogos de desarrollo.
 - `database/tests`: pruebas de la base.
 - `database/admin`: scripts controlados para cuentas PostgreSQL.
-- `docs/architecture`: modelo y diccionario de datos.
-- `deploy/postgres`: imagen PostgreSQL con pgAudit.
+- `docs/architecture`: modelo, diccionario y decisiones técnicas.
+- `docs/api`: documentación de endpoints.
+- `docs/operations`: guías de operación local.
+- `deploy`: archivos Docker.
+- `scripts`: comandos PowerShell repetibles.
 
-## Decisiones Técnicas
+## Decisiones técnicas
 
-- La aplicación futura usará Hibernate solo para validar el esquema (`ddl-auto=validate`).
-- Flyway será el único responsable de aplicar cambios estructurales.
-- Las operaciones comerciales se coordinarán en el backend; la base protege invariantes con restricciones y transacciones.
+- Flyway es el único responsable de aplicar cambios estructurales de base de datos.
+- El backend coordina las operaciones comerciales; la base protege invariantes con restricciones y transacciones.
 - Las cuentas PostgreSQL y los usuarios de negocio son conceptos separados.
-- El backend se organizará por módulos de negocio; cada módulo separará dominio, aplicación, puertos y adaptadores.
+- El backend se organiza por módulos de negocio con separación de dominio, aplicación, puertos y adaptadores.
+- No se deben versionar secretos ni datos productivos. Usa `.env.example` como plantilla local.
