@@ -1,0 +1,167 @@
+package com.odcc.tienda.modules.identity.application.usecase;
+
+import com.odcc.tienda.modules.identity.application.command.LoginCommand;
+import com.odcc.tienda.modules.identity.application.exception.InvalidCredentialsException;
+import com.odcc.tienda.modules.identity.application.exception.UserNotActiveException;
+import com.odcc.tienda.modules.identity.application.model.IssuedAccessToken;
+import com.odcc.tienda.modules.identity.application.model.LoginResult;
+import com.odcc.tienda.modules.identity.application.port.out.AccessTokenPort;
+import com.odcc.tienda.modules.identity.application.port.out.AuthenticationAuditPort;
+import com.odcc.tienda.modules.identity.application.port.out.PasswordVerificationPort;
+import com.odcc.tienda.modules.identity.application.port.out.UserAccountPort;
+import com.odcc.tienda.modules.identity.domain.model.UserAccount;
+import com.odcc.tienda.modules.identity.domain.model.UserAccountStatus;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+class LoginServiceTest {
+
+    private static final UUID USER_ID = UUID.fromString(
+        "b36f4e12-1404-4a39-9e14-cb15dd64027e"
+    );
+
+    private FakeUserAccountPort userAccountPort;
+    private FakeAuthenticationAuditPort auditPort;
+    private LoginService service;
+
+    @BeforeEach
+    void setUp() {
+        userAccountPort = new FakeUserAccountPort(activeUser());
+        auditPort = new FakeAuthenticationAuditPort();
+        PasswordVerificationPort passwordPort = (raw, encoded) ->
+            "correct-password".equals(raw) && "stored-hash".equals(encoded);
+        AccessTokenPort tokenPort = user -> new IssuedAccessToken(
+            "signed.jwt.token",
+            Instant.parse("2026-07-24T08:30:00Z")
+        );
+
+        service = new LoginService(
+            userAccountPort,
+            passwordPort,
+            tokenPort,
+            auditPort
+        );
+    }
+
+    @Test
+    void shouldAuthenticateActiveUserAndReturnAuthorities() {
+        LoginResult result = service.execute(
+            new LoginCommand(" ADMIN ", "correct-password")
+        );
+
+        assertEquals("signed.jwt.token", result.accessToken());
+        assertEquals("Bearer", result.tokenType());
+        assertEquals(USER_ID, result.user().id());
+        assertEquals(Set.of("SYSTEM_ADMIN"), result.user().roles());
+        assertEquals(
+            Set.of("CATALOG_BRAND_READ"),
+            result.user().permissions()
+        );
+        assertEquals(List.of("SUCCESS:admin"), auditPort.events);
+    }
+
+    @Test
+    void shouldRejectInvalidPasswordWithoutIssuingToken() {
+        assertThrows(
+            InvalidCredentialsException.class,
+            () -> service.execute(
+                new LoginCommand("admin", "wrong-password")
+            )
+        );
+
+        assertEquals(List.of("FAILURE:admin:INVALID_PASSWORD"), auditPort.events);
+    }
+
+    @Test
+    void shouldRejectUnknownUserWithoutRevealingItsExistence() {
+        userAccountPort.user = null;
+
+        InvalidCredentialsException exception = assertThrows(
+            InvalidCredentialsException.class,
+            () -> service.execute(
+                new LoginCommand("unknown", "any-password")
+            )
+        );
+
+        assertEquals(
+            "Las credenciales proporcionadas no son válidas",
+            exception.getMessage()
+        );
+        assertEquals(List.of("FAILURE:unknown:USER_NOT_FOUND"), auditPort.events);
+    }
+
+    @Test
+    void shouldRejectUserThatIsNotActiveAfterPasswordValidation() {
+        userAccountPort.user = new UserAccount(
+            USER_ID,
+            "admin",
+            "stored-hash",
+            "Administrador",
+            UserAccountStatus.LOCKED,
+            Set.of("SYSTEM_ADMIN"),
+            Set.of("CATALOG_BRAND_READ")
+        );
+
+        assertThrows(
+            UserNotActiveException.class,
+            () -> service.execute(
+                new LoginCommand("admin", "correct-password")
+            )
+        );
+
+        assertEquals(List.of("FAILURE:admin:USER_LOCKED"), auditPort.events);
+    }
+
+    private static UserAccount activeUser() {
+        return new UserAccount(
+            USER_ID,
+            "admin",
+            "stored-hash",
+            "Administrador",
+            UserAccountStatus.ACTIVE,
+            Set.of("SYSTEM_ADMIN"),
+            Set.of("CATALOG_BRAND_READ")
+        );
+    }
+
+    private static final class FakeUserAccountPort implements UserAccountPort {
+
+        private UserAccount user;
+
+        private FakeUserAccountPort(UserAccount user) {
+            this.user = user;
+        }
+
+        @Override
+        public Optional<UserAccount> findByUsername(String username) {
+            return Optional.ofNullable(user)
+                .filter(account -> account.username().equals(username));
+        }
+    }
+
+    private static final class FakeAuthenticationAuditPort
+        implements AuthenticationAuditPort {
+
+        private final List<String> events = new ArrayList<>();
+
+        @Override
+        public void loginSucceeded(UUID userId, String username) {
+            events.add("SUCCESS:" + username);
+        }
+
+        @Override
+        public void loginFailed(UUID userId, String username, String reason) {
+            events.add("FAILURE:" + username + ":" + reason);
+        }
+    }
+}
