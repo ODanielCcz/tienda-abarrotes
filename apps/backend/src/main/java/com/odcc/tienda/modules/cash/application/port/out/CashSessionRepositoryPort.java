@@ -1,6 +1,7 @@
 package com.odcc.tienda.modules.cash.application.port.out;
 
 import com.odcc.tienda.modules.cash.application.command.CloseCashSessionCommand;
+import com.odcc.tienda.modules.cash.application.command.CreateCashMovementCommand;
 import com.odcc.tienda.modules.cash.application.command.OpenCashSessionCommand;
 import com.odcc.tienda.modules.cash.application.model.CashMovement;
 import com.odcc.tienda.modules.cash.application.model.CashSession;
@@ -20,4 +21,6 @@ public interface CashSessionRepositoryPort {
     CashSession close(CloseCashSessionCommand command);
 
     List<CashMovement> findMovements(UUID cashSessionId);
+
+    CashMovement createManualMovement(CreateCashMovementCommand command);
 }

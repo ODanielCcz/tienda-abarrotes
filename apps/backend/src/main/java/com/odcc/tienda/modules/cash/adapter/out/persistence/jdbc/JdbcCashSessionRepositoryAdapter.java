@@ -1,6 +1,7 @@
 package com.odcc.tienda.modules.cash.adapter.out.persistence.jdbc;
 
 import com.odcc.tienda.modules.cash.application.command.CloseCashSessionCommand;
+import com.odcc.tienda.modules.cash.application.command.CreateCashMovementCommand;
 import com.odcc.tienda.modules.cash.application.command.OpenCashSessionCommand;
 import com.odcc.tienda.modules.cash.application.exception.CashException;
 import com.odcc.tienda.modules.cash.application.exception.CashSessionAlreadyOpenException;
@@ -110,6 +111,18 @@ public class JdbcCashSessionRepositoryAdapter implements CashSessionRepositoryPo
         return jdbc.query("SELECT * FROM cash.cash_movements WHERE cash_session_id = :id ORDER BY created_at", new MapSqlParameterSource("id", cashSessionId), this::mapMovement);
     }
 
+    @Override
+    public CashMovement createManualMovement(CreateCashMovementCommand command) {
+        CashSession session = findById(command.cashSessionId()).orElseThrow(() -> new CashException("No existe la sesion de caja " + command.cashSessionId()));
+        if (!"OPEN".equals(session.status())) throw new CashException("Solo se pueden registrar movimientos en sesiones de caja abiertas");
+        UUID movementId = insertMovement(command.cashSessionId(), normalize(command.movementType()), normalize(command.direction()), command.amount(), null, command.reference(), command.reason(), command.createdBy());
+        return findMovement(movementId);
+    }
+
+    private CashMovement findMovement(UUID movementId) {
+        return jdbc.queryForObject("SELECT * FROM cash.cash_movements WHERE cash_movement_id = :id", new MapSqlParameterSource("id", movementId), this::mapMovement);
+    }
+
     private void ensureActiveCashRegister(UUID cashRegisterId) {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM organization.cash_registers WHERE cash_register_id = :id AND status = 'ACTIVE'", new MapSqlParameterSource("id", cashRegisterId), Integer.class);
         if (count == null || count == 0) throw new CashException("No existe una caja registradora activa con id " + cashRegisterId);
@@ -132,7 +145,8 @@ public class JdbcCashSessionRepositoryAdapter implements CashSessionRepositoryPo
             """, new MapSqlParameterSource("id", cashSessionId), BigDecimal.class);
     }
 
-    private void insertMovement(UUID sessionId, String type, String direction, BigDecimal amount, UUID paymentId, String reference, String reason, UUID createdBy) {
+    private UUID insertMovement(UUID sessionId, String type, String direction, BigDecimal amount, UUID paymentId, String reference, String reason, UUID createdBy) {
+        UUID id = UUID.randomUUID();
         jdbc.update("""
             INSERT INTO cash.cash_movements (
                 cash_movement_id, cash_session_id, movement_type, direction, amount, payment_id, reference, reason, created_by
@@ -140,7 +154,7 @@ public class JdbcCashSessionRepositoryAdapter implements CashSessionRepositoryPo
                 :id, :sessionId, :type, :direction, :amount, :paymentId, :reference, :reason, :createdBy
             )
             """, new MapSqlParameterSource()
-            .addValue("id", UUID.randomUUID())
+            .addValue("id", id)
             .addValue("sessionId", sessionId)
             .addValue("type", type)
             .addValue("direction", direction)
@@ -149,6 +163,7 @@ public class JdbcCashSessionRepositoryAdapter implements CashSessionRepositoryPo
             .addValue("reference", reference)
             .addValue("reason", reason)
             .addValue("createdBy", createdBy));
+        return id;
     }
 
     private String baseSelect() {

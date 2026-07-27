@@ -15,4 +15,8 @@ public interface SalesPaymentRepositoryPort {
     SalesPayment createCaptured(CreateSalesPaymentCommand command, String fingerprint);
 
     List<SalesPayment> findBySalesOrderId(UUID salesOrderId);
+
+    Optional<SalesPayment> findById(UUID paymentId);
+
+    SalesPayment cancel(UUID paymentId, UUID cancelledBy);
 }

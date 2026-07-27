@@ -1,8 +1,10 @@
 package com.odcc.tienda.modules.cash.adapter.in.rest;
 
 import com.odcc.tienda.modules.cash.adapter.in.rest.request.CloseCashSessionRequest;
+import com.odcc.tienda.modules.cash.adapter.in.rest.request.CreateCashMovementRequest;
 import com.odcc.tienda.modules.cash.adapter.in.rest.request.OpenCashSessionRequest;
 import com.odcc.tienda.modules.cash.application.command.CloseCashSessionCommand;
+import com.odcc.tienda.modules.cash.application.command.CreateCashMovementCommand;
 import com.odcc.tienda.modules.cash.application.command.OpenCashSessionCommand;
 import com.odcc.tienda.modules.cash.application.model.CashMovement;
 import com.odcc.tienda.modules.cash.application.model.CashSession;
@@ -41,17 +43,8 @@ public class CashSessionController {
     @PostMapping("/open")
     @Operation(summary = "Abrir sesion de caja")
     @PreAuthorize("hasAuthority('CASH_SESSION_OPEN')")
-    public ResponseEntity<ApiResponseDto<CashSession>> open(
-        @Valid @RequestBody OpenCashSessionRequest request,
-        @AuthenticationPrincipal Jwt jwt,
-        HttpServletRequest servletRequest
-    ) {
-        CashSession session = useCases.open(new OpenCashSessionCommand(
-            request.cashRegisterId(),
-            currentUserId(jwt),
-            request.openingAmount(),
-            request.notes()
-        ));
+    public ResponseEntity<ApiResponseDto<CashSession>> open(@Valid @RequestBody OpenCashSessionRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        CashSession session = useCases.open(new OpenCashSessionCommand(request.cashRegisterId(), currentUserId(jwt), request.openingAmount(), request.notes()));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "CASH_SESSION_OPENED", "Caja abierta correctamente", session, servletRequest.getRequestURI()));
     }
 
@@ -65,23 +58,14 @@ public class CashSessionController {
     @GetMapping
     @Operation(summary = "Listar sesiones de caja")
     @PreAuthorize("hasAuthority('CASH_SESSION_READ')")
-    public ResponseEntity<ApiResponseDto<List<CashSession>>> list(
-        @RequestParam(required = false) UUID cashRegisterId,
-        @RequestParam(required = false) String status,
-        HttpServletRequest servletRequest
-    ) {
+    public ResponseEntity<ApiResponseDto<List<CashSession>>> list(@RequestParam(required = false) UUID cashRegisterId, @RequestParam(required = false) String status, HttpServletRequest servletRequest) {
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_SESSIONS_FOUND", "Sesiones de caja consultadas correctamente", useCases.list(new ListCashSessionsQuery(cashRegisterId, status)), servletRequest.getRequestURI()));
     }
 
     @PostMapping("/{cashSessionId}/close")
     @Operation(summary = "Cerrar sesion de caja")
     @PreAuthorize("hasAuthority('CASH_SESSION_CLOSE')")
-    public ResponseEntity<ApiResponseDto<CashSession>> close(
-        @PathVariable UUID cashSessionId,
-        @Valid @RequestBody CloseCashSessionRequest request,
-        @AuthenticationPrincipal Jwt jwt,
-        HttpServletRequest servletRequest
-    ) {
+    public ResponseEntity<ApiResponseDto<CashSession>> close(@PathVariable UUID cashSessionId, @Valid @RequestBody CloseCashSessionRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
         CashSession session = useCases.close(new CloseCashSessionCommand(cashSessionId, currentUserId(jwt), request.countedCashAmount(), request.notes()));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_SESSION_CLOSED", "Caja cerrada correctamente", session, servletRequest.getRequestURI()));
     }
@@ -91,6 +75,14 @@ public class CashSessionController {
     @PreAuthorize("hasAuthority('CASH_MOVEMENT_READ')")
     public ResponseEntity<ApiResponseDto<List<CashMovement>>> listMovements(@PathVariable UUID cashSessionId, HttpServletRequest servletRequest) {
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_MOVEMENTS_FOUND", "Movimientos de caja consultados correctamente", useCases.listMovements(cashSessionId), servletRequest.getRequestURI()));
+    }
+
+    @PostMapping("/{cashSessionId}/movements")
+    @Operation(summary = "Registrar movimiento manual de caja")
+    @PreAuthorize("hasAuthority('CASH_MOVEMENT_CREATE')")
+    public ResponseEntity<ApiResponseDto<CashMovement>> createMovement(@PathVariable UUID cashSessionId, @Valid @RequestBody CreateCashMovementRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        CashMovement movement = useCases.createMovement(new CreateCashMovementCommand(cashSessionId, request.movementType(), request.direction(), request.amount(), request.reference(), request.reason(), currentUserId(jwt)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "CASH_MOVEMENT_CREATED", "Movimiento de caja registrado correctamente", movement, servletRequest.getRequestURI()));
     }
 
     private UUID currentUserId(Jwt jwt) {

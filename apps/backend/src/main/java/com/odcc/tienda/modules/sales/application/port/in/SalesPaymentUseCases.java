@@ -10,4 +10,8 @@ public interface SalesPaymentUseCases {
     SalesPayment create(CreateSalesPaymentCommand command);
 
     List<SalesPayment> listBySalesOrder(UUID salesOrderId);
+
+    SalesPayment getById(UUID paymentId);
+
+    SalesPayment cancel(UUID paymentId, UUID cancelledBy);
 }

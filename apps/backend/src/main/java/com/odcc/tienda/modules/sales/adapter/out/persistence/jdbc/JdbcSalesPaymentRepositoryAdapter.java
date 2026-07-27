@@ -3,6 +3,7 @@ package com.odcc.tienda.modules.sales.adapter.out.persistence.jdbc;
 import com.odcc.tienda.modules.sales.application.command.CreateSalesPaymentCommand;
 import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundException;
+import com.odcc.tienda.modules.sales.application.exception.SalesPaymentNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentOverpaidException;
 import com.odcc.tienda.modules.sales.application.model.SalesPayment;
 import com.odcc.tienda.modules.sales.application.port.out.SalesPaymentRepositoryPort;
@@ -78,9 +79,7 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
             .addValue("paidAt", Timestamp.from(now))
             .addValue("createdAt", Timestamp.from(now)));
 
-        if ("CASH".equals(method)) {
-            insertCashMovement(command.cashSessionId(), amount, paymentId, command.createdBy(), command.reference());
-        }
+        if ("CASH".equals(method)) insertCashMovement(command.cashSessionId(), "SALE", "IN", amount, paymentId, command.createdBy(), command.reference(), "Pago de venta en efectivo");
         updatePaymentStatus(command.salesOrderId(), paidBefore.add(amount), order.total());
         return findPayment(paymentId);
     }
@@ -90,9 +89,37 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
         return jdbc.query(paymentSelect() + " WHERE p.sales_order_id = :salesOrderId ORDER BY p.created_at", new MapSqlParameterSource("salesOrderId", salesOrderId), this::mapPayment);
     }
 
+    @Override
+    public Optional<SalesPayment> findById(UUID paymentId) {
+        try {
+            return Optional.of(findPayment(paymentId));
+        } catch (EmptyResultDataAccessException exception) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public SalesPayment cancel(UUID paymentId, UUID cancelledBy) {
+        SalesPayment current = findById(paymentId).orElseThrow(() -> new SalesPaymentNotFoundException(paymentId));
+        if (!"CAPTURED".equals(current.status())) throw new SalesException("Solo se pueden cancelar pagos capturados");
+        OrderRow order = findOrder(current.salesOrderId());
+        if ("CASH".equals(current.paymentMethod())) {
+            if (current.cashSessionId() == null) throw new SalesException("El pago en efectivo no tiene sesion de caja asociada");
+            ensureOpenCashSession(current.cashSessionId(), order.branchId());
+            insertCashMovement(current.cashSessionId(), "REFUND", "OUT", money(current.amount()), paymentId, cancelledBy, current.reference(), "Cancelacion de pago en efectivo");
+        }
+        jdbc.update("""
+            UPDATE sales.payments
+            SET status = 'CANCELLED'
+            WHERE payment_id = :paymentId
+            """, new MapSqlParameterSource("paymentId", paymentId));
+        updatePaymentStatusFromCapturedPayments(current.salesOrderId(), order.total());
+        return findPayment(paymentId);
+    }
+
     private OrderRow findOrder(UUID salesOrderId) {
         try {
-            return jdbc.queryForObject("SELECT sales_order_id, branch_id, status, payment_status, currency_code, total FROM sales.sales_orders WHERE sales_order_id = :id", new MapSqlParameterSource("id", salesOrderId), (rs, rowNum) -> new OrderRow(rs.getObject("sales_order_id", UUID.class), rs.getObject("branch_id", UUID.class), rs.getString("status"), rs.getString("payment_status"), rs.getString("currency_code"), rs.getBigDecimal("total")));
+            return jdbc.queryForObject("SELECT sales_order_id, branch_id, status, payment_status, currency_code, total FROM sales.sales_orders WHERE sales_order_id = :id", new MapSqlParameterSource("id", salesOrderId), (rs, rowNum) -> new OrderRow(rs.getObject("sales_order_id", UUID.class), rs.getObject("branch_id", UUID.class), rs.getString("status"), rs.getString("payment_status"), trim(rs.getString("currency_code")), rs.getBigDecimal("total")));
         } catch (EmptyResultDataAccessException exception) {
             throw new SalesOrderNotFoundException(salesOrderId);
         }
@@ -119,26 +146,35 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
         if (count == null || count == 0) throw new SalesException("No existe una sesion de caja abierta para la sucursal de la venta");
     }
 
-    private void insertCashMovement(UUID cashSessionId, BigDecimal amount, UUID paymentId, UUID createdBy, String reference) {
+    private void insertCashMovement(UUID cashSessionId, String movementType, String direction, BigDecimal amount, UUID paymentId, UUID createdBy, String reference, String reason) {
         jdbc.update("""
             INSERT INTO cash.cash_movements (
                 cash_movement_id, cash_session_id, movement_type, direction, amount,
                 payment_id, reference, reason, created_by
             ) VALUES (
-                :id, :cashSessionId, 'SALE', 'IN', :amount,
-                :paymentId, :reference, 'Pago de venta en efectivo', :createdBy
+                :id, :cashSessionId, :movementType, :direction, :amount,
+                :paymentId, :reference, :reason, :createdBy
             )
             """, new MapSqlParameterSource()
             .addValue("id", UUID.randomUUID())
             .addValue("cashSessionId", cashSessionId)
+            .addValue("movementType", movementType)
+            .addValue("direction", direction)
             .addValue("amount", amount)
             .addValue("paymentId", paymentId)
             .addValue("reference", reference)
+            .addValue("reason", reason)
             .addValue("createdBy", createdBy));
     }
 
     private void updatePaymentStatus(UUID salesOrderId, BigDecimal paid, BigDecimal total) {
         String status = paid.compareTo(total) >= 0 ? "PAID" : "PARTIAL";
+        jdbc.update("UPDATE sales.sales_orders SET payment_status = :status WHERE sales_order_id = :id", new MapSqlParameterSource().addValue("status", status).addValue("id", salesOrderId));
+    }
+
+    private void updatePaymentStatusFromCapturedPayments(UUID salesOrderId, BigDecimal total) {
+        BigDecimal paid = paidAmount(salesOrderId);
+        String status = paid.compareTo(BigDecimal.ZERO) == 0 ? "PENDING" : paid.compareTo(total) >= 0 ? "PAID" : "PARTIAL";
         jdbc.update("UPDATE sales.sales_orders SET payment_status = :status WHERE sales_order_id = :id", new MapSqlParameterSource().addValue("status", status).addValue("id", salesOrderId));
     }
 

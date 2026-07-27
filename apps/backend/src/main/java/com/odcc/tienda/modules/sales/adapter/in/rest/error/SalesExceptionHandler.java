@@ -3,6 +3,7 @@ package com.odcc.tienda.modules.sales.adapter.in.rest.error;
 import com.odcc.tienda.modules.sales.adapter.in.rest.CustomerController;
 import com.odcc.tienda.modules.sales.adapter.in.rest.SalesOrderController;
 import com.odcc.tienda.modules.sales.adapter.in.rest.SalesPaymentController;
+import com.odcc.tienda.modules.sales.adapter.in.rest.SalesPaymentManagementController;
 import com.odcc.tienda.modules.sales.application.exception.CustomerCodeAlreadyExistsException;
 import com.odcc.tienda.modules.sales.application.exception.CustomerNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesException;
@@ -10,6 +11,7 @@ import com.odcc.tienda.modules.sales.application.exception.SalesOrderIdempotency
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentIdempotencyConflictException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentOverpaidException;
+import com.odcc.tienda.modules.sales.application.exception.SalesPaymentNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.StockInsufficientException;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,7 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = {SalesOrderController.class, SalesPaymentController.class, CustomerController.class})
+@RestControllerAdvice(assignableTypes = {SalesOrderController.class, SalesPaymentController.class, SalesPaymentManagementController.class, CustomerController.class})
 public class SalesExceptionHandler {
 
     @ExceptionHandler(CustomerNotFoundException.class)
@@ -44,6 +46,11 @@ public class SalesExceptionHandler {
     @ExceptionHandler(StockInsufficientException.class)
     public ResponseEntity<ApiResponseDto<Void>> stockInsufficient(StockInsufficientException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "STOCK_INSUFFICIENT", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(SalesPaymentNotFoundException.class)
+    public ResponseEntity<ApiResponseDto<Void>> paymentNotFound(SalesPaymentNotFoundException exception, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, "SALES_PAYMENT_NOT_FOUND", exception.getMessage(), request);
     }
 
     @ExceptionHandler(SalesPaymentIdempotencyConflictException.class)

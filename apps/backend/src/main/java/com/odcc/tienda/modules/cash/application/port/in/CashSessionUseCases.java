@@ -1,6 +1,7 @@
 package com.odcc.tienda.modules.cash.application.port.in;
 
 import com.odcc.tienda.modules.cash.application.command.CloseCashSessionCommand;
+import com.odcc.tienda.modules.cash.application.command.CreateCashMovementCommand;
 import com.odcc.tienda.modules.cash.application.command.OpenCashSessionCommand;
 import com.odcc.tienda.modules.cash.application.model.CashMovement;
 import com.odcc.tienda.modules.cash.application.model.CashSession;
@@ -19,4 +20,6 @@ public interface CashSessionUseCases {
     CashSession close(CloseCashSessionCommand command);
 
     List<CashMovement> listMovements(UUID cashSessionId);
+
+    CashMovement createMovement(CreateCashMovementCommand command);
 }

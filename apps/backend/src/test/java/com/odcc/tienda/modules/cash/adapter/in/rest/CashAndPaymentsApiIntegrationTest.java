@@ -356,9 +356,175 @@ class CashAndPaymentsApiIntegrationTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.paths['/api/v1/cash/sessions/open']").exists())
-            .andExpect(jsonPath("$.paths['/api/v1/sales/orders/{salesOrderId}/payments']").exists());
+            .andExpect(jsonPath("$.paths['/api/v1/sales/orders/{salesOrderId}/payments']").exists())
+            .andExpect(jsonPath("$.paths['/api/v1/cash/sessions/{cashSessionId}/movements']").exists())
+            .andExpect(jsonPath("$.paths['/api/v1/sales/payments/{paymentId}']").exists())
+            .andExpect(jsonPath("$.paths['/api/v1/sales/payments/{paymentId}/cancel']").exists());
     }
 
+
+    @Test
+    void shouldCreateManualCashMovementAndReflectExpectedCloseAmount() throws Exception {
+        UUID userId = insertUser("cash_manual_admin", "correct-password", "SYSTEM_ADMIN");
+        String token = login("cash_manual_admin", "correct-password");
+        TestContext context = createContext("CASH-MANUAL");
+
+        MvcResult openResult = mockMvc.perform(
+                post("/api/v1/cash/sessions/open")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "cashRegisterId": "%s",
+                          "openingAmount": 100.00,
+                          "notes": "Apertura movimiento manual"
+                        }
+                        """.formatted(context.cashRegisterId()))
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+        String cashSessionId = JsonPath.read(openResult.getResponse().getContentAsString(), "$.data.cashSessionId");
+
+        mockMvc.perform(
+                post("/api/v1/cash/sessions/{cashSessionId}/movements", cashSessionId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "movementType": "CASH_IN",
+                          "direction": "IN",
+                          "amount": 25.00,
+                          "reference": "Fondo extra",
+                          "reason": "Cambio adicional"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value("CASH_MOVEMENT_CREATED"))
+            .andExpect(jsonPath("$.data.movementType").value("CASH_IN"))
+            .andExpect(jsonPath("$.data.direction").value("IN"));
+
+        mockMvc.perform(
+                post("/api/v1/cash/sessions/{cashSessionId}/close", cashSessionId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "countedCashAmount": 125.00,
+                          "notes": "Cierre con ingreso manual"
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.expectedAmount").value(125.0000))
+            .andExpect(jsonPath("$.data.differenceAmount").value(0.0000));
+
+        Integer auditCount = jdbcTemplate.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM audit.business_events
+                WHERE actor_user_id = ?
+                  AND event_type = 'CASH_MOVEMENT_CREATED'
+                """,
+            Integer.class,
+            userId
+        );
+        assertEquals(1, auditCount);
+    }
+
+    @Test
+    void shouldGetAndCancelCashPaymentWithRefundMovement() throws Exception {
+        UUID userId = insertUser("cash_cancel_payment_admin", "correct-password", "SYSTEM_ADMIN");
+        String token = login("cash_cancel_payment_admin", "correct-password");
+        TestContext context = createContext("CASH-CANCEL-PAYMENT");
+        UUID orderId = insertSalesOrder(context, new BigDecimal("80.0000"), "CONFIRMED", "PENDING");
+
+        MvcResult openResult = mockMvc.perform(
+                post("/api/v1/cash/sessions/open")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "cashRegisterId": "%s",
+                          "openingAmount": 200.00
+                        }
+                        """.formatted(context.cashRegisterId()))
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+        String cashSessionId = JsonPath.read(openResult.getResponse().getContentAsString(), "$.data.cashSessionId");
+
+        MvcResult paymentResult = mockMvc.perform(
+                post("/api/v1/sales/orders/{salesOrderId}/payments", orderId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "cashSessionId": "%s",
+                          "paymentMethod": "CASH",
+                          "amount": 80.00,
+                          "currencyCode": "MXN",
+                          "reference": "Pago a cancelar",
+                          "idempotencyKey": "%s"
+                        }
+                        """.formatted(cashSessionId, UUID.randomUUID()))
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+        String paymentId = JsonPath.read(paymentResult.getResponse().getContentAsString(), "$.data.paymentId");
+
+        mockMvc.perform(
+                get("/api/v1/sales/payments/{paymentId}", paymentId)
+                    .header("Authorization", "Bearer " + token)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("SALES_PAYMENT_FOUND"))
+            .andExpect(jsonPath("$.data.status").value("CAPTURED"));
+
+        mockMvc.perform(
+                post("/api/v1/sales/payments/{paymentId}/cancel", paymentId)
+                    .header("Authorization", "Bearer " + token)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("SALES_PAYMENT_CANCELLED"))
+            .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+
+        mockMvc.perform(
+                get("/api/v1/sales/orders/{salesOrderId}", orderId)
+                    .header("Authorization", "Bearer " + token)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"));
+
+        mockMvc.perform(
+                get("/api/v1/cash/sessions/{cashSessionId}/movements", cashSessionId)
+                    .header("Authorization", "Bearer " + token)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[1].movementType").value("SALE"))
+            .andExpect(jsonPath("$.data[2].movementType").value("REFUND"))
+            .andExpect(jsonPath("$.data[2].direction").value("OUT"))
+            .andExpect(jsonPath("$.data[2].paymentId").value(paymentId));
+
+        mockMvc.perform(
+                post("/api/v1/sales/payments/{paymentId}/cancel", paymentId)
+                    .header("Authorization", "Bearer " + token)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_SALES_OPERATION"));
+
+        Integer auditCount = jdbcTemplate.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM audit.business_events
+                WHERE actor_user_id = ?
+                  AND event_type = 'SALES_PAYMENT_CANCELLED'
+                """,
+            Integer.class,
+            userId
+        );
+        assertEquals(1, auditCount);
+    }
     private String login(String username, String password) throws Exception {
         MvcResult result = mockMvc.perform(
                 post(LOGIN_ENDPOINT)
