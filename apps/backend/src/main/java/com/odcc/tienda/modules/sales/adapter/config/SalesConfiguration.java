@@ -3,12 +3,15 @@ package com.odcc.tienda.modules.sales.adapter.config;
 import com.odcc.tienda.modules.sales.application.port.in.CustomerUseCases;
 import com.odcc.tienda.modules.sales.application.port.in.SalesOrderUseCases;
 import com.odcc.tienda.modules.sales.application.port.in.SalesPaymentUseCases;
+import com.odcc.tienda.modules.sales.application.port.in.SalesReturnUseCases;
 import com.odcc.tienda.modules.sales.application.port.out.CustomerRepositoryPort;
 import com.odcc.tienda.modules.sales.application.port.out.SalesOrderRepositoryPort;
 import com.odcc.tienda.modules.sales.application.port.out.SalesPaymentRepositoryPort;
+import com.odcc.tienda.modules.sales.application.port.out.SalesReturnRepositoryPort;
 import com.odcc.tienda.modules.sales.application.usecase.CustomerService;
 import com.odcc.tienda.modules.sales.application.usecase.SalesOrderService;
 import com.odcc.tienda.modules.sales.application.usecase.SalesPaymentService;
+import com.odcc.tienda.modules.sales.application.usecase.SalesReturnService;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import org.springframework.context.annotation.Bean;
@@ -43,5 +46,14 @@ public class SalesConfiguration {
         BusinessAuditPort auditPort
     ) {
         return new SalesPaymentService(repository, salesOrderRepository, transactionRunner, auditPort);
+    }
+
+    @Bean
+    SalesReturnUseCases salesReturnUseCases(
+        SalesReturnRepositoryPort repository,
+        TransactionRunner transactionRunner,
+        BusinessAuditPort auditPort
+    ) {
+        return new SalesReturnService(repository, transactionRunner, auditPort);
     }
 }
