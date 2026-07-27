@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,8 +92,8 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
             .addValue("total", totals.total())
             .addValue("idempotencyKey", command.idempotencyKey())
             .addValue("fingerprint", fingerprint)
-            .addValue("createdAt", now)
-            .addValue("confirmedAt", now));
+            .addValue("createdAt", Timestamp.from(now))
+            .addValue("confirmedAt", Timestamp.from(now)));
 
         boolean movementCreated = false;
         for (CreateSalesOrderItemCommand item : command.items()) {
@@ -129,9 +130,9 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
     public List<SalesOrder> findAll(ListSalesOrdersQuery query) {
         List<SalesOrder> orders = jdbc.query("""
             SELECT * FROM sales.sales_orders
-            WHERE (:warehouseId IS NULL OR warehouse_id = :warehouseId)
-              AND (:customerId IS NULL OR customer_id = :customerId)
-              AND (:status IS NULL OR status = :status)
+            WHERE (CAST(:warehouseId AS uuid) IS NULL OR warehouse_id = CAST(:warehouseId AS uuid))
+              AND (CAST(:customerId AS uuid) IS NULL OR customer_id = CAST(:customerId AS uuid))
+              AND (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
             ORDER BY created_at DESC
             LIMIT 200
             """, new MapSqlParameterSource()
@@ -412,3 +413,4 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
     private record LotCandidate(UUID lotId, BigDecimal availableQuantity, BigDecimal stockBefore, BigDecimal averageUnitCost) {}
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal total) {}
 }
+
