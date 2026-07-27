@@ -14,12 +14,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public final class InMemorySalesOrderRepository implements SalesOrderRepositoryPort {
 
     private final Map<UUID, SalesOrder> orders = new LinkedHashMap<>();
     private final Map<UUID, String> fingerprintsByIdempotencyKey = new LinkedHashMap<>();
+    private final Set<UUID> activeCustomers = new java.util.HashSet<>();
+
+    public void addActiveCustomer(UUID customerId) {
+        activeCustomers.add(customerId);
+    }
 
     @Override
     public Optional<SalesOrder> findByIdempotencyKey(UUID idempotencyKey, String fingerprint) {
@@ -33,6 +39,11 @@ public final class InMemorySalesOrderRepository implements SalesOrderRepositoryP
     public boolean existsByIdempotencyKeyWithDifferentFingerprint(UUID idempotencyKey, String fingerprint) {
         return fingerprintsByIdempotencyKey.containsKey(idempotencyKey)
             && !fingerprint.equals(fingerprintsByIdempotencyKey.get(idempotencyKey));
+    }
+
+    @Override
+    public boolean customerIsActive(UUID customerId) {
+        return customerId == null || activeCustomers.contains(customerId);
     }
 
     @Override

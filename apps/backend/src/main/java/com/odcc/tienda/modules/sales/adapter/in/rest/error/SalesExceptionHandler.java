@@ -1,7 +1,10 @@
 package com.odcc.tienda.modules.sales.adapter.in.rest.error;
 
+import com.odcc.tienda.modules.sales.adapter.in.rest.CustomerController;
 import com.odcc.tienda.modules.sales.adapter.in.rest.SalesOrderController;
 import com.odcc.tienda.modules.sales.adapter.in.rest.SalesPaymentController;
+import com.odcc.tienda.modules.sales.application.exception.CustomerCodeAlreadyExistsException;
+import com.odcc.tienda.modules.sales.application.exception.CustomerNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderIdempotencyConflictException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundException;
@@ -15,8 +18,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = {SalesOrderController.class, SalesPaymentController.class})
+@RestControllerAdvice(assignableTypes = {SalesOrderController.class, SalesPaymentController.class, CustomerController.class})
 public class SalesExceptionHandler {
+
+    @ExceptionHandler(CustomerNotFoundException.class)
+    public ResponseEntity<ApiResponseDto<Void>> customerNotFound(CustomerNotFoundException exception, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, "CUSTOMER_NOT_FOUND", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(CustomerCodeAlreadyExistsException.class)
+    public ResponseEntity<ApiResponseDto<Void>> customerCodeAlreadyExists(CustomerCodeAlreadyExistsException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "CUSTOMER_CODE_ALREADY_EXISTS", exception.getMessage(), request);
+    }
 
     @ExceptionHandler(SalesOrderNotFoundException.class)
     public ResponseEntity<ApiResponseDto<Void>> salesOrderNotFound(SalesOrderNotFoundException exception, HttpServletRequest request) {

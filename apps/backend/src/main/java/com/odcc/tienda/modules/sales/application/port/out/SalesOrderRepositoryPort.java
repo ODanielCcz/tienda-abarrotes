@@ -13,6 +13,8 @@ public interface SalesOrderRepositoryPort {
 
     boolean existsByIdempotencyKeyWithDifferentFingerprint(UUID idempotencyKey, String fingerprint);
 
+    boolean customerIsActive(UUID customerId);
+
     SalesOrder createConfirmed(CreateSalesOrderCommand command, String fingerprint);
 
     Optional<SalesOrder> findById(UUID salesOrderId);

@@ -57,6 +57,13 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
     }
 
     @Override
+    public boolean customerIsActive(UUID customerId) {
+        if (customerId == null) return true;
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM sales.customers WHERE customer_id = :customerId AND status = 'ACTIVE'", new MapSqlParameterSource("customerId", customerId), Integer.class);
+        return count != null && count > 0;
+    }
+
+    @Override
     public SalesOrder createConfirmed(CreateSalesOrderCommand command, String fingerprint) {
         WarehouseRow warehouse = findWarehouse(command.warehouseId());
         UUID orderId = UUID.randomUUID();

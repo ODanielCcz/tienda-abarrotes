@@ -71,6 +71,23 @@ class SalesOrderServiceTest {
     }
 
     @Test
+    void shouldCreateSalesOrderWithActiveCustomer() {
+        UUID customerId = UUID.randomUUID();
+        repository.addActiveCustomer(customerId);
+
+        SalesOrder order = service.create(validCommand(UUID.randomUUID(), customerId));
+
+        assertEquals(customerId, order.customerId());
+    }
+
+    @Test
+    void shouldRejectSalesOrderWithInactiveCustomer() {
+        UUID customerId = UUID.randomUUID();
+
+        assertThrows(SalesException.class, () -> service.create(validCommand(UUID.randomUUID(), customerId)));
+    }
+
+    @Test
     void shouldRejectSalesOrderWithoutIdempotencyKey() {
         CreateSalesOrderCommand command = new CreateSalesOrderCommand(
             UUID.randomUUID(),
@@ -96,9 +113,13 @@ class SalesOrderServiceTest {
     }
 
     private static CreateSalesOrderCommand validCommand(UUID idempotencyKey) {
+        return validCommand(idempotencyKey, null);
+    }
+
+    private static CreateSalesOrderCommand validCommand(UUID idempotencyKey, UUID customerId) {
         return new CreateSalesOrderCommand(
             UUID.randomUUID(),
-            null,
+            customerId,
             null,
             "POS",
             "MXN",

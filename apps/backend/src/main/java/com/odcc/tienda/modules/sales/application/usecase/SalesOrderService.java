@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,8 +41,15 @@ public class SalesOrderService implements SalesOrderUseCases {
             }
             var existing = repository.findByIdempotencyKey(command.idempotencyKey(), fingerprint);
             if (existing.isPresent()) return existing.get();
+            if (command.customerId() != null && !repository.customerIsActive(command.customerId())) {
+                throw new SalesException("El cliente no existe o no esta activo");
+            }
             SalesOrder order = repository.createConfirmed(command, fingerprint);
-            auditPort.record(new BusinessAuditEvent("SALES_ORDER_CREATED", "SALES_ORDER", order.salesOrderId(), Map.of(), Map.of("orderNumber", order.orderNumber(), "total", order.total()), Map.of()));
+            Map<String, Object> after = new LinkedHashMap<>();
+            after.put("orderNumber", order.orderNumber());
+            after.put("total", order.total());
+            if (order.customerId() != null) after.put("customerId", order.customerId());
+            auditPort.record(new BusinessAuditEvent("SALES_ORDER_CREATED", "SALES_ORDER", order.salesOrderId(), Map.of(), after, Map.of()));
             return order;
         });
     }
