@@ -1,10 +1,13 @@
 package com.odcc.tienda.modules.inventory.adapter.config;
 
+import com.odcc.tienda.modules.inventory.application.port.in.AdvancedInventoryUseCases;
 import com.odcc.tienda.modules.inventory.application.port.in.CreateInventoryReceiptUseCase;
 import com.odcc.tienda.modules.inventory.application.port.in.GetInventoryReceiptByIdUseCase;
 import com.odcc.tienda.modules.inventory.application.port.in.InventoryQueriesUseCase;
+import com.odcc.tienda.modules.inventory.application.port.out.AdvancedInventoryRepositoryPort;
 import com.odcc.tienda.modules.inventory.application.port.out.InventoryQueryRepositoryPort;
 import com.odcc.tienda.modules.inventory.application.port.out.InventoryReceiptRepositoryPort;
+import com.odcc.tienda.modules.inventory.application.usecase.AdvancedInventoryService;
 import com.odcc.tienda.modules.inventory.application.usecase.CreateInventoryReceiptService;
 import com.odcc.tienda.modules.inventory.application.usecase.GetInventoryReceiptByIdService;
 import com.odcc.tienda.modules.inventory.application.usecase.InventoryQueriesService;
@@ -34,4 +37,12 @@ public class InventoryConfiguration {
     InventoryQueriesUseCase inventoryQueriesUseCase(InventoryQueryRepositoryPort repository) {
         return new InventoryQueriesService(repository);
     }
-}
+
+    @Bean
+    AdvancedInventoryUseCases advancedInventoryUseCases(
+        AdvancedInventoryRepositoryPort repository,
+        TransactionRunner transactionRunner,
+        BusinessAuditPort auditPort
+    ) {
+        return new AdvancedInventoryService(repository, transactionRunner, auditPort);
+    }}

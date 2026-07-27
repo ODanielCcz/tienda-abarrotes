@@ -1,5 +1,6 @@
 package com.odcc.tienda.modules.inventory.adapter.in.rest.error;
 
+import com.odcc.tienda.modules.inventory.adapter.in.rest.AdvancedInventoryController;
 import com.odcc.tienda.modules.inventory.adapter.in.rest.InventoryQueryController;
 import com.odcc.tienda.modules.inventory.adapter.in.rest.InventoryReceiptController;
 import com.odcc.tienda.modules.inventory.application.exception.InventoryReceiptAlreadyExistsException;
@@ -13,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = {InventoryReceiptController.class, InventoryQueryController.class})
+@RestControllerAdvice(assignableTypes = {InventoryReceiptController.class, InventoryQueryController.class, AdvancedInventoryController.class})
 public class InventoryReceiptExceptionHandler {
 
     @ExceptionHandler(InventoryReceiptNotFoundException.class)
