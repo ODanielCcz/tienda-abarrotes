@@ -2,9 +2,11 @@ package com.odcc.tienda.modules.identity.adapter.out.persistence;
 
 import com.odcc.tienda.modules.identity.application.model.ManagedUser;
 import com.odcc.tienda.modules.identity.application.model.PermissionSummary;
+import com.odcc.tienda.modules.identity.application.model.RoleDetail;
 import com.odcc.tienda.modules.identity.application.model.RoleSummary;
 import com.odcc.tienda.modules.identity.application.port.out.UserManagementRepositoryPort;
 import com.odcc.tienda.modules.identity.application.query.ListUsersQuery;
+import com.odcc.tienda.modules.identity.domain.model.RoleStatus;
 import com.odcc.tienda.modules.identity.domain.model.UserAccountStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -185,8 +187,125 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
             """, this::mapPermission);
     }
 
+    @Override
+    public boolean existsRoleCode(String roleCode) {
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM iam.roles WHERE code = :roleCode", new MapSqlParameterSource("roleCode", roleCode), Integer.class);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public boolean existsRoleCodeAndIdNot(String roleCode, UUID roleId) {
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM iam.roles WHERE code = :roleCode AND role_id <> :roleId", new MapSqlParameterSource().addValue("roleCode", roleCode).addValue("roleId", roleId), Integer.class);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public RoleDetail createRole(UUID roleId, String code, String name, String description, RoleStatus status) {
+        jdbc.update("""
+            INSERT INTO iam.roles (role_id, code, name, description, is_system, status)
+            VALUES (:roleId, :code, :name, :description, FALSE, :status)
+            """, new MapSqlParameterSource()
+            .addValue("roleId", roleId)
+            .addValue("code", code)
+            .addValue("name", name)
+            .addValue("description", description)
+            .addValue("status", status.name()));
+        return findRoleById(roleId).orElseThrow();
+    }
+
+    @Override
+    public RoleDetail updateRole(UUID roleId, String code, String name, String description) {
+        jdbc.update("""
+            UPDATE iam.roles
+            SET code = :code,
+                name = :name,
+                description = :description
+            WHERE role_id = :roleId
+            """, new MapSqlParameterSource()
+            .addValue("roleId", roleId)
+            .addValue("code", code)
+            .addValue("name", name)
+            .addValue("description", description));
+        return findRoleById(roleId).orElseThrow();
+    }
+
+    @Override
+    public RoleDetail updateRoleStatus(UUID roleId, RoleStatus status) {
+        jdbc.update("""
+            UPDATE iam.roles
+            SET status = :status
+            WHERE role_id = :roleId
+            """, new MapSqlParameterSource().addValue("roleId", roleId).addValue("status", status.name()));
+        return findRoleById(roleId).orElseThrow();
+    }
+
+    @Override
+    public Optional<RoleDetail> findRoleById(UUID roleId) {
+        try {
+            RoleSummary role = jdbc.queryForObject("""
+                SELECT role_id, code, name, description, is_system, status, created_at
+                FROM iam.roles
+                WHERE role_id = :roleId
+                """, new MapSqlParameterSource("roleId", roleId), this::mapRole);
+            return Optional.of(toRoleDetail(role));
+        } catch (EmptyResultDataAccessException exception) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Set<String> findExistingPermissionCodes(Set<String> permissionCodes) {
+        if (permissionCodes == null || permissionCodes.isEmpty()) return Set.of();
+        return new LinkedHashSet<>(jdbc.queryForList("SELECT code FROM iam.permissions WHERE code IN (:permissionCodes)", new MapSqlParameterSource("permissionCodes", permissionCodes), String.class));
+    }
+
+    @Override
+    public void replaceRolePermissions(UUID roleId, Set<String> permissionCodes) {
+        jdbc.update("DELETE FROM iam.role_permissions WHERE role_id = :roleId", new MapSqlParameterSource("roleId", roleId));
+        if (permissionCodes == null || permissionCodes.isEmpty()) return;
+        jdbc.update("""
+            INSERT INTO iam.role_permissions (role_id, permission_id)
+            SELECT :roleId, permission_id
+            FROM iam.permissions
+            WHERE code IN (:permissionCodes)
+            """, new MapSqlParameterSource().addValue("roleId", roleId).addValue("permissionCodes", permissionCodes));
+    }
+
+    @Override
+    public Set<UUID> findActiveBranchIds(Set<UUID> branchIds) {
+        if (branchIds == null || branchIds.isEmpty()) return Set.of();
+        return new LinkedHashSet<>(jdbc.queryForList("SELECT branch_id FROM organization.branches WHERE status = 'ACTIVE' AND branch_id IN (:branchIds)", new MapSqlParameterSource("branchIds", branchIds), UUID.class));
+    }
+
+    @Override
+    public void replaceUserBranches(UUID userId, Set<UUID> branchIds) {
+        jdbc.update("DELETE FROM iam.user_branch_access WHERE user_id = :userId", new MapSqlParameterSource("userId", userId));
+        if (branchIds == null || branchIds.isEmpty()) return;
+        jdbc.update("""
+            INSERT INTO iam.user_branch_access (user_id, branch_id, status)
+            SELECT :userId, branch_id, 'ACTIVE'
+            FROM organization.branches
+            WHERE status = 'ACTIVE'
+              AND branch_id IN (:branchIds)
+            """, new MapSqlParameterSource().addValue("userId", userId).addValue("branchIds", branchIds));
+    }
+
     private ManagedUser toManagedUser(ManagedUserRow row) {
-        return new ManagedUser(row.userId(), row.username(), row.displayName(), row.status(), findRoles(row.userId()), findPermissions(row.userId()), row.createdAt().toInstant(), row.updatedAt().toInstant());
+        return new ManagedUser(
+            row.userId(),
+            row.username(),
+            row.displayName(),
+            row.status(),
+            findRoles(row.userId()),
+            findPermissions(row.userId()),
+            findActiveBranchIdsByUserId(row.userId()),
+            row.createdAt().toInstant(),
+            row.updatedAt().toInstant()
+        );
+    }
+
+    private RoleDetail toRoleDetail(RoleSummary role) {
+        return new RoleDetail(role.roleId(), role.code(), role.name(), role.description(), role.system(), role.status(), findRolePermissions(role.roleId()), role.createdAt());
     }
 
     private Set<String> findRoles(UUID userId) {
@@ -211,6 +330,26 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
               AND role.status = 'ACTIVE'
             ORDER BY permission.code
             """, new MapSqlParameterSource("userId", userId), String.class));
+    }
+
+    private Set<UUID> findActiveBranchIdsByUserId(UUID userId) {
+        return new LinkedHashSet<>(jdbc.queryForList("""
+            SELECT branch_id
+            FROM iam.user_branch_access
+            WHERE user_id = :userId
+              AND status = 'ACTIVE'
+            ORDER BY branch_id
+            """, new MapSqlParameterSource("userId", userId), UUID.class));
+    }
+
+    private Set<String> findRolePermissions(UUID roleId) {
+        return new LinkedHashSet<>(jdbc.queryForList("""
+            SELECT permission.code
+            FROM iam.role_permissions role_permission
+            JOIN iam.permissions permission ON permission.permission_id = role_permission.permission_id
+            WHERE role_permission.role_id = :roleId
+            ORDER BY permission.code
+            """, new MapSqlParameterSource("roleId", roleId), String.class));
     }
 
     private ManagedUserRow mapUserRow(ResultSet rs, int rowNum) throws SQLException {

@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -283,6 +284,191 @@ class UserManagementApiIntegrationTest {
             .andExpect(jsonPath("$.code").value("IDENTITY_LAST_SYSTEM_ADMIN"));
     }
 
+    @Test
+    void shouldManageRolesPermissionsAndUserBranches() throws Exception {
+        insertUser("identity_roles_admin", "correct-password", "SYSTEM_ADMIN", "ACTIVE");
+        String adminToken = login("identity_roles_admin", "correct-password");
+        String suffix = UUID.randomUUID().toString().substring(0, 8).replace("-", "").toUpperCase();
+        String roleCode = "CAJERO_" + suffix;
+
+        MvcResult createdRole = mockMvc.perform(
+                post("/api/v1/identity/roles")
+                    .header("Authorization", "Bearer " + adminToken)
+                    .header("X-Correlation-ID", "roles-v2-test")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "code": " %s ",
+                          "name": "Cajero de prueba",
+                          "description": "Puede operar ventas y caja"
+                        }
+                        """.formatted(roleCode.toLowerCase()))
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value("IDENTITY_ROLE_CREATED"))
+            .andExpect(jsonPath("$.reason").value("Created"))
+            .andExpect(jsonPath("$.correlationId").value("roles-v2-test"))
+            .andExpect(jsonPath("$.data.code").value(roleCode))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+            .andReturn();
+
+        String roleId = JsonPath.read(createdRole.getResponse().getContentAsString(), "$.data.roleId");
+
+        mockMvc.perform(
+                post("/api/v1/identity/roles")
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "code": "%s",
+                          "name": "Duplicado"
+                        }
+                        """.formatted(roleCode))
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("IDENTITY_ROLE_ALREADY_EXISTS"));
+
+        mockMvc.perform(
+                put("/api/v1/identity/roles/{roleId}", roleId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "code": "%s",
+                          "name": "Cajero actualizado",
+                          "description": "Rol actualizado desde API"
+                        }
+                        """.formatted(roleCode))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("IDENTITY_ROLE_UPDATED"))
+            .andExpect(jsonPath("$.data.name").value("Cajero actualizado"));
+
+        mockMvc.perform(
+                put("/api/v1/identity/roles/{roleId}/permissions", roleId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "permissionCodes": ["SALES_ORDER_READ", "SALES_ORDER_CREATE", "SALES_PAYMENT_CREATE"]
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("IDENTITY_ROLE_PERMISSIONS_UPDATED"))
+            .andExpect(jsonPath("$.data.permissions").isArray());
+
+        mockMvc.perform(
+                put("/api/v1/identity/roles/{roleId}/permissions", roleId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "permissionCodes": ["PERMISO_QUE_NO_EXISTE"]
+                        }
+                        """)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("IDENTITY_PERMISSION_NOT_FOUND"));
+
+        UUID activeBranchId = insertBranch("BR" + suffix.substring(0, 8), "Sucursal activa", "ACTIVE");
+        UUID inactiveBranchId = insertBranch("BI" + suffix.substring(0, 8), "Sucursal inactiva", "INACTIVE");
+        MvcResult createdUser = mockMvc.perform(
+                post("/api/v1/identity/users")
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "username": "cajero_roles_%s",
+                          "displayName": "Cajero Roles v2",
+                          "password": "Temporal123!",
+                          "roleCodes": ["%s"]
+                        }
+                        """.formatted(suffix.toLowerCase(), roleCode))
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+        String userId = JsonPath.read(createdUser.getResponse().getContentAsString(), "$.data.userId");
+
+        mockMvc.perform(
+                put("/api/v1/identity/users/{userId}/branches", userId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "branchIds": ["%s"]
+                        }
+                        """.formatted(activeBranchId))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("IDENTITY_USER_BRANCHES_UPDATED"))
+            .andExpect(jsonPath("$.data.branchIds[0]").value(activeBranchId.toString()))
+            .andExpect(jsonPath("$.data.permissions").isArray());
+
+        mockMvc.perform(
+                put("/api/v1/identity/users/{userId}/branches", userId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "branchIds": ["%s"]
+                        }
+                        """.formatted(inactiveBranchId))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("IDENTITY_BRANCH_NOT_FOUND"));
+
+        UUID systemAdminRoleId = jdbcTemplate.queryForObject("SELECT role_id FROM iam.roles WHERE code = 'SYSTEM_ADMIN'", UUID.class);
+        mockMvc.perform(
+                patch("/api/v1/identity/roles/{roleId}/status", systemAdminRoleId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "status": "INACTIVE"
+                        }
+                        """)
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("IDENTITY_SYSTEM_ROLE_PROTECTED"));
+
+        mockMvc.perform(
+                put("/api/v1/identity/roles/{roleId}/permissions", systemAdminRoleId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "permissionCodes": ["IDENTITY_USER_READ"]
+                        }
+                        """)
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("IDENTITY_SYSTEM_ROLE_PROTECTED"));
+
+        mockMvc.perform(
+                patch("/api/v1/identity/roles/{roleId}/status", roleId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "status": "INACTIVE"
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("IDENTITY_ROLE_STATUS_UPDATED"))
+            .andExpect(jsonPath("$.data.status").value("INACTIVE"));
+
+        Integer auditCount = jdbcTemplate.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM audit.business_events
+                WHERE event_type IN ('ROLE_CREATED', 'ROLE_UPDATED', 'ROLE_PERMISSIONS_UPDATED', 'ROLE_STATUS_CHANGED', 'USER_BRANCHES_UPDATED')
+            """,
+            Integer.class
+        );
+        assertTrue(auditCount != null && auditCount >= 5);
+    }
     private String login(String username, String password) throws Exception {
         MvcResult result = mockMvc.perform(
                 post(LOGIN_ENDPOINT)
@@ -321,6 +507,22 @@ class UserManagementApiIntegrationTest {
             roleCode
         );
         return userId;
+    }
+
+    private UUID insertBranch(String code, String name, String status) {
+        UUID branchId = UUID.randomUUID();
+        jdbcTemplate.update(
+            """
+                INSERT INTO organization.branches (branch_id, code, name, legal_name, status)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+            branchId,
+            code,
+            name,
+            name + " Legal",
+            status
+        );
+        return branchId;
     }
 
     private void createRoleWithoutPermissions(String roleCode) {

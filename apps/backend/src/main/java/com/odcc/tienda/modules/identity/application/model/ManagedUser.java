@@ -13,6 +13,7 @@ public record ManagedUser(
     UserAccountStatus status,
     Set<String> roles,
     Set<String> permissions,
+    Set<UUID> branchIds,
     Instant createdAt,
     Instant updatedAt
 ) {

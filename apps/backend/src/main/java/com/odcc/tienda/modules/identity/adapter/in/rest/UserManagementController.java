@@ -1,17 +1,28 @@
 package com.odcc.tienda.modules.identity.adapter.in.rest;
 
+import com.odcc.tienda.modules.identity.adapter.in.rest.request.AssignRolePermissionsRequest;
+import com.odcc.tienda.modules.identity.adapter.in.rest.request.AssignUserBranchesRequest;
 import com.odcc.tienda.modules.identity.adapter.in.rest.request.AssignUserRolesRequest;
+import com.odcc.tienda.modules.identity.adapter.in.rest.request.ChangeRoleStatusRequest;
 import com.odcc.tienda.modules.identity.adapter.in.rest.request.ChangeUserPasswordRequest;
 import com.odcc.tienda.modules.identity.adapter.in.rest.request.ChangeUserStatusRequest;
+import com.odcc.tienda.modules.identity.adapter.in.rest.request.CreateRoleRequest;
 import com.odcc.tienda.modules.identity.adapter.in.rest.request.CreateUserRequest;
+import com.odcc.tienda.modules.identity.adapter.in.rest.request.UpdateRoleRequest;
 import com.odcc.tienda.modules.identity.adapter.in.rest.request.UpdateUserRequest;
+import com.odcc.tienda.modules.identity.application.command.AssignRolePermissionsCommand;
+import com.odcc.tienda.modules.identity.application.command.AssignUserBranchesCommand;
 import com.odcc.tienda.modules.identity.application.command.AssignUserRolesCommand;
+import com.odcc.tienda.modules.identity.application.command.ChangeRoleStatusCommand;
 import com.odcc.tienda.modules.identity.application.command.ChangeUserPasswordCommand;
 import com.odcc.tienda.modules.identity.application.command.ChangeUserStatusCommand;
+import com.odcc.tienda.modules.identity.application.command.CreateRoleCommand;
 import com.odcc.tienda.modules.identity.application.command.CreateUserCommand;
+import com.odcc.tienda.modules.identity.application.command.UpdateRoleCommand;
 import com.odcc.tienda.modules.identity.application.command.UpdateUserCommand;
 import com.odcc.tienda.modules.identity.application.model.ManagedUser;
 import com.odcc.tienda.modules.identity.application.model.PermissionSummary;
+import com.odcc.tienda.modules.identity.application.model.RoleDetail;
 import com.odcc.tienda.modules.identity.application.model.RoleSummary;
 import com.odcc.tienda.modules.identity.application.port.in.UserManagementUseCases;
 import com.odcc.tienda.modules.identity.application.query.ListUsersQuery;
@@ -114,11 +125,51 @@ public class UserManagementController {
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_USER_ROLES_UPDATED", "Roles de usuario actualizados correctamente", user, servletRequest.getRequestURI()));
     }
 
+    @PutMapping("/users/{userId}/branches")
+    @Operation(summary = "Asignar sucursales a usuario")
+    @PreAuthorize("hasAuthority('IDENTITY_USER_BRANCH_ASSIGN')")
+    public ResponseEntity<ApiResponseDto<ManagedUser>> assignUserBranches(@PathVariable UUID userId, @Valid @RequestBody AssignUserBranchesRequest request, HttpServletRequest servletRequest) {
+        ManagedUser user = useCases.assignBranches(new AssignUserBranchesCommand(userId, request.branchIds()));
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_USER_BRANCHES_UPDATED", "Sucursales de usuario actualizadas correctamente", user, servletRequest.getRequestURI()));
+    }
+
     @GetMapping("/roles")
     @Operation(summary = "Listar roles")
     @PreAuthorize("hasAuthority('IDENTITY_ROLE_READ')")
     public ResponseEntity<ApiResponseDto<List<RoleSummary>>> listRoles(HttpServletRequest servletRequest) {
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_ROLES_FOUND", "Roles consultados correctamente", useCases.listRoles(), servletRequest.getRequestURI()));
+    }
+
+    @PostMapping("/roles")
+    @Operation(summary = "Crear rol")
+    @PreAuthorize("hasAuthority('IDENTITY_ROLE_CREATE')")
+    public ResponseEntity<ApiResponseDto<RoleDetail>> createRole(@Valid @RequestBody CreateRoleRequest request, HttpServletRequest servletRequest) {
+        RoleDetail role = useCases.createRole(new CreateRoleCommand(request.code(), request.name(), request.description()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "IDENTITY_ROLE_CREATED", "Rol creado correctamente", role, servletRequest.getRequestURI()));
+    }
+
+    @PutMapping("/roles/{roleId}")
+    @Operation(summary = "Actualizar rol")
+    @PreAuthorize("hasAuthority('IDENTITY_ROLE_UPDATE')")
+    public ResponseEntity<ApiResponseDto<RoleDetail>> updateRole(@PathVariable UUID roleId, @Valid @RequestBody UpdateRoleRequest request, HttpServletRequest servletRequest) {
+        RoleDetail role = useCases.updateRole(new UpdateRoleCommand(roleId, request.code(), request.name(), request.description()));
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_ROLE_UPDATED", "Rol actualizado correctamente", role, servletRequest.getRequestURI()));
+    }
+
+    @PatchMapping("/roles/{roleId}/status")
+    @Operation(summary = "Cambiar estado de rol")
+    @PreAuthorize("hasAuthority('IDENTITY_ROLE_STATUS')")
+    public ResponseEntity<ApiResponseDto<RoleDetail>> changeRoleStatus(@PathVariable UUID roleId, @Valid @RequestBody ChangeRoleStatusRequest request, HttpServletRequest servletRequest) {
+        RoleDetail role = useCases.changeRoleStatus(new ChangeRoleStatusCommand(roleId, request.status()));
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_ROLE_STATUS_UPDATED", "Estado de rol actualizado correctamente", role, servletRequest.getRequestURI()));
+    }
+
+    @PutMapping("/roles/{roleId}/permissions")
+    @Operation(summary = "Asignar permisos a rol")
+    @PreAuthorize("hasAuthority('IDENTITY_ROLE_PERMISSION_ASSIGN')")
+    public ResponseEntity<ApiResponseDto<RoleDetail>> assignRolePermissions(@PathVariable UUID roleId, @Valid @RequestBody AssignRolePermissionsRequest request, HttpServletRequest servletRequest) {
+        RoleDetail role = useCases.assignRolePermissions(new AssignRolePermissionsCommand(roleId, request.permissionCodes()));
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_ROLE_PERMISSIONS_UPDATED", "Permisos de rol actualizados correctamente", role, servletRequest.getRequestURI()));
     }
 
     @GetMapping("/permissions")

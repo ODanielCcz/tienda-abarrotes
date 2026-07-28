@@ -1,0 +1,17 @@
+package com.odcc.tienda.modules.identity.application.model;
+
+import java.time.Instant;
+import java.util.Set;
+import java.util.UUID;
+
+public record RoleDetail(
+    UUID roleId,
+    String code,
+    String name,
+    String description,
+    boolean system,
+    String status,
+    Set<String> permissions,
+    Instant createdAt
+) {
+}

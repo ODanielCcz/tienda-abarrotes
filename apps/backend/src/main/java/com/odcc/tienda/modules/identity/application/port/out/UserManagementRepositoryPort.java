@@ -2,8 +2,10 @@ package com.odcc.tienda.modules.identity.application.port.out;
 
 import com.odcc.tienda.modules.identity.application.model.ManagedUser;
 import com.odcc.tienda.modules.identity.application.model.PermissionSummary;
+import com.odcc.tienda.modules.identity.application.model.RoleDetail;
 import com.odcc.tienda.modules.identity.application.model.RoleSummary;
 import com.odcc.tienda.modules.identity.application.query.ListUsersQuery;
+import com.odcc.tienda.modules.identity.domain.model.RoleStatus;
 import com.odcc.tienda.modules.identity.domain.model.UserAccountStatus;
 
 import java.util.List;
@@ -40,4 +42,24 @@ public interface UserManagementRepositoryPort {
     List<RoleSummary> findRoles();
 
     List<PermissionSummary> findPermissions();
+
+    boolean existsRoleCode(String roleCode);
+
+    boolean existsRoleCodeAndIdNot(String roleCode, UUID roleId);
+
+    RoleDetail createRole(UUID roleId, String code, String name, String description, RoleStatus status);
+
+    RoleDetail updateRole(UUID roleId, String code, String name, String description);
+
+    RoleDetail updateRoleStatus(UUID roleId, RoleStatus status);
+
+    Optional<RoleDetail> findRoleById(UUID roleId);
+
+    Set<String> findExistingPermissionCodes(Set<String> permissionCodes);
+
+    void replaceRolePermissions(UUID roleId, Set<String> permissionCodes);
+
+    Set<UUID> findActiveBranchIds(Set<UUID> branchIds);
+
+    void replaceUserBranches(UUID userId, Set<UUID> branchIds);
 }
