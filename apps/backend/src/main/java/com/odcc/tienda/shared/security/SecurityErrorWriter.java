@@ -1,5 +1,6 @@
 package com.odcc.tienda.shared.security;
 
+import com.odcc.tienda.shared.web.correlation.CorrelationIdFilter;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,7 +31,8 @@ public class SecurityErrorWriter {
             code,
             message,
             null,
-            request.getRequestURI()
+            request.getRequestURI(),
+            CorrelationIdFilter.from(request)
         );
 
         response.setStatus(status.value());
@@ -44,3 +46,4 @@ public class SecurityErrorWriter {
         }
     }
 }
+

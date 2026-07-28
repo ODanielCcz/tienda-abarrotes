@@ -7,11 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class GlobalExceptionHandlerTest {
 
@@ -37,10 +36,9 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("INTERNAL_ERROR", response.getBody().code());
+        assertEquals("Internal Server Error", response.getBody().reason());
         assertFalse(response.getBody().message().contains("sensitive"));
-        assertEquals(
-            "error-correlation-123",
-            ((Map<?, ?>) response.getBody().errors()).get("correlationId")
-        );
+        assertNull(response.getBody().errors());
+        assertEquals("error-correlation-123", response.getBody().correlationId());
     }
 }

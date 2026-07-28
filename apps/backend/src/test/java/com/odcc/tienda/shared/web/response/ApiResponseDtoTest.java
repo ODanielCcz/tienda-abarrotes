@@ -1,6 +1,9 @@
 package com.odcc.tienda.shared.web.response;
 
+import com.odcc.tienda.shared.web.correlation.CorrelationIdFilter;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 
 import java.util.Map;
@@ -12,8 +15,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ApiResponseDtoTest {
 
+    @AfterEach
+    void cleanMdc() {
+        MDC.remove(CorrelationIdFilter.MDC_KEY);
+    }
+
     @Test
     void shouldCreateSuccessfulResponseFromHttpStatus() {
+        MDC.put(CorrelationIdFilter.MDC_KEY, "test-correlation-123");
+
         ApiResponseDto<String> response = ApiResponseDto.success(
             HttpStatus.CREATED,
             "RESOURCE_CREATED",
@@ -25,6 +35,7 @@ class ApiResponseDtoTest {
         assertNotNull(response.timestamp());
         assertEquals(201, response.status());
         assertEquals("RESOURCE_CREATED", response.code());
+        assertEquals("Created", response.reason());
         assertEquals(
             "Recurso creado correctamente",
             response.message()
@@ -32,6 +43,7 @@ class ApiResponseDtoTest {
         assertEquals("resource-data", response.data());
         assertNull(response.errors());
         assertEquals("/api/v1/resources", response.path());
+        assertEquals("test-correlation-123", response.correlationId());
     }
 
     @Test
@@ -46,13 +58,29 @@ class ApiResponseDtoTest {
             "VALIDATION_ERROR",
             "La solicitud contiene campos inválidos",
             errors,
-            "/api/v1/resources"
+            "/api/v1/resources",
+            "explicit-correlation-456"
         );
 
         assertEquals(400, response.status());
         assertEquals("VALIDATION_ERROR", response.code());
+        assertEquals("Bad Request", response.reason());
         assertNull(response.data());
         assertEquals(errors, response.errors());
+        assertEquals("explicit-correlation-456", response.correlationId());
+    }
+
+    @Test
+    void shouldUseUnavailableCorrelationIdWhenRequestContextDoesNotProvideOne() {
+        ApiResponseDto<String> response = ApiResponseDto.success(
+            HttpStatus.OK,
+            "RESOURCE_FOUND",
+            "Recurso consultado correctamente",
+            "resource-data",
+            "/api/v1/resources"
+        );
+
+        assertEquals("unavailable", response.correlationId());
     }
 
     @Test

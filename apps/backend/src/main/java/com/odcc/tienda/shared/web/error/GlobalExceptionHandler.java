@@ -172,7 +172,7 @@ public class GlobalExceptionHandler {
             HttpStatus.INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
             "Ocurrió un error interno. Reporta el identificador de correlación.",
-            Map.of("correlationId", correlationId),
+            null,
             request
         );
     }
@@ -189,9 +189,11 @@ public class GlobalExceptionHandler {
             code,
             message,
             errors,
-            request.getRequestURI()
+            request.getRequestURI(),
+            CorrelationIdFilter.from(request)
         );
 
         return ResponseEntity.status(status).body(response);
     }
 }
+
