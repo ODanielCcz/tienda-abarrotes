@@ -57,6 +57,7 @@ class SalesReturnApiIntegrationTest {
         MvcResult created = mockMvc.perform(
                 post("/api/v1/sales/orders/{salesOrderId}/returns", sale.salesOrderId())
                     .header("Authorization", "Bearer " + token)
+                    .header("X-Correlation-ID", "return-flow-create-123")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -72,6 +73,8 @@ class SalesReturnApiIntegrationTest {
             )
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.code").value("SALES_RETURN_CREATED"))
+            .andExpect(jsonPath("$.reason").value("Created"))
+            .andExpect(jsonPath("$.correlationId").value("return-flow-create-123"))
             .andExpect(jsonPath("$.data.status").value("DRAFT"))
             .andExpect(jsonPath("$.data.total").value(42.9200))
             .andReturn();
@@ -81,6 +84,7 @@ class SalesReturnApiIntegrationTest {
         mockMvc.perform(
                 post("/api/v1/sales/returns/{returnId}/confirm", returnId)
                     .header("Authorization", "Bearer " + token)
+                    .header("X-Correlation-ID", "return-flow-create-123")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -90,6 +94,8 @@ class SalesReturnApiIntegrationTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("SALES_RETURN_CONFIRMED"))
+            .andExpect(jsonPath("$.reason").value("OK"))
+            .andExpect(jsonPath("$.correlationId").exists())
             .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
 
         mockMvc.perform(
@@ -98,6 +104,8 @@ class SalesReturnApiIntegrationTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("SALES_RETURN_FOUND"))
+            .andExpect(jsonPath("$.reason").value("OK"))
+            .andExpect(jsonPath("$.correlationId").exists())
             .andExpect(jsonPath("$.data.items[0].lotId").value(lotId.toString()));
 
         assertEquals(new BigDecimal("5.000"), stockOnHand(context.warehouseId(), presentationId));
@@ -134,6 +142,30 @@ class SalesReturnApiIntegrationTest {
             userId
         );
         assertEquals(2, auditCount);
+
+        mockMvc.perform(
+                post("/api/v1/sales/returns/{returnId}/confirm", returnId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "cashSessionId": "%s"
+                        }
+                        """.formatted(cashSessionId))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_SALES_OPERATION"))
+            .andExpect(jsonPath("$.reason").value("Bad Request"))
+            .andExpect(jsonPath("$.correlationId").exists());
+
+        mockMvc.perform(
+                post("/api/v1/sales/returns/{returnId}/cancel", returnId)
+                    .header("Authorization", "Bearer " + token)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_SALES_OPERATION"))
+            .andExpect(jsonPath("$.reason").value("Bad Request"))
+            .andExpect(jsonPath("$.correlationId").exists());
     }
 
     @Test
@@ -144,7 +176,9 @@ class SalesReturnApiIntegrationTest {
 
         mockMvc.perform(post("/api/v1/sales/orders/{salesOrderId}/returns", sale.salesOrderId()))
             .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+            .andExpect(jsonPath("$.reason").value("Unauthorized"))
+            .andExpect(jsonPath("$.correlationId").exists());
 
         createRoleWithoutPermissions("TEST_NO_RETURNS");
         insertUser("no_sales_returns", "correct-password", "TEST_NO_RETURNS");
@@ -167,7 +201,9 @@ class SalesReturnApiIntegrationTest {
                         """.formatted(sale.salesOrderItemId()))
             )
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+            .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+            .andExpect(jsonPath("$.reason").value("Forbidden"))
+            .andExpect(jsonPath("$.correlationId").exists());
 
         insertUser("sales_return_validation_admin", "correct-password", "SYSTEM_ADMIN");
         String token = login("sales_return_validation_admin", "correct-password");
@@ -175,6 +211,7 @@ class SalesReturnApiIntegrationTest {
         mockMvc.perform(
                 post("/api/v1/sales/orders/{salesOrderId}/returns", sale.salesOrderId())
                     .header("Authorization", "Bearer " + token)
+                    .header("X-Correlation-ID", "return-flow-create-123")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -189,7 +226,9 @@ class SalesReturnApiIntegrationTest {
                         """.formatted(sale.salesOrderItemId()))
             )
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("INVALID_SALES_OPERATION"));
+            .andExpect(jsonPath("$.code").value("INVALID_SALES_OPERATION"))
+            .andExpect(jsonPath("$.reason").value("Bad Request"))
+            .andExpect(jsonPath("$.correlationId").exists());
     }
 
     @Test
@@ -203,6 +242,7 @@ class SalesReturnApiIntegrationTest {
         MvcResult created = mockMvc.perform(
                 post("/api/v1/sales/orders/{salesOrderId}/returns", sale.salesOrderId())
                     .header("Authorization", "Bearer " + token)
+                    .header("X-Correlation-ID", "return-flow-create-123")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -227,6 +267,8 @@ class SalesReturnApiIntegrationTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("SALES_RETURN_CANCELLED"))
+            .andExpect(jsonPath("$.reason").value("OK"))
+            .andExpect(jsonPath("$.correlationId").exists())
             .andExpect(jsonPath("$.data.status").value("CANCELLED"));
 
         mockMvc.perform(
@@ -502,3 +544,4 @@ class SalesReturnApiIntegrationTest {
     private record SaleFixture(UUID salesOrderId, UUID salesOrderItemId) {
     }
 }
+
