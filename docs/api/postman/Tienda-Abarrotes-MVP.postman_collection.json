@@ -1,0 +1,232 @@
+{
+  "info": {
+    "_postman_id": "6b47631d-a9dc-4b75-9f97-29d75f80b001",
+    "name": "Tienda de Abarrotes - Backend MVP",
+    "description": "Flujos base de autenticación, facturación interna y sincronización offline v1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login correcto', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('auth_token', json.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Facturación",
+      "item": [
+        {
+          "name": "Clasificar producto SAT",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"satProductServiceCode\": \"50131700\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/catalog/products/{{product_id}}/fiscal-classification"
+          }
+        },
+        {
+          "name": "Clasificar unidad SAT",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"satUnitCode\": \"H87\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/catalog/units/{{unit_id}}/fiscal-classification"
+          }
+        },
+        {
+          "name": "Crear perfil emisor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branch_id}}\",\n  \"rfc\": \"AAA010101AAA\",\n  \"legalName\": \"Abarrotes Ejemplo SA de CV\",\n  \"postalCode\": \"06000\",\n  \"fiscalRegimeCode\": \"601\",\n  \"defaultSeries\": \"A\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/billing/issuer-profiles"
+          }
+        },
+        {
+          "name": "Crear perfil fiscal de cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"rfc\": \"XAXX010101000\",\n  \"legalName\": \"Público en General\",\n  \"postalCode\": \"06000\",\n  \"fiscalRegimeCode\": \"616\",\n  \"cfdiUseCode\": \"S01\",\n  \"email\": \"cliente@example.test\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/billing/fiscal-profiles"
+          }
+        },
+        {
+          "name": "Crear documento fiscal DRAFT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salesOrderId\": \"{{sales_order_id}}\",\n  \"issuerProfileId\": \"{{issuer_profile_id}}\",\n  \"fiscalProfileId\": \"{{fiscal_profile_id}}\",\n  \"series\": \"A\",\n  \"folio\": \"1001\",\n  \"paymentFormCode\": \"01\",\n  \"paymentMethodCode\": \"PUE\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/billing/fiscal-documents"
+          }
+        },
+        {
+          "name": "Marcar documento READY",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}{{api_prefix}}/billing/fiscal-documents/{{fiscal_document_id}}/ready"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync offline",
+      "item": [
+        {
+          "name": "Enviar operación inbox",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"operationId\": \"{{$guid}}\",\n  \"deviceId\": \"{{device_id}}\",\n  \"deviceSequence\": {{device_sequence}},\n  \"idempotencyKey\": \"{{$guid}}\",\n  \"operationType\": \"INVENTORY_COUNT_CREATE\",\n  \"aggregateType\": \"INVENTORY_COUNT\",\n  \"aggregateId\": null,\n  \"clientCreatedAt\": \"{{$isoTimestamp}}\",\n  \"payload\": {\n    \"warehouseId\": \"{{warehouse_id}}\",\n    \"notes\": \"Conteo creado desde Postman\"\n  }\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/sync/inbox"
+          }
+        },
+        {
+          "name": "Consultar outbox",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/sync/outbox?deviceId={{device_id}}&afterSequence={{after_sequence}}&limit=100"
+          }
+        },
+        {
+          "name": "Consultar checkpoint",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/sync/devices/{{device_id}}/checkpoint"
+          }
+        },
+        {
+          "name": "Confirmar checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"outboxSequence\": {{outbox_sequence}}\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/sync/devices/{{device_id}}/checkpoint"
+          }
+        },
+        {
+          "name": "Consultar conflictos",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}{{api_prefix}}/sync/conflicts?deviceId={{device_id}}&resolved=false"
+          }
+        },
+        {
+          "name": "Resolver conflicto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolution\": \"SERVER_WINS\",\n  \"resolutionNotes\": \"Se conserva el estado del servidor\",\n  \"mergedPayload\": null\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/sync/conflicts/{{conflict_id}}/resolve"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -16,32 +16,23 @@ Sistema modular para administrar una tienda de abarrotes. El repositorio está p
 
 ## Módulos actuales
 
-- Autenticación y seguridad
-- Usuarios, roles y permisos base
+- Autenticación, usuarios, roles, permisos y acceso por sucursal
 - Auditoría funcional
-- Catálogo
-  - Marcas
-  - Categorías
-  - Árbol de categorías
-  - Productos
-  - Presentaciones
-- Inventario
-  - Stock
-  - Lotes
-  - Pallets
-  - Movimientos
-  - Recepción de mercancía
-- Compras
-  - Proveedores
-  - Órdenes de compra
-  - Confirmación
-  - Recepción conectada a inventario
-- Ventas
-  - Creación de venta
-  - Descuento real de stock
-  - FEFO para lotes
-  - Idempotencia
-  - Cancelación y reposición de stock
+- Catálogo: marcas, categorías, productos y presentaciones
+- Inventario: stock, lotes, pallets, movimientos, recepción y operación avanzada
+- Compras: proveedores, órdenes, confirmación y recepción
+- Ventas: stock concurrente, FEFO, idempotencia, pagos, caja, clientes y devoluciones
+- Organización: sucursales, almacenes, cajas y dispositivos
+- Reportes v2: ventas, margen, rentabilidad, inventario, caducidad y devoluciones
+- Facturación interna:
+  - perfiles emisores y receptores;
+  - clasificación SAT de productos y unidades;
+  - documentos `DRAFT` y `READY` con snapshots inmutables.
+- Sincronización offline v1:
+  - inbox idempotente;
+  - outbox por sucursal;
+  - checkpoints y conflictos;
+  - conteos físicos y carritos offline.
 
 ## Componentes disponibles
 
@@ -60,6 +51,19 @@ Sistema modular para administrar una tienda de abarrotes. El repositorio está p
 
 ```powershell
 Copy-Item .env.example .env
+```
+
+Reemplaza contraseñas y genera `JWT_SECRET_BASE64`:
+
+```powershell
+[Convert]::ToBase64String(
+  [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+)
+```
+
+Después:
+
+```powershell
 .\scripts\db-up.ps1
 .\scripts\db-migrate.ps1
 .\scripts\db-seed.ps1
@@ -71,7 +75,10 @@ Set-Location .\apps\backend
 También se puede levantar con Docker Compose:
 
 ```powershell
-docker compose up -d database backend
+docker compose up -d database
+docker compose --profile migrate run --rm flyway migrate
+docker compose build backend
+docker compose up -d backend
 ```
 
 Swagger:
@@ -97,6 +104,7 @@ http://localhost:8080/actuator/health
 - `database/admin`: scripts controlados para cuentas PostgreSQL.
 - `docs/architecture`: modelo, diccionario y decisiones técnicas.
 - `docs/api`: documentación de endpoints.
+- `docs/api/postman`: colección y environment local sin secretos.
 - `docs/operations`: guías de operación local.
 - `deploy`: archivos Docker.
 - `scripts`: comandos PowerShell repetibles.
@@ -106,5 +114,10 @@ http://localhost:8080/actuator/health
 - Flyway es el único responsable de aplicar cambios estructurales de base de datos.
 - El backend coordina las operaciones comerciales; la base protege invariantes con restricciones y transacciones.
 - Las cuentas PostgreSQL y los usuarios de negocio son conceptos separados.
-- El backend se organiza por módulos de negocio con separación de dominio, aplicación, puertos y adaptadores.
-- No se deben versionar secretos ni datos productivos. Usa `.env.example` como plantilla local.
+- El backend se organiza por módulos con dominio, aplicación, puertos y adaptadores.
+- Las transacciones de escritura pertenecen al caso de uso mediante `TransactionRunner`.
+- Los documentos fiscales congelan snapshots y son inmutables después de `READY`.
+- Sync v1 solo admite carritos y conteos; ventas, pagos y ajustes offline quedan fuera del MVP.
+- No se versionan secretos ni datos productivos. Usa `.env.example` como plantilla local.
+
+Estado objetivo actual: candidato `backend-v1.0.0-rc1`.
