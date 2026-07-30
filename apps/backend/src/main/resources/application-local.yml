@@ -22,7 +22,7 @@ logging:
 app:
   security:
     jwt:
-      secret-base64: ${JWT_SECRET_BASE64:bG9jYWwtb25seS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
+      secret-base64: ${JWT_SECRET_BASE64}
     bootstrap-admin:
       enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
       username: ${BOOTSTRAP_ADMIN_USERNAME:admin}

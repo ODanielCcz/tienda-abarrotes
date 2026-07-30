@@ -36,7 +36,6 @@ public class JwtAccessTokenAdapter implements AccessTokenPort {
             .claim("username", userAccount.username())
             .claim("display_name", userAccount.displayName())
             .claim("roles", List.copyOf(userAccount.roles()))
-            .claim("permissions", List.copyOf(userAccount.permissions()))
             .claim("authorities", List.copyOf(userAccount.authorities()))
             .build();
 
