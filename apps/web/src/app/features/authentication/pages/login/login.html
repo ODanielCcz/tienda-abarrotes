@@ -1,0 +1,71 @@
+<main class="login-page">
+  <mat-card class="login-card">
+    <mat-card-header>
+      <mat-card-title>Tienda de abarrotes</mat-card-title>
+      <mat-card-subtitle> Ingresa con tu cuenta para continuar </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form class="login-form" [formGroup]="form" (ngSubmit)="submit()">
+        <mat-form-field appearance="outline">
+          <mat-label>Usuario</mat-label>
+
+          <input matInput type="text" autocomplete="username" formControlName="username" />
+
+          <mat-icon matPrefix>person</mat-icon>
+
+          @if (form.controls.username.touched && form.controls.username.hasError('required')) {
+            <mat-error>El usuario es obligatorio</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Contraseña</mat-label>
+
+          <input
+            matInput
+            [type]="hidePassword() ? 'password' : 'text'"
+            autocomplete="current-password"
+            formControlName="password"
+          />
+
+          <mat-icon matPrefix>lock</mat-icon>
+
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            aria-label="Mostrar u ocultar contraseña"
+            (click)="togglePasswordVisibility()"
+          >
+            <mat-icon>
+              {{ hidePassword() ? 'visibility' : 'visibility_off' }}
+            </mat-icon>
+          </button>
+
+          @if (form.controls.password.touched && form.controls.password.hasError('required')) {
+            <mat-error>La contraseña es obligatoria</mat-error>
+          }
+        </mat-form-field>
+
+        @if (errorMessage()) {
+          <p class="login-error" role="alert">
+            {{ errorMessage() }}
+          </p>
+        }
+
+        <button mat-flat-button class="login-button" type="submit" [disabled]="loading()">
+          @if (loading()) {
+            <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
+          } @else {
+            <mat-icon>login</mat-icon>
+          }
+
+          <span>
+            {{ loading() ? 'Iniciando sesión...' : 'Iniciar sesión' }}
+          </span>
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</main>

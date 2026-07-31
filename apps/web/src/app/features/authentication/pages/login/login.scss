@@ -1,0 +1,44 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+.login-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  background:
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--mat-sys-primary) 18%, transparent),
+      transparent 42%
+    ),
+    var(--mat-sys-surface-container-low);
+}
+
+.login-card {
+  width: min(100%, 28rem);
+  padding: 1rem;
+}
+
+.login-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.login-error {
+  margin: 0;
+  color: var(--mat-sys-error);
+  text-align: center;
+}
+
+.login-button {
+  min-height: 3rem;
+}
+
+.login-button mat-spinner {
+  margin-inline: auto;
+}
