@@ -41,7 +41,7 @@ export class AuthSessionStore {
   }
 
   hasPermission(permission: string): boolean {
-    return this.currentUser()?.permissions.includes(permission) ?? false;
+    return this.grantedPermissions().has(permission);
   }
 
   hasAnyPermission(permissions: string[]): boolean {
@@ -49,8 +49,8 @@ export class AuthSessionStore {
       return true;
     }
 
-    const userPermissions = this.currentUser()?.permissions ?? [];
-    return permissions.some((permission) => userPermissions.includes(permission));
+    const grantedPermissions = this.grantedPermissions();
+    return permissions.some((permission) => grantedPermissions.has(permission));
   }
 
   hasAllPermissions(permissions: string[]): boolean {
@@ -58,8 +58,18 @@ export class AuthSessionStore {
       return true;
     }
 
-    const userPermissions = this.currentUser()?.permissions ?? [];
-    return permissions.every((permission) => userPermissions.includes(permission));
+    const grantedPermissions = this.grantedPermissions();
+    return permissions.every((permission) => grantedPermissions.has(permission));
+  }
+
+  private grantedPermissions(): Set<string> {
+    const user = this.currentUser();
+
+    if (user === null) {
+      return new Set<string>();
+    }
+
+    return new Set([...user.permissions, ...user.authorities]);
   }
 
   private validSession(): LoginResponse | null {
@@ -167,3 +177,4 @@ export class AuthSessionStore {
       : [];
   }
 }
+

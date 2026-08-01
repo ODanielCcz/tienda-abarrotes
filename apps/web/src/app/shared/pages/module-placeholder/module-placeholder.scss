@@ -1,0 +1,47 @@
+.module-placeholder {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.module-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.module-heading > mat-icon {
+  width: 3rem;
+  height: 3rem;
+  font-size: 3rem;
+  color: var(--mat-sys-primary);
+}
+
+.eyebrow {
+  margin: 0 0 0.25rem;
+  color: var(--mat-sys-primary);
+  font: var(--mat-sys-label-large);
+}
+
+h1 {
+  margin: 0;
+  font: var(--mat-sys-headline-medium);
+}
+
+h2 {
+  margin: 0;
+  font: var(--mat-sys-title-medium);
+}
+
+.module-heading p:last-child,
+article p {
+  margin: 0.5rem 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+article {
+  max-width: 42rem;
+  padding: 1rem;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+  background: var(--mat-sys-surface-container-low);
+}

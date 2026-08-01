@@ -58,7 +58,7 @@ export class AppShell {
       {
         label: 'Catalogo',
         icon: 'inventory_2',
-        route: '/catalog',
+        route: '/catalog/brands',
         permissions: ['CATALOG_BRAND_READ', 'CATALOG_CATEGORY_READ', 'CATALOG_PRODUCT_READ'],
       },
       {
