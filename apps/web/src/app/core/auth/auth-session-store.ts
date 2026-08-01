@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { LoginResponse } from '../../features/authentication/models/login-response';
+import { AuthSessionUser } from './auth-session-user';
 
 const AUTH_SESSION_KEY = 'tienda.auth.session';
 
@@ -27,6 +28,38 @@ export class AuthSessionStore {
 
   isAuthenticated(): boolean {
     return this.validSession() !== null;
+  }
+
+  currentUser(): AuthSessionUser | null {
+    const token = this.accessToken();
+
+    if (token === null) {
+      return null;
+    }
+
+    return this.decodeUser(token);
+  }
+
+  hasPermission(permission: string): boolean {
+    return this.currentUser()?.permissions.includes(permission) ?? false;
+  }
+
+  hasAnyPermission(permissions: string[]): boolean {
+    if (permissions.length === 0) {
+      return true;
+    }
+
+    const userPermissions = this.currentUser()?.permissions ?? [];
+    return permissions.some((permission) => userPermissions.includes(permission));
+  }
+
+  hasAllPermissions(permissions: string[]): boolean {
+    if (permissions.length === 0) {
+      return true;
+    }
+
+    const userPermissions = this.currentUser()?.permissions ?? [];
+    return permissions.every((permission) => userPermissions.includes(permission));
   }
 
   private validSession(): LoginResponse | null {
@@ -85,5 +118,52 @@ export class AuthSessionStore {
       typeof candidate['tokenType'] === 'string' &&
       typeof candidate['expiresAt'] === 'string'
     );
+  }
+
+  private decodeUser(token: string): AuthSessionUser | null {
+    const payload = this.decodeJwtPayload(token);
+
+    if (payload === null) {
+      return null;
+    }
+
+    return {
+      userId: this.asString(payload['sub']),
+      username: this.asString(payload['username']),
+      displayName: this.asString(payload['display_name']),
+      roles: this.asStringArray(payload['roles']),
+      permissions: this.asStringArray(payload['permissions']),
+      authorities: this.asStringArray(payload['authorities']),
+    };
+  }
+
+  private decodeJwtPayload(token: string): Record<string, unknown> | null {
+    const [, payload] = token.split('.');
+
+    if (!payload) {
+      return null;
+    }
+
+    try {
+      const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const paddedPayload = normalizedPayload.padEnd(
+        normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+        '=',
+      );
+
+      return JSON.parse(atob(paddedPayload)) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  private asString(value: unknown): string {
+    return typeof value === 'string' ? value : '';
+  }
+
+  private asStringArray(value: unknown): string[] {
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string')
+      : [];
   }
 }

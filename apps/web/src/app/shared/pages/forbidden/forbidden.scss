@@ -1,0 +1,27 @@
+.forbidden-page {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.forbidden-panel {
+  width: min(100%, 28rem);
+  text-align: center;
+}
+
+.forbidden-panel > mat-icon {
+  width: 3rem;
+  height: 3rem;
+  font-size: 3rem;
+  color: var(--mat-sys-error);
+}
+
+h1 {
+  margin: 1rem 0 0.5rem;
+}
+
+p {
+  margin: 0 0 1.5rem;
+  color: var(--mat-sys-on-surface-variant);
+}

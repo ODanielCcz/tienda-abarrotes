@@ -1,14 +1,27 @@
-<mat-toolbar>
-  <span>Tienda de abarrotes</span>
-  <span class="toolbar-spacer"></span>
+<section class="dashboard-content">
+  <header>
+    <p class="eyebrow">Resumen general</p>
+    <h1>Dashboard</h1>
+    <p>Desde aqui iremos conectando ventas, inventario, caja, clientes y reportes.</p>
+  </header>
 
-  <button mat-button type="button" (click)="logout()">
-    <mat-icon>logout</mat-icon>
-    Cerrar sesión
-  </button>
-</mat-toolbar>
+  <div class="dashboard-grid">
+    <article>
+      <span>Ventas</span>
+      <strong>$0.00</strong>
+      <small>Pendiente de conectar a reportes</small>
+    </article>
 
-<main class="dashboard-content">
-  <h1>Dashboard</h1>
-  <p>La autenticación se completó correctamente.</p>
-</main>
+    <article>
+      <span>Inventario</span>
+      <strong>0</strong>
+      <small>Productos por revisar</small>
+    </article>
+
+    <article>
+      <span>Caja</span>
+      <strong>Cerrada</strong>
+      <small>Sin sesion activa detectada</small>
+    </article>
+  </div>
+</section>

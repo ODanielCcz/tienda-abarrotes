@@ -1,0 +1,52 @@
+<mat-sidenav-container class="shell">
+  <mat-sidenav class="shell-sidenav" mode="side" opened>
+    <div class="brand">
+      <mat-icon>storefront</mat-icon>
+
+      <div>
+        <p class="brand-name">Tienda</p>
+        <p class="brand-subtitle">Abarrotes ODCC</p>
+      </div>
+    </div>
+
+    <mat-divider />
+
+    <mat-nav-list>
+      @for (item of navigationItems(); track item.route) {
+        <a
+          mat-list-item
+          [routerLink]="item.route"
+          routerLinkActive="active-link"
+          [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
+        >
+          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="shell-content">
+    <mat-toolbar class="shell-toolbar">
+      <div>
+        <p class="toolbar-title">Panel operativo</p>
+        <p class="toolbar-subtitle">{{ user()?.displayName || user()?.username || 'Usuario' }}</p>
+      </div>
+
+      <span class="toolbar-spacer"></span>
+
+      <button mat-icon-button type="button" (click)="toggleTheme()" [attr.aria-label]="isDarkTheme() ? 'Activar modo claro' : 'Activar modo oscuro'">
+        <mat-icon>{{ isDarkTheme() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
+
+      <button mat-button type="button" (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        Cerrar sesion
+      </button>
+    </mat-toolbar>
+
+    <main class="page-content">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -10,18 +10,31 @@ export const routes: Routes = [
       import('./features/authentication/pages/login/login').then((module) => module.Login),
   },
   {
-    path: 'dashboard',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/dashboard/pages/dashboard/dashboard').then((module) => module.Dashboard),
-  },
-  {
     path: '',
-    pathMatch: 'full',
-    redirectTo: 'dashboard',
-  },
-  {
-    path: '**',
-    redirectTo: 'dashboard',
+    canActivate: [authGuard],
+    loadComponent: () => import('./layout/app-shell/app-shell').then((module) => module.AppShell),
+    children: [
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./features/dashboard/pages/dashboard/dashboard').then(
+            (module) => module.Dashboard,
+          ),
+      },
+      {
+        path: 'forbidden',
+        loadComponent: () =>
+          import('./shared/pages/forbidden/forbidden').then((module) => module.Forbidden),
+      },
+      {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'dashboard',
+      },
+      {
+        path: '**',
+        redirectTo: 'dashboard',
+      },
+    ],
   },
 ];

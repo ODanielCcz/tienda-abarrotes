@@ -1,7 +1,50 @@
-.toolbar-spacer {
-  flex: 1;
+.dashboard-content {
+  display: grid;
+  gap: 1.5rem;
 }
 
-.dashboard-content {
-  padding: 2rem;
+.eyebrow {
+  margin: 0 0 0.25rem;
+  color: var(--mat-sys-primary);
+  font: var(--mat-sys-label-large);
+}
+
+h1 {
+  margin: 0;
+  font: var(--mat-sys-headline-medium);
+}
+
+header p:last-child {
+  margin: 0.5rem 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+article {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+  background: var(--mat-sys-surface-container-low);
+}
+
+article span,
+article small {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+article strong {
+  font: var(--mat-sys-headline-small);
+}
+
+@media (max-width: 760px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
 }
