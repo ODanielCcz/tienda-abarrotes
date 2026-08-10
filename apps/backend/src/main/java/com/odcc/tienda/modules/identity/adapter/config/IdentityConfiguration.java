@@ -8,6 +8,7 @@ import com.odcc.tienda.modules.identity.application.port.out.AuthenticationAudit
 import com.odcc.tienda.modules.identity.application.port.out.PasswordHashingPort;
 import com.odcc.tienda.modules.identity.application.port.out.PasswordVerificationPort;
 import com.odcc.tienda.modules.identity.application.port.out.UserAccountPort;
+import com.odcc.tienda.modules.identity.application.port.out.LoginRateLimitPort;
 import com.odcc.tienda.modules.identity.application.port.out.UserManagementRepositoryPort;
 import com.odcc.tienda.modules.identity.application.usecase.LoginService;
 import com.odcc.tienda.modules.identity.application.usecase.UserManagementService;
@@ -16,6 +17,7 @@ import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import java.time.Clock;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(BootstrapAdminProperties.class)
@@ -26,13 +28,17 @@ public class IdentityConfiguration {
         UserAccountPort userAccountPort,
         PasswordVerificationPort passwordVerificationPort,
         AccessTokenPort accessTokenPort,
-        AuthenticationAuditPort authenticationAuditPort
+        AuthenticationAuditPort authenticationAuditPort,
+        Clock clock,
+        LoginRateLimitPort loginRateLimitPort
     ) {
         return new LoginService(
             userAccountPort,
             passwordVerificationPort,
             accessTokenPort,
-            authenticationAuditPort
+            authenticationAuditPort,
+            clock,
+            loginRateLimitPort
         );
     }
 

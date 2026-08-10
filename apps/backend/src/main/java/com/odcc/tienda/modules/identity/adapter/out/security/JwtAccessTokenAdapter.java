@@ -37,6 +37,7 @@ public class JwtAccessTokenAdapter implements AccessTokenPort {
             .claim("display_name", userAccount.displayName())
             .claim("roles", List.copyOf(userAccount.roles()))
             .claim("authorities", List.copyOf(userAccount.authorities()))
+            .claim("auth_version", userAccount.authVersion())
             .build();
 
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

@@ -74,6 +74,7 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
             UPDATE iam.users
             SET status = :status,
                 version = version + 1,
+                auth_version = auth_version + 1,
                 updated_at = clock_timestamp()
             WHERE user_id = :userId
             """, new MapSqlParameterSource().addValue("userId", userId).addValue("status", status.name()));
@@ -87,6 +88,7 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
             SET password_hash = :passwordHash,
                 password_changed_at = clock_timestamp(),
                 version = version + 1,
+                auth_version = auth_version + 1,
                 updated_at = clock_timestamp()
             WHERE user_id = :userId
             """, new MapSqlParameterSource().addValue("userId", userId).addValue("passwordHash", passwordHash));
@@ -132,14 +134,19 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
     @Override
     public void replaceRoles(UUID userId, Set<String> roleCodes) {
         jdbc.update("DELETE FROM iam.user_roles WHERE user_id = :userId", new MapSqlParameterSource("userId", userId));
-        if (roleCodes == null || roleCodes.isEmpty()) return;
-        jdbc.update("""
-            INSERT INTO iam.user_roles (user_id, role_id)
-            SELECT :userId, role_id
-            FROM iam.roles
-            WHERE status = 'ACTIVE'
-              AND code IN (:roleCodes)
-            """, new MapSqlParameterSource().addValue("userId", userId).addValue("roleCodes", roleCodes));
+        if (roleCodes != null && !roleCodes.isEmpty()) {
+            jdbc.update("""
+                INSERT INTO iam.user_roles (user_id, role_id)
+                SELECT :userId, role_id
+                FROM iam.roles
+                WHERE status = 'ACTIVE'
+                  AND code IN (:roleCodes)
+                """, new MapSqlParameterSource().addValue("userId", userId).addValue("roleCodes", roleCodes));
+        }
+        jdbc.update(
+            "UPDATE iam.users SET auth_version = auth_version + 1, updated_at = clock_timestamp() WHERE user_id = :userId",
+            new MapSqlParameterSource("userId", userId)
+        );
     }
 
     @Override
@@ -236,6 +243,7 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
             SET status = :status
             WHERE role_id = :roleId
             """, new MapSqlParameterSource().addValue("roleId", roleId).addValue("status", status.name()));
+        revokeTokensForRole(roleId);
         return findRoleById(roleId).orElseThrow();
     }
 
@@ -262,13 +270,32 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
     @Override
     public void replaceRolePermissions(UUID roleId, Set<String> permissionCodes) {
         jdbc.update("DELETE FROM iam.role_permissions WHERE role_id = :roleId", new MapSqlParameterSource("roleId", roleId));
-        if (permissionCodes == null || permissionCodes.isEmpty()) return;
-        jdbc.update("""
-            INSERT INTO iam.role_permissions (role_id, permission_id)
-            SELECT :roleId, permission_id
-            FROM iam.permissions
-            WHERE code IN (:permissionCodes)
-            """, new MapSqlParameterSource().addValue("roleId", roleId).addValue("permissionCodes", permissionCodes));
+        if (permissionCodes != null && !permissionCodes.isEmpty()) {
+            jdbc.update("""
+                INSERT INTO iam.role_permissions (role_id, permission_id)
+                SELECT :roleId, permission_id
+                FROM iam.permissions
+                WHERE code IN (:permissionCodes)
+                """, new MapSqlParameterSource().addValue("roleId", roleId).addValue("permissionCodes", permissionCodes));
+        }
+        revokeTokensForRole(roleId);
+    }
+
+    private void revokeTokensForRole(UUID roleId) {
+        jdbc.update(
+            """
+                UPDATE iam.users user_account
+                SET auth_version = auth_version + 1,
+                    updated_at = clock_timestamp()
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM iam.user_roles user_role
+                    WHERE user_role.user_id = user_account.user_id
+                      AND user_role.role_id = :roleId
+                )
+                """,
+            new MapSqlParameterSource("roleId", roleId)
+        );
     }
 
     @Override

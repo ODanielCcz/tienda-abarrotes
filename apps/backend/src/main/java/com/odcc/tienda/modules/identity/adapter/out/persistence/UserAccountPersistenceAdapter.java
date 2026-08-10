@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
+import java.sql.Timestamp;
 
 @Repository
 @RequiredArgsConstructor
@@ -31,7 +33,8 @@ public class UserAccountPersistenceAdapter implements UserAccountPort {
 
         List<UserRow> users = jdbcTemplate.query(
             """
-                SELECT user_id, username, password_hash, display_name, status
+                SELECT user_id, username, password_hash, display_name, status,
+                       failed_login_attempts, locked_until, auth_version
                 FROM iam.users
                 WHERE LOWER(username) = LOWER(:username)
                 """,
@@ -53,8 +56,45 @@ public class UserAccountPersistenceAdapter implements UserAccountPort {
                 user.displayName(),
                 user.status(),
                 findRoles(user.id()),
-                findPermissions(user.id())
+                findPermissions(user.id()),
+                user.failedLoginAttempts(),
+                user.lockedUntil(),
+                user.authVersion()
             )
+        );
+    }
+
+    @Override
+    public void recordFailedLogin(UUID userId, Instant lockedUntilAtThreshold) {
+        jdbcTemplate.update(
+            """
+                UPDATE iam.users
+                SET failed_login_attempts = failed_login_attempts + 1,
+                    locked_until = CASE
+                        WHEN failed_login_attempts + 1 >= 5 THEN :lockedUntil
+                        ELSE locked_until
+                    END,
+                    updated_at = clock_timestamp()
+                WHERE user_id = :userId
+                """,
+            new MapSqlParameterSource("userId", userId)
+                .addValue("lockedUntil", Timestamp.from(lockedUntilAtThreshold))
+        );
+    }
+
+    @Override
+    public void clearLoginFailures(UUID userId, Instant loginAt) {
+        jdbcTemplate.update(
+            """
+                UPDATE iam.users
+                SET failed_login_attempts = 0,
+                    locked_until = NULL,
+                    last_login_at = :loginAt,
+                    updated_at = clock_timestamp()
+                WHERE user_id = :userId
+                """,
+            new MapSqlParameterSource("userId", userId)
+                .addValue("loginAt", Timestamp.from(loginAt))
         );
     }
 
@@ -111,6 +151,9 @@ public class UserAccountPersistenceAdapter implements UserAccountPort {
             resultSet.getString("password_hash"),
             resultSet.getString("display_name"),
             UserAccountStatus.valueOf(resultSet.getString("status"))
+            ,resultSet.getInt("failed_login_attempts")
+            ,resultSet.getTimestamp("locked_until") == null ? null : resultSet.getTimestamp("locked_until").toInstant()
+            ,resultSet.getLong("auth_version")
         );
     }
 
@@ -119,7 +162,10 @@ public class UserAccountPersistenceAdapter implements UserAccountPort {
         String username,
         String passwordHash,
         String displayName,
-        UserAccountStatus status
+        UserAccountStatus status,
+        int failedLoginAttempts,
+        Instant lockedUntil,
+        long authVersion
     ) {
     }
 }

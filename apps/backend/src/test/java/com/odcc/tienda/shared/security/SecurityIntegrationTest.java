@@ -107,6 +107,23 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void shouldRejectTokenAfterAuthenticationVersionChanges() throws Exception {
+        UUID userId = insertUser(
+            "security_revoked",
+            "correct-password",
+            "CATALOG_MANAGER"
+        );
+        String token = login("security_revoked", "correct-password");
+
+        jdbcTemplate.update("UPDATE iam.users SET auth_version = auth_version + 1 WHERE user_id = ?", userId);
+
+        mockMvc.perform(get(BRANDS_ENDPOINT).header("Authorization", "Bearer " + token))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("TOKEN_REVOKED"))
+            .andExpect(jsonPath("$.correlationId").isNotEmpty());
+    }
+
+    @Test
     void shouldReturnStructuredUnauthorizedResponseWithoutToken()
         throws Exception {
         mockMvc.perform(

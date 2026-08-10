@@ -3,6 +3,7 @@ package com.odcc.tienda.modules.identity.application.usecase;
 import com.odcc.tienda.modules.identity.application.command.LoginCommand;
 import com.odcc.tienda.modules.identity.application.exception.InvalidCredentialsException;
 import com.odcc.tienda.modules.identity.application.exception.UserNotActiveException;
+import com.odcc.tienda.modules.identity.application.exception.UserTemporarilyLockedException;
 import com.odcc.tienda.modules.identity.application.model.IssuedAccessToken;
 import com.odcc.tienda.modules.identity.application.model.LoginResult;
 import com.odcc.tienda.modules.identity.application.port.out.AccessTokenPort;
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,10 +36,12 @@ class LoginServiceTest {
     private FakeUserAccountPort userAccountPort;
     private FakeAuthenticationAuditPort auditPort;
     private LoginService service;
+    private Clock clock;
 
     @BeforeEach
     void setUp() {
         userAccountPort = new FakeUserAccountPort(activeUser());
+        clock = Clock.fixed(Instant.parse("2026-08-09T18:00:00Z"), ZoneOffset.UTC);
         auditPort = new FakeAuthenticationAuditPort();
         PasswordVerificationPort passwordPort = (raw, encoded) ->
             "correct-password".equals(raw) && "stored-hash".equals(encoded);
@@ -49,7 +54,9 @@ class LoginServiceTest {
             userAccountPort,
             passwordPort,
             tokenPort,
-            auditPort
+            auditPort,
+            clock,
+            clientAddress -> { }
         );
     }
 
@@ -122,6 +129,36 @@ class LoginServiceTest {
         assertEquals(List.of("FAILURE:admin:USER_LOCKED"), auditPort.events);
     }
 
+    @Test
+    void shouldLockAccountForFifteenMinutesAfterFiveInvalidPasswords() {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThrows(
+                InvalidCredentialsException.class,
+                () -> service.execute(new LoginCommand("admin", "wrong-password"))
+            );
+        }
+
+        assertEquals(5, userAccountPort.user.failedLoginAttempts());
+        assertEquals(Instant.parse("2026-08-09T18:15:00Z"), userAccountPort.user.lockedUntil());
+        assertThrows(
+            UserTemporarilyLockedException.class,
+            () -> service.execute(new LoginCommand("admin", "correct-password"))
+        );
+    }
+
+    @Test
+    void shouldClearFailuresAfterSuccessfulLogin() {
+        userAccountPort.user = activeUser().withAuthenticationState(
+            2,
+            Instant.parse("2026-08-09T17:59:00Z")
+        );
+
+        service.execute(new LoginCommand("admin", "correct-password"));
+
+        assertEquals(0, userAccountPort.user.failedLoginAttempts());
+        assertEquals(null, userAccountPort.user.lockedUntil());
+    }
+
     private static UserAccount activeUser() {
         return new UserAccount(
             USER_ID,
@@ -146,6 +183,17 @@ class LoginServiceTest {
         public Optional<UserAccount> findByUsername(String username) {
             return Optional.ofNullable(user)
                 .filter(account -> account.username().equals(username));
+        }
+
+        @Override
+        public void recordFailedLogin(UUID userId, Instant lockedUntil) {
+            int attempts = user.failedLoginAttempts() + 1;
+            user = user.withAuthenticationState(attempts, attempts >= 5 ? lockedUntil : user.lockedUntil());
+        }
+
+        @Override
+        public void clearLoginFailures(UUID userId, Instant loginAt) {
+            user = user.withAuthenticationState(0, null);
         }
     }
 
