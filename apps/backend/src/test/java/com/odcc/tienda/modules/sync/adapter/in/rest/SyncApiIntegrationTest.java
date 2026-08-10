@@ -91,20 +91,25 @@ class SyncApiIntegrationTest {
             .andExpect(jsonPath("$.data.operationId").value(cartOperationId.toString()))
             .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
 
+        UUID unsupportedOperationId = UUID.randomUUID();
         String unsupportedPayload = envelope(
-            UUID.randomUUID(), fixture.deviceId(), 2, UUID.randomUUID(),
+            unsupportedOperationId, fixture.deviceId(), 2, UUID.randomUUID(),
             "SALES_ORDER_CREATE", "SALES_ORDER", null, "{}"
         );
         mockMvc.perform(post("/api/v1/sync/inbox")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(unsupportedPayload))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.status").value("REJECTED"))
-            .andExpect(jsonPath("$.data.errorCode").value("SYNC_OPERATION_UNSUPPORTED"));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("SYNC_PAYLOAD_INVALID"));
+        assertEquals(0, jdbc.queryForObject(
+            "SELECT COUNT(*) FROM sync.inbox_operations WHERE operation_id = ?",
+            Integer.class,
+            unsupportedOperationId
+        ));
 
         String countPayload = envelope(
-            UUID.randomUUID(), fixture.deviceId(), 3, UUID.randomUUID(),
+            UUID.randomUUID(), fixture.deviceId(), 2, UUID.randomUUID(),
             "INVENTORY_COUNT_CREATE", "INVENTORY_COUNT", null,
             """
                 {
@@ -127,7 +132,7 @@ class SyncApiIntegrationTest {
 
         UUID gapOperationId = UUID.randomUUID();
         String gapPayload = envelope(
-            gapOperationId, fixture.deviceId(), 5, UUID.randomUUID(),
+            gapOperationId, fixture.deviceId(), 4, UUID.randomUUID(),
             "CART_UPSERT", "CART", UUID.randomUUID(),
             """
                 {
@@ -150,16 +155,28 @@ class SyncApiIntegrationTest {
             .andExpect(jsonPath("$.data.status").value("CONFLICT"))
             .andExpect(jsonPath("$.data.errorCode").value("SEQUENCE_GAP"));
 
-        String sequenceFourPayload = envelope(
-            UUID.randomUUID(), fixture.deviceId(), 4, UUID.randomUUID(),
-            "UNSUPPORTED", "TEST", null, "{}"
+        String sequenceThreePayload = envelope(
+            UUID.randomUUID(), fixture.deviceId(), 3, UUID.randomUUID(),
+            "CART_UPSERT", "CART", UUID.randomUUID(),
+            """
+                {
+                  "branchId":"%s",
+                  "currencyCode":"MXN",
+                  "expiresAt":"2030-01-01T00:00:00Z",
+                  "items":[{
+                    "productPresentationId":"%s",
+                    "quantity":1,
+                    "unitPriceSnapshot":25.50
+                  }]
+                }
+                """.formatted(fixture.branchId(), fixture.presentationId())
         );
         mockMvc.perform(post("/api/v1/sync/inbox")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(sequenceFourPayload))
+                .content(sequenceThreePayload))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.status").value("REJECTED"));
+            .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
 
         MvcResult conflictsResult = mockMvc.perform(get("/api/v1/sync/conflicts")
                 .param("deviceId", fixture.deviceId().toString())
@@ -195,7 +212,7 @@ class SyncApiIntegrationTest {
                 .content("{\"outboxSequence\":%d}".formatted(nextSequence.longValue())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.lastAcknowledgedOutboxSequence").value(nextSequence.longValue()))
-            .andExpect(jsonPath("$.data.lastProcessedSequence").value(5));
+            .andExpect(jsonPath("$.data.lastProcessedSequence").value(4));
 
         Integer carts = jdbc.queryForObject("SELECT COUNT(*) FROM sales.carts WHERE cart_id = ?", Integer.class, cartId);
         Integer counts = jdbc.queryForObject("SELECT COUNT(*) FROM inventory.inventory_counts WHERE warehouse_id = ?", Integer.class, fixture.warehouseId());
@@ -209,16 +226,26 @@ class SyncApiIntegrationTest {
         String token = login(fixture.username(), "correct-password");
         UUID operationId = UUID.randomUUID();
         UUID idempotencyKey = UUID.randomUUID();
+        UUID cartId = UUID.randomUUID();
+        String originalPayload = """
+            {
+              "branchId":"%s",
+              "currencyCode":"MXN",
+              "expiresAt":"2030-01-01T00:00:00Z",
+              "items":[{"productPresentationId":"%s","quantity":1,"unitPriceSnapshot":25.50}]
+            }
+            """.formatted(fixture.branchId(), fixture.presentationId());
         String original = envelope(operationId, fixture.deviceId(), 1, idempotencyKey,
-            "UNSUPPORTED", "TEST", null, "{}");
+            "CART_UPSERT", "CART", cartId, originalPayload);
         mockMvc.perform(post("/api/v1/sync/inbox")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(original))
             .andExpect(status().isCreated());
 
+        String changedPayload = originalPayload.replace("\"quantity\":1", "\"quantity\":2");
         String changed = envelope(UUID.randomUUID(), fixture.deviceId(), 2, idempotencyKey,
-            "UNSUPPORTED_CHANGED", "TEST", null, "{}");
+            "CART_UPSERT", "CART", cartId, changedPayload);
         mockMvc.perform(post("/api/v1/sync/inbox")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -231,6 +258,35 @@ class SyncApiIntegrationTest {
         mockMvc.perform(get("/api/v1/sync/outbox").param("deviceId", fixture.deviceId().toString()))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void shouldRejectOversizedAndDeepPayloads() throws Exception {
+        Fixture fixture = fixture();
+        String token = login(fixture.username(), "correct-password");
+
+        String oversized = "{\"padding\":\"" + "a".repeat(256 * 1024) + "\"}";
+        mockMvc.perform(post("/api/v1/sync/inbox")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(oversized))
+            .andExpect(status().isPayloadTooLarge())
+            .andExpect(jsonPath("$.code").value("SYNC_PAYLOAD_TOO_LARGE"))
+            .andExpect(jsonPath("$.correlationId").isNotEmpty());
+
+        String nested = "\"value\"";
+        for (int level = 0; level < 21; level++) nested = "{\"nested\":" + nested + "}";
+        String deepPayload = envelope(
+            UUID.randomUUID(), fixture.deviceId(), 1, UUID.randomUUID(),
+            "CART_UPSERT", "CART", UUID.randomUUID(), nested
+        );
+        mockMvc.perform(post("/api/v1/sync/inbox")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(deepPayload))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("SYNC_PAYLOAD_INVALID"))
+            .andExpect(jsonPath("$.correlationId").isNotEmpty());
     }
 
     private Fixture fixture() {

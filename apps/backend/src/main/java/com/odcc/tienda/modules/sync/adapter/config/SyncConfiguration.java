@@ -5,6 +5,7 @@ import com.odcc.tienda.modules.sales.application.port.in.SalesCartUseCases;
 import com.odcc.tienda.modules.sync.application.port.in.SyncUseCases;
 import com.odcc.tienda.modules.sync.application.port.out.RequestFingerprintPort;
 import com.odcc.tienda.modules.sync.application.port.out.SyncRepositoryPort;
+import com.odcc.tienda.modules.sync.application.port.out.SyncRateLimitPort;
 import com.odcc.tienda.modules.sync.application.usecase.SyncService;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
@@ -21,8 +22,9 @@ public class SyncConfiguration {
         AdvancedInventoryUseCases inventoryUseCases,
         SalesCartUseCases salesCartUseCases,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        SyncRateLimitPort rateLimitPort
     ) {
-        return new SyncService(repository, fingerprintPort, inventoryUseCases, salesCartUseCases, transactionRunner, auditPort);
+        return new SyncService(repository, fingerprintPort, inventoryUseCases, salesCartUseCases, transactionRunner, auditPort, rateLimitPort);
     }
 }

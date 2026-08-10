@@ -21,6 +21,8 @@ import com.odcc.tienda.modules.sync.application.model.SyncModels.SyncOperation;
 import com.odcc.tienda.modules.sync.application.port.in.SyncUseCases;
 import com.odcc.tienda.modules.sync.application.port.out.RequestFingerprintPort;
 import com.odcc.tienda.modules.sync.application.port.out.SyncRepositoryPort;
+import com.odcc.tienda.modules.sync.application.port.out.SyncRateLimitPort;
+import com.odcc.tienda.modules.sync.application.exception.SyncPayloadInvalidException;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
@@ -49,10 +51,12 @@ public final class SyncService implements SyncUseCases {
     private final SalesCartUseCases salesCartUseCases;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final SyncRateLimitPort rateLimitPort;
 
     @Override
     public SyncOperation ingest(IngestOperationCommand command) {
         validateEnvelope(command);
+        rateLimitPort.check(command.deviceId());
         DeviceContext device = requireAuthorizedDevice(command.deviceId(), command.actorUserId());
         String requestHash = fingerprint(command);
         return transactionRunner.required(() -> ingest(command, device, requestHash));
@@ -262,6 +266,29 @@ public final class SyncService implements SyncUseCases {
         if (command.payload() == null) throw new SyncException("El payload es obligatorio");
         if (command.clientCreatedAt() == null) throw new SyncException("La fecha del cliente es obligatoria");
         if (command.actorUserId() == null) throw new SyncException("El usuario autenticado es obligatorio");
+        String operationType = normalize(command.operationType());
+        if (!List.of(INVENTORY_COUNT_CREATE, CART_UPSERT).contains(operationType)) {
+            throw new SyncPayloadInvalidException("El tipo de operacion no esta permitido en Sync v1");
+        }
+        validatePayload(command.payload(), 1, new int[] {0});
+    }
+
+    private static void validatePayload(Object value, int depth, int[] nodes) {
+        if (depth > 20) throw new SyncPayloadInvalidException("El payload supera la profundidad maxima de 20");
+        if (++nodes[0] > 1_000) throw new SyncPayloadInvalidException("El payload supera el maximo de 1000 nodos");
+        if (value instanceof String text && text.length() > 16 * 1024) {
+            throw new SyncPayloadInvalidException("El payload contiene un texto mayor a 16 KiB");
+        }
+        if (value instanceof Map<?, ?> map) {
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (entry.getKey() != null && entry.getKey().toString().length() > 16 * 1024) {
+                    throw new SyncPayloadInvalidException("El payload contiene una clave mayor a 16 KiB");
+                }
+                validatePayload(entry.getValue(), depth + 1, nodes);
+            }
+        } else if (value instanceof List<?> list) {
+            list.forEach(item -> validatePayload(item, depth + 1, nodes));
+        }
     }
 
     private static void validateResolutionForOperation(String operationType, String resolution) {
