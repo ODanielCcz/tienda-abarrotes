@@ -59,7 +59,7 @@ public class ReportController {
             HttpStatus.OK,
             "REPORT_SALES_SUMMARY_FOUND",
             "Resumen de ventas consultado correctamente",
-            reports.salesSummary(filter(from, to, branchId, warehouseId, customerId, null)),
+            reports.salesSummary(filter(from, to, branchId, warehouseId, customerId, null), currentUserId(request)),
             request.getRequestURI()
         ));
     }
@@ -80,7 +80,7 @@ public class ReportController {
             HttpStatus.OK,
             "REPORT_TOP_PRODUCTS_FOUND",
             "Productos mas vendidos consultados correctamente",
-            reports.topProducts(filter(from, to, branchId, warehouseId, customerId, limit)),
+            reports.topProducts(filter(from, to, branchId, warehouseId, customerId, limit), currentUserId(request)),
             request.getRequestURI()
         ));
     }
@@ -101,7 +101,7 @@ public class ReportController {
             HttpStatus.OK,
             "REPORT_CUSTOMER_SALES_FOUND",
             "Ventas por cliente consultadas correctamente",
-            reports.customerSales(filter(from, to, branchId, warehouseId, customerId, limit)),
+            reports.customerSales(filter(from, to, branchId, warehouseId, customerId, limit), currentUserId(request)),
             request.getRequestURI()
         ));
     }
@@ -119,7 +119,7 @@ public class ReportController {
             HttpStatus.OK,
             "REPORT_LOW_STOCK_FOUND",
             "Stock bajo consultado correctamente",
-            reports.lowStock(filter(null, null, branchId, warehouseId, null, limit)),
+            reports.lowStock(filter(null, null, branchId, warehouseId, null, limit), currentUserId(request)),
             request.getRequestURI()
         ));
     }
@@ -139,7 +139,7 @@ public class ReportController {
             HttpStatus.OK,
             "REPORT_INVENTORY_MOVEMENTS_FOUND",
             "Movimientos de inventario consultados correctamente",
-            reports.inventoryMovements(filter(from, to, branchId, warehouseId, null, limit)),
+            reports.inventoryMovements(filter(from, to, branchId, warehouseId, null, limit), currentUserId(request)),
             request.getRequestURI()
         ));
     }
@@ -158,7 +158,7 @@ public class ReportController {
             HttpStatus.OK,
             "REPORT_CASH_SUMMARY_FOUND",
             "Resumen de caja consultado correctamente",
-            reports.cashSummary(filter(from, to, branchId, null, null, limit)),
+            reports.cashSummary(filter(from, to, branchId, null, null, limit), currentUserId(request)),
             request.getRequestURI()
         ));
     }
@@ -177,7 +177,7 @@ public class ReportController {
     ) {
         List<SalesByPeriodReport> result = reports.salesByPeriod(periodQuery(
             from, to, branchId, warehouseId, customerId, groupBy
-        ));
+        ), currentUserId(request));
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "REPORT_SALES_BY_PERIOD_FOUND",
@@ -200,7 +200,7 @@ public class ReportController {
     ) {
         GrossMarginReport result = reports.grossMargin(periodQuery(
             from, to, branchId, warehouseId, customerId, null
-        ));
+        ), currentUserId(request));
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "REPORT_GROSS_MARGIN_FOUND",
@@ -223,7 +223,8 @@ public class ReportController {
         HttpServletRequest request
     ) {
         List<ProductProfitabilityReport> result = reports.productProfitability(
-            new ProductProfitabilityQuery(from, to, branchId, warehouseId, customerId, limit)
+            new ProductProfitabilityQuery(from, to, branchId, warehouseId, customerId, limit),
+            currentUserId(request)
         );
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
@@ -244,7 +245,8 @@ public class ReportController {
         HttpServletRequest request
     ) {
         StockValuationReport result = reports.stockValuation(
-            new StockValuationQuery(branchId, warehouseId, limit)
+            new StockValuationQuery(branchId, warehouseId, limit),
+            currentUserId(request)
         );
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
@@ -266,7 +268,8 @@ public class ReportController {
         HttpServletRequest request
     ) {
         List<ExpiringProductReport> result = reports.expiringProducts(
-            new ExpiringProductsQuery(branchId, warehouseId, days, limit, null)
+            new ExpiringProductsQuery(branchId, warehouseId, days, limit, null),
+            currentUserId(request)
         );
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
@@ -291,7 +294,7 @@ public class ReportController {
     ) {
         ReturnsSummaryReport result = reports.returnsSummary(periodQuery(
             from, to, branchId, warehouseId, customerId, groupBy
-        ));
+        ), currentUserId(request));
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "REPORT_RETURNS_SUMMARY_FOUND",
@@ -328,5 +331,12 @@ public class ReportController {
             customerId,
             ReportGroupBy.from(groupBy)
         );
+    }
+
+    private static UUID currentUserId(HttpServletRequest request) {
+        if (request.getUserPrincipal() == null || request.getUserPrincipal().getName() == null) {
+            throw new IllegalStateException("El JWT no contiene usuario");
+        }
+        return UUID.fromString(request.getUserPrincipal().getName());
     }
 }

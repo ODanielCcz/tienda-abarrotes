@@ -51,15 +51,15 @@ public class CashSessionController {
     @GetMapping("/{cashSessionId}")
     @Operation(summary = "Consultar sesion de caja")
     @PreAuthorize("hasAuthority('CASH_SESSION_READ')")
-    public ResponseEntity<ApiResponseDto<CashSession>> getById(@PathVariable UUID cashSessionId, HttpServletRequest servletRequest) {
-        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_SESSION_FOUND", "Sesion de caja consultada correctamente", useCases.getById(cashSessionId), servletRequest.getRequestURI()));
+    public ResponseEntity<ApiResponseDto<CashSession>> getById(@PathVariable UUID cashSessionId, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_SESSION_FOUND", "Sesion de caja consultada correctamente", useCases.getById(cashSessionId, currentUserId(jwt)), servletRequest.getRequestURI()));
     }
 
     @GetMapping
     @Operation(summary = "Listar sesiones de caja")
     @PreAuthorize("hasAuthority('CASH_SESSION_READ')")
-    public ResponseEntity<ApiResponseDto<List<CashSession>>> list(@RequestParam(required = false) UUID cashRegisterId, @RequestParam(required = false) String status, HttpServletRequest servletRequest) {
-        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_SESSIONS_FOUND", "Sesiones de caja consultadas correctamente", useCases.list(new ListCashSessionsQuery(cashRegisterId, status)), servletRequest.getRequestURI()));
+    public ResponseEntity<ApiResponseDto<List<CashSession>>> list(@RequestParam(required = false) UUID cashRegisterId, @RequestParam(required = false) String status, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_SESSIONS_FOUND", "Sesiones de caja consultadas correctamente", useCases.list(new ListCashSessionsQuery(cashRegisterId, status), currentUserId(jwt)), servletRequest.getRequestURI()));
     }
 
     @PostMapping("/{cashSessionId}/close")
@@ -73,8 +73,8 @@ public class CashSessionController {
     @GetMapping("/{cashSessionId}/movements")
     @Operation(summary = "Consultar movimientos de una sesion de caja")
     @PreAuthorize("hasAuthority('CASH_MOVEMENT_READ')")
-    public ResponseEntity<ApiResponseDto<List<CashMovement>>> listMovements(@PathVariable UUID cashSessionId, HttpServletRequest servletRequest) {
-        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_MOVEMENTS_FOUND", "Movimientos de caja consultados correctamente", useCases.listMovements(cashSessionId), servletRequest.getRequestURI()));
+    public ResponseEntity<ApiResponseDto<List<CashMovement>>> listMovements(@PathVariable UUID cashSessionId, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CASH_MOVEMENTS_FOUND", "Movimientos de caja consultados correctamente", useCases.listMovements(cashSessionId, currentUserId(jwt)), servletRequest.getRequestURI()));
     }
 
     @PostMapping("/{cashSessionId}/movements")

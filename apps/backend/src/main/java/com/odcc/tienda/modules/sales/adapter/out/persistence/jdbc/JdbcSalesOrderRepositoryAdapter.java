@@ -64,6 +64,52 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
     }
 
     @Override
+    public Optional<BigDecimal> findCurrentPrice(
+        UUID warehouseId,
+        UUID productPresentationId,
+        String currencyCode
+    ) {
+        try {
+            BigDecimal amount = jdbc.queryForObject(
+                """
+                    SELECT price.amount
+                    FROM organization.warehouses warehouse
+                    JOIN catalog.price_lists price_list
+                      ON price_list.code = 'GENERAL'
+                     AND price_list.status = 'ACTIVE'
+                     AND price_list.currency_code = :currencyCode
+                    JOIN catalog.prices price
+                      ON price.price_list_id = price_list.price_list_id
+                     AND price.product_presentation_id = :presentationId
+                     AND (price.branch_id = warehouse.branch_id OR price.branch_id IS NULL)
+                     AND price.valid_from <= clock_timestamp()
+                     AND (price.valid_until IS NULL OR price.valid_until > clock_timestamp())
+                    WHERE warehouse.warehouse_id = :warehouseId
+                      AND warehouse.status = 'ACTIVE'
+                    ORDER BY
+                      CASE WHEN price.branch_id = warehouse.branch_id THEN 0 ELSE 1 END,
+                      price.valid_from DESC,
+                      price.created_at DESC
+                    LIMIT 1
+                    """,
+                new MapSqlParameterSource()
+                    .addValue("warehouseId", warehouseId)
+                    .addValue("presentationId", productPresentationId)
+                    .addValue("currencyCode", normalize(currencyCode, "MXN")),
+                BigDecimal.class
+            );
+            return Optional.ofNullable(amount);
+        } catch (EmptyResultDataAccessException exception) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public UUID findBranchIdByWarehouseId(UUID warehouseId) {
+        return findWarehouse(warehouseId).branchId();
+    }
+
+    @Override
     public SalesOrder createConfirmed(CreateSalesOrderCommand command, String fingerprint) {
         WarehouseRow warehouse = findWarehouse(command.warehouseId());
         UUID orderId = UUID.randomUUID();

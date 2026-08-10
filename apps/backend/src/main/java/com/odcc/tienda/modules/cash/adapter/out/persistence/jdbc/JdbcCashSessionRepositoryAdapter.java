@@ -5,6 +5,7 @@ import com.odcc.tienda.modules.cash.application.command.CreateCashMovementComman
 import com.odcc.tienda.modules.cash.application.command.OpenCashSessionCommand;
 import com.odcc.tienda.modules.cash.application.exception.CashException;
 import com.odcc.tienda.modules.cash.application.exception.CashSessionAlreadyOpenException;
+import com.odcc.tienda.modules.cash.application.exception.CashSessionAlreadyClosedException;
 import com.odcc.tienda.modules.cash.application.model.CashMovement;
 import com.odcc.tienda.modules.cash.application.model.CashSession;
 import com.odcc.tienda.modules.cash.application.port.out.CashSessionRepositoryPort;
@@ -79,11 +80,11 @@ public class JdbcCashSessionRepositoryAdapter implements CashSessionRepositoryPo
 
     @Override
     public CashSession close(CloseCashSessionCommand command) {
-        CashSession current = findById(command.cashSessionId()).orElseThrow(() -> new CashException("No existe la sesion de caja " + command.cashSessionId()));
-        if (!"OPEN".equals(current.status())) throw new CashException("Solo se pueden cerrar sesiones de caja abiertas");
+        CashSession current = findByIdForUpdate(command.cashSessionId());
+        if (!"OPEN".equals(current.status())) throw new CashSessionAlreadyClosedException(command.cashSessionId());
         BigDecimal expected = expectedAmount(command.cashSessionId());
         BigDecimal difference = command.countedCashAmount().subtract(expected);
-        jdbc.update("""
+        int updated = jdbc.update("""
             UPDATE cash.cash_sessions
             SET status = 'CLOSED',
                 closed_by = :closedBy,
@@ -93,6 +94,7 @@ public class JdbcCashSessionRepositoryAdapter implements CashSessionRepositoryPo
                 closed_at = clock_timestamp(),
                 notes = COALESCE(:notes, notes)
             WHERE cash_session_id = :id
+              AND status = 'OPEN'
             """, new MapSqlParameterSource()
             .addValue("id", command.cashSessionId())
             .addValue("closedBy", command.closedBy())
@@ -100,6 +102,7 @@ public class JdbcCashSessionRepositoryAdapter implements CashSessionRepositoryPo
             .addValue("countedAmount", command.countedCashAmount())
             .addValue("differenceAmount", difference)
             .addValue("notes", command.notes()));
+        if (updated != 1) throw new CashSessionAlreadyClosedException(command.cashSessionId());
         if (command.countedCashAmount().compareTo(BigDecimal.ZERO) > 0) {
             insertMovement(command.cashSessionId(), "CLOSING", "OUT", command.countedCashAmount(), null, "Cierre de caja", command.notes(), command.closedBy());
         }
@@ -113,10 +116,35 @@ public class JdbcCashSessionRepositoryAdapter implements CashSessionRepositoryPo
 
     @Override
     public CashMovement createManualMovement(CreateCashMovementCommand command) {
-        CashSession session = findById(command.cashSessionId()).orElseThrow(() -> new CashException("No existe la sesion de caja " + command.cashSessionId()));
+        CashSession session = findByIdForUpdate(command.cashSessionId());
         if (!"OPEN".equals(session.status())) throw new CashException("Solo se pueden registrar movimientos en sesiones de caja abiertas");
         UUID movementId = insertMovement(command.cashSessionId(), normalize(command.movementType()), normalize(command.direction()), command.amount(), null, command.reference(), command.reason(), command.createdBy());
         return findMovement(movementId);
+    }
+
+    @Override
+    public UUID findBranchIdByCashRegisterId(UUID cashRegisterId) {
+        try {
+            return jdbc.queryForObject(
+                "SELECT branch_id FROM organization.cash_registers WHERE cash_register_id = :id AND status = 'ACTIVE'",
+                new MapSqlParameterSource("id", cashRegisterId),
+                UUID.class
+            );
+        } catch (EmptyResultDataAccessException exception) {
+            throw new CashException("No existe una caja registradora activa con id " + cashRegisterId);
+        }
+    }
+
+    private CashSession findByIdForUpdate(UUID cashSessionId) {
+        try {
+            return jdbc.queryForObject(
+                baseSelect() + " WHERE cs.cash_session_id = :id FOR UPDATE OF cs",
+                new MapSqlParameterSource("id", cashSessionId),
+                this::mapSession
+            );
+        } catch (EmptyResultDataAccessException exception) {
+            throw new CashException("No existe la sesion de caja " + cashSessionId);
+        }
     }
 
     private CashMovement findMovement(UUID movementId) {

@@ -23,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,9 +49,10 @@ public class InventoryReceiptController {
     @PreAuthorize("hasAuthority('INVENTORY_RECEIPT_CREATE')")
     public ResponseEntity<ApiResponseDto<InventoryReceiptResponse>> create(
         @Valid @RequestBody CreateInventoryReceiptRequest request,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        InventoryReceipt receipt = createInventoryReceiptUseCase.execute(toCommand(request));
+        InventoryReceipt receipt = createInventoryReceiptUseCase.execute(toCommand(request), currentUserId(jwt));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(
             HttpStatus.CREATED,
             "INVENTORY_RECEIPT_CREATED",
@@ -59,14 +62,20 @@ public class InventoryReceiptController {
         ));
     }
 
+    private UUID currentUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null) throw new IllegalArgumentException("No se pudo identificar al usuario autenticado");
+        return UUID.fromString(jwt.getSubject());
+    }
+
     @GetMapping("/{receiptId}")
     @Operation(summary = "Consultar una recepcion de mercancia")
     @PreAuthorize("hasAuthority('INVENTORY_RECEIPT_READ')")
     public ResponseEntity<ApiResponseDto<InventoryReceiptResponse>> getById(
         @PathVariable("receiptId") UUID receiptId,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        InventoryReceipt receipt = getInventoryReceiptByIdUseCase.execute(receiptId);
+        InventoryReceipt receipt = getInventoryReceiptByIdUseCase.execute(receiptId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "INVENTORY_RECEIPT_FOUND",

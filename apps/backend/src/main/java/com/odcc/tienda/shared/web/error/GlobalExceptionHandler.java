@@ -1,5 +1,7 @@
 package com.odcc.tienda.shared.web.error;
 
+import com.odcc.tienda.shared.application.authorization.BranchAccessDeniedException;
+import com.odcc.tienda.modules.sync.adapter.in.rest.filter.SyncPayloadTooLargeIOException;
 import com.odcc.tienda.shared.web.correlation.CorrelationIdFilter;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
@@ -151,6 +153,38 @@ public class GlobalExceptionHandler {
             null,
             request
         );
+    }
+
+    @ExceptionHandler(BranchAccessDeniedException.class)
+    public ResponseEntity<ApiResponseDto<Void>> handleBranchAccessDenied(
+        BranchAccessDeniedException exception,
+        HttpServletRequest request
+    ) {
+        if (hasCause(exception, SyncPayloadTooLargeIOException.class)) {
+            return error(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "SYNC_PAYLOAD_TOO_LARGE",
+                "El payload Sync supera 256 KiB",
+                null,
+                request
+            );
+        }
+        return error(
+            HttpStatus.FORBIDDEN,
+            "BRANCH_ACCESS_DENIED",
+            exception.getMessage(),
+            null,
+            request
+        );
+    }
+
+    private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        Throwable current = error;
+        while (current != null) {
+            if (type.isInstance(current)) return true;
+            current = current.getCause();
+        }
+        return false;
     }
 
     @ExceptionHandler(Exception.class)

@@ -153,18 +153,18 @@ class SalesReturnApiIntegrationTest {
                         }
                         """.formatted(cashSessionId))
             )
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("INVALID_SALES_OPERATION"))
-            .andExpect(jsonPath("$.reason").value("Bad Request"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("SALES_RETURN_ALREADY_PROCESSED"))
+            .andExpect(jsonPath("$.reason").value("Conflict"))
             .andExpect(jsonPath("$.correlationId").exists());
 
         mockMvc.perform(
                 post("/api/v1/sales/returns/{returnId}/cancel", returnId)
                     .header("Authorization", "Bearer " + token)
             )
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("INVALID_SALES_OPERATION"))
-            .andExpect(jsonPath("$.reason").value("Bad Request"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("SALES_RETURN_ALREADY_PROCESSED"))
+            .andExpect(jsonPath("$.reason").value("Conflict"))
             .andExpect(jsonPath("$.correlationId").exists());
     }
 

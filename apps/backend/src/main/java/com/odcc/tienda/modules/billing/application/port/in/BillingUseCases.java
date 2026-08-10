@@ -16,23 +16,23 @@ import java.util.List;
 import java.util.UUID;
 
 public interface BillingUseCases {
-    IssuerProfile createIssuerProfile(CreateIssuerProfileCommand command);
-    List<IssuerProfile> listIssuerProfiles(UUID branchId, String status);
-    IssuerProfile getIssuerProfile(UUID issuerProfileId);
-    IssuerProfile updateIssuerProfile(UpdateIssuerProfileCommand command);
-    IssuerProfile changeIssuerProfileStatus(ChangeStatusCommand command);
+    IssuerProfile createIssuerProfile(CreateIssuerProfileCommand command, UUID actorUserId);
+    List<IssuerProfile> listIssuerProfiles(UUID branchId, String status, UUID actorUserId);
+    IssuerProfile getIssuerProfile(UUID issuerProfileId, UUID actorUserId);
+    IssuerProfile updateIssuerProfile(UpdateIssuerProfileCommand command, UUID actorUserId);
+    IssuerProfile changeIssuerProfileStatus(ChangeStatusCommand command, UUID actorUserId);
 
-    FiscalProfile createFiscalProfile(CreateFiscalProfileCommand command);
-    List<FiscalProfile> listFiscalProfiles(UUID customerId, String status);
-    FiscalProfile getFiscalProfile(UUID fiscalProfileId);
-    FiscalProfile updateFiscalProfile(UpdateFiscalProfileCommand command);
-    FiscalProfile changeFiscalProfileStatus(ChangeStatusCommand command);
+    FiscalProfile createFiscalProfile(CreateFiscalProfileCommand command, UUID actorUserId);
+    List<FiscalProfile> listFiscalProfiles(UUID customerId, String status, UUID actorUserId);
+    FiscalProfile getFiscalProfile(UUID fiscalProfileId, UUID actorUserId);
+    FiscalProfile updateFiscalProfile(UpdateFiscalProfileCommand command, UUID actorUserId);
+    FiscalProfile changeFiscalProfileStatus(ChangeStatusCommand command, UUID actorUserId);
 
-    void updateProductFiscalClassification(UpdateProductFiscalClassificationCommand command);
-    void updateUnitFiscalClassification(UpdateUnitFiscalClassificationCommand command);
+    void updateProductFiscalClassification(UpdateProductFiscalClassificationCommand command, UUID actorUserId);
+    void updateUnitFiscalClassification(UpdateUnitFiscalClassificationCommand command, UUID actorUserId);
 
-    FiscalDocument createFiscalDocument(CreateFiscalDocumentCommand command);
-    List<FiscalDocument> listFiscalDocuments(UUID salesOrderId, String status);
-    FiscalDocument getFiscalDocument(UUID fiscalDocumentId);
-    FiscalDocument markFiscalDocumentReady(UUID fiscalDocumentId);
+    FiscalDocument createFiscalDocument(CreateFiscalDocumentCommand command, UUID actorUserId);
+    List<FiscalDocument> listFiscalDocuments(UUID salesOrderId, String status, UUID actorUserId);
+    FiscalDocument getFiscalDocument(UUID fiscalDocumentId, UUID actorUserId);
+    FiscalDocument markFiscalDocumentReady(UUID fiscalDocumentId, UUID actorUserId);
 }

@@ -8,14 +8,15 @@ import com.odcc.tienda.modules.inventory.application.exception.InventoryReceiptE
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptPallet;
 import com.odcc.tienda.modules.inventory.application.port.in.CreateInventoryReceiptUseCase;
+import com.odcc.tienda.modules.inventory.application.port.out.InventoryReceiptFingerprintPort;
 import com.odcc.tienda.modules.inventory.application.port.out.InventoryReceiptRepositoryPort;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -27,9 +28,22 @@ public class CreateInventoryReceiptService implements CreateInventoryReceiptUseC
     private final InventoryReceiptRepositoryPort repository;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccessPort;
+    private final InventoryReceiptFingerprintPort fingerprintPort;
 
     @Override
     public InventoryReceipt execute(CreateInventoryReceiptCommand command) {
+        return executeInternal(command);
+    }
+
+    @Override
+    public InventoryReceipt execute(CreateInventoryReceiptCommand command, UUID actorUserId) {
+        validate(command);
+        branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(command.warehouseId()));
+        return executeInternal(command);
+    }
+
+    private InventoryReceipt executeInternal(CreateInventoryReceiptCommand command) {
         validate(command);
         String fingerprint = fingerprint(command);
         return transactionRunner.required(() -> create(command, fingerprint));
@@ -79,6 +93,9 @@ public class CreateInventoryReceiptService implements CreateInventoryReceiptUseC
         if (command.warehouseId() == null) {
             throw new InventoryReceiptException("El almacen es obligatorio");
         }
+        if (command.idempotencyKey() == null) {
+            throw new InventoryReceiptException("La llave de idempotencia es obligatoria");
+        }
         int simpleItems = command.items() == null ? 0 : command.items().size();
         int palletItems = command.pallets() == null ? 0 : command.pallets().stream()
             .mapToInt(pallet -> pallet.items() == null ? 0 : pallet.items().size())
@@ -98,7 +115,7 @@ public class CreateInventoryReceiptService implements CreateInventoryReceiptUseC
         return state;
     }
 
-    private static String fingerprint(CreateInventoryReceiptCommand command) {
+    private String fingerprint(CreateInventoryReceiptCommand command) {
         StringBuilder builder = new StringBuilder();
         builder.append(command.warehouseId()).append('|')
             .append(command.supplierId()).append('|')
@@ -115,7 +132,7 @@ public class CreateInventoryReceiptService implements CreateInventoryReceiptUseC
                 .sorted()
                 .forEach(value -> builder.append("P:").append(value).append('|'));
         }
-        return sha256(builder.toString());
+        return fingerprintPort.sha256(builder.toString());
     }
 
     private static String palletFingerprint(InventoryReceiptPalletCommand pallet) {
@@ -147,8 +164,5 @@ public class CreateInventoryReceiptService implements CreateInventoryReceiptUseC
         return value == null ? "" : value.stripTrailingZeros().toPlainString();
     }
 
-    private static String sha256(String value) {
-        return UUID.nameUUIDFromBytes(value.getBytes(StandardCharsets.UTF_8)).toString();
-    }
 }
 

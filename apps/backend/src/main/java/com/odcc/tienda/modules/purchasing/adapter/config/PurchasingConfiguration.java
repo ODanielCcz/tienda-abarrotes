@@ -8,6 +8,7 @@ import com.odcc.tienda.modules.purchasing.application.port.out.SupplierRepositor
 import com.odcc.tienda.modules.purchasing.application.usecase.PurchaseService;
 import com.odcc.tienda.modules.purchasing.application.usecase.SupplierService;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,9 +20,10 @@ public class PurchasingConfiguration {
     SupplierUseCases supplierUseCases(
         SupplierRepositoryPort repository,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        BranchAccessPort branchAccessPort
     ) {
-        return new SupplierService(repository, transactionRunner, auditPort);
+        return new SupplierService(repository, transactionRunner, auditPort, branchAccessPort);
     }
 
     @Bean
@@ -29,8 +31,9 @@ public class PurchasingConfiguration {
         PurchaseRepositoryPort repository,
         CreateInventoryReceiptUseCase inventoryReceiptUseCase,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        BranchAccessPort branchAccessPort
     ) {
-        return new PurchaseService(repository, inventoryReceiptUseCase, transactionRunner, auditPort);
+        return new PurchaseService(repository, inventoryReceiptUseCase, transactionRunner, auditPort, branchAccessPort);
     }
 }

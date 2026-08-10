@@ -20,6 +20,7 @@ import com.odcc.tienda.modules.reports.application.query.PeriodReportQuery;
 import com.odcc.tienda.modules.reports.application.query.ProductProfitabilityQuery;
 import com.odcc.tienda.modules.reports.application.query.ReportFilter;
 import com.odcc.tienda.modules.reports.application.query.StockValuationQuery;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -40,7 +41,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     private final NamedParameterJdbcTemplate jdbc;
 
     @Override
-    public SalesSummaryReport salesSummary(ReportFilter filter) {
+    public SalesSummaryReport salesSummary(ReportFilter filter, BranchScope scope) {
         return jdbc.queryForObject("""
             SELECT COUNT(*) AS ticket_count,
                    COALESCE(SUM(subtotal), 0) AS subtotal,
@@ -52,10 +53,11 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             WHERE so.status IN ('CONFIRMED', 'PARTIALLY_RETURNED', 'RETURNED')
               AND so.created_at >= CAST(:from AS date)
               AND so.created_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
               AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
-            """, params(filter), (rs, rowNum) -> new SalesSummaryReport(
+            """, params(filter, scope), (rs, rowNum) -> new SalesSummaryReport(
             rs.getLong("ticket_count"),
             value(rs, "subtotal"),
             value(rs, "discount_total"),
@@ -66,7 +68,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public List<TopProductReport> topProducts(ReportFilter filter) {
+    public List<TopProductReport> topProducts(ReportFilter filter, BranchScope scope) {
         return jdbc.query("""
             SELECT soi.product_presentation_id,
                    soi.sku_snapshot AS sku,
@@ -78,13 +80,14 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             WHERE so.status IN ('CONFIRMED', 'PARTIALLY_RETURNED', 'RETURNED')
               AND so.created_at >= CAST(:from AS date)
               AND so.created_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
               AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
             GROUP BY soi.product_presentation_id, soi.sku_snapshot, soi.product_name_snapshot
             ORDER BY gross_amount DESC, quantity_sold DESC
             LIMIT :limit
-            """, params(filter), (rs, rowNum) -> new TopProductReport(
+            """, params(filter, scope), (rs, rowNum) -> new TopProductReport(
             rs.getObject("product_presentation_id", UUID.class),
             rs.getString("sku"),
             rs.getString("product_name"),
@@ -94,7 +97,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public List<CustomerSalesReport> customerSales(ReportFilter filter) {
+    public List<CustomerSalesReport> customerSales(ReportFilter filter, BranchScope scope) {
         return jdbc.query("""
             SELECT so.customer_id,
                    COALESCE(c.customer_code, 'MOSTRADOR') AS customer_code,
@@ -107,13 +110,14 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
               AND so.customer_id IS NOT NULL
               AND so.created_at >= CAST(:from AS date)
               AND so.created_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
               AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
             GROUP BY so.customer_id, c.customer_code, c.display_name
             ORDER BY total DESC, ticket_count DESC
             LIMIT :limit
-            """, params(filter), (rs, rowNum) -> new CustomerSalesReport(
+            """, params(filter, scope), (rs, rowNum) -> new CustomerSalesReport(
             rs.getObject("customer_id", UUID.class),
             rs.getString("customer_code"),
             rs.getString("display_name"),
@@ -123,7 +127,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public List<LowStockReport> lowStock(ReportFilter filter) {
+    public List<LowStockReport> lowStock(ReportFilter filter, BranchScope scope) {
         return jdbc.query("""
             SELECT cs.warehouse_id,
                    w.name AS warehouse_name,
@@ -137,11 +141,12 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             JOIN catalog.product_presentations pp ON pp.product_presentation_id = cs.product_presentation_id
             WHERE pp.minimum_stock > 0
               AND cs.available_quantity <= pp.minimum_stock
+              AND (CAST(:globalAccess AS boolean) OR cs.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR cs.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR cs.warehouse_id = CAST(:warehouseId AS uuid))
             ORDER BY (pp.minimum_stock - cs.available_quantity) DESC, cs.presentation_name
             LIMIT :limit
-            """, params(filter), (rs, rowNum) -> new LowStockReport(
+            """, params(filter, scope), (rs, rowNum) -> new LowStockReport(
             rs.getObject("warehouse_id", UUID.class),
             rs.getString("warehouse_name"),
             rs.getObject("product_presentation_id", UUID.class),
@@ -153,7 +158,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public List<InventoryMovementReport> inventoryMovements(ReportFilter filter) {
+    public List<InventoryMovementReport> inventoryMovements(ReportFilter filter, BranchScope scope) {
         return jdbc.query("""
             SELECT sm.warehouse_id,
                    w.name AS warehouse_name,
@@ -166,12 +171,13 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             WHERE sm.status = 'CONFIRMED'
               AND sm.created_at >= CAST(:from AS date)
               AND sm.created_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (CAST(:globalAccess AS boolean) OR sm.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR sm.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR sm.warehouse_id = CAST(:warehouseId AS uuid))
             GROUP BY sm.warehouse_id, w.name, sm.movement_type
             ORDER BY movement_count DESC, total_quantity DESC
             LIMIT :limit
-            """, params(filter), (rs, rowNum) -> new InventoryMovementReport(
+            """, params(filter, scope), (rs, rowNum) -> new InventoryMovementReport(
             rs.getObject("warehouse_id", UUID.class),
             rs.getString("warehouse_name"),
             rs.getString("movement_type"),
@@ -181,7 +187,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public List<CashSummaryReport> cashSummary(ReportFilter filter) {
+    public List<CashSummaryReport> cashSummary(ReportFilter filter, BranchScope scope) {
         return jdbc.query("""
             SELECT cs.cash_session_id,
                    cs.cash_register_id,
@@ -200,17 +206,18 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             LEFT JOIN cash.cash_movements cm ON cm.cash_session_id = cs.cash_session_id
             WHERE cs.opened_at >= CAST(:from AS date)
               AND cs.opened_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (CAST(:globalAccess AS boolean) OR cr.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR cr.branch_id = CAST(:branchId AS uuid))
             GROUP BY cs.cash_session_id, cs.cash_register_id, cr.code, cs.status,
                      cs.opening_amount, cs.expected_amount, cs.counted_amount,
                      cs.difference_amount, cs.opened_at, cs.closed_at
             ORDER BY cs.opened_at DESC
             LIMIT :limit
-            """, params(filter), this::mapCashSummary);
+            """, params(filter, scope), this::mapCashSummary);
     }
 
     @Override
-    public List<SalesByPeriodReport> salesByPeriod(PeriodReportQuery query) {
+    public List<SalesByPeriodReport> salesByPeriod(PeriodReportQuery query, BranchScope scope) {
         return jdbc.query("""
             WITH events AS (
                 SELECT date_trunc(
@@ -232,6 +239,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                        CASE WHEN CAST(:branchId AS uuid) IS NULL
                             THEN :defaultTimezone ELSE b.timezone END)::date
                       BETWEEN CAST(:from AS date) AND CAST(:to AS date)
+                  AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
                   AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
                   AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
                   AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
@@ -258,6 +266,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                        CASE WHEN CAST(:branchId AS uuid) IS NULL
                             THEN :defaultTimezone ELSE b.timezone END)::date
                       BETWEEN CAST(:from AS date) AND CAST(:to AS date)
+                  AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
                   AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
                   AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
                   AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
@@ -278,7 +287,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             FROM events
             GROUP BY period_start
             ORDER BY period_start
-            """, params(query), (rs, rowNum) -> new SalesByPeriodReport(
+            """, params(query, scope), (rs, rowNum) -> new SalesByPeriodReport(
             rs.getObject("period_start", java.time.LocalDate.class),
             rs.getObject("period_end", java.time.LocalDate.class),
             rs.getLong("ticket_count"),
@@ -292,7 +301,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public GrossMarginReport grossMargin(PeriodReportQuery query) {
+    public GrossMarginReport grossMargin(PeriodReportQuery query, BranchScope scope) {
         return jdbc.queryForObject("""
             WITH metrics AS (
                 SELECT COALESCE(SUM(soi.line_total - soi.tax_amount), 0) AS gross_revenue,
@@ -307,6 +316,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                        CASE WHEN CAST(:branchId AS uuid) IS NULL
                             THEN :defaultTimezone ELSE b.timezone END)::date
                       BETWEEN CAST(:from AS date) AND CAST(:to AS date)
+                  AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
                   AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
                   AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
                   AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
@@ -330,6 +340,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                        CASE WHEN CAST(:branchId AS uuid) IS NULL
                             THEN :defaultTimezone ELSE b.timezone END)::date
                       BETWEEN CAST(:from AS date) AND CAST(:to AS date)
+                  AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
                   AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
                   AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
                   AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
@@ -361,7 +372,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                         ELSE ROUND(((net_revenue - net_cost) / net_revenue) * 100, 4) END
                        AS gross_margin_percent
             FROM calculated
-            """, params(query), (rs, rowNum) -> new GrossMarginReport(
+            """, params(query, scope), (rs, rowNum) -> new GrossMarginReport(
             value(rs, "gross_revenue"),
             value(rs, "returned_revenue"),
             value(rs, "net_revenue"),
@@ -374,7 +385,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public List<ProductProfitabilityReport> productProfitability(ProductProfitabilityQuery query) {
+    public List<ProductProfitabilityReport> productProfitability(ProductProfitabilityQuery query, BranchScope scope) {
         return jdbc.query("""
             WITH events AS (
                 SELECT soi.product_presentation_id,
@@ -394,6 +405,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                        CASE WHEN CAST(:branchId AS uuid) IS NULL
                             THEN :defaultTimezone ELSE b.timezone END)::date
                       BETWEEN CAST(:from AS date) AND CAST(:to AS date)
+                  AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
                   AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
                   AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
                   AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
@@ -421,6 +433,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                        CASE WHEN CAST(:branchId AS uuid) IS NULL
                             THEN :defaultTimezone ELSE b.timezone END)::date
                       BETWEEN CAST(:from AS date) AND CAST(:to AS date)
+                  AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
                   AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
                   AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
                   AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
@@ -453,7 +466,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             FROM aggregated
             ORDER BY gross_profit DESC, net_revenue DESC, product_name
             LIMIT :limit
-            """, params(query), (rs, rowNum) -> new ProductProfitabilityReport(
+            """, params(query, scope), (rs, rowNum) -> new ProductProfitabilityReport(
             rs.getObject("product_presentation_id", UUID.class),
             rs.getString("sku"),
             rs.getString("product_name"),
@@ -468,7 +481,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public StockValuationReport stockValuation(StockValuationQuery query) {
+    public StockValuationReport stockValuation(StockValuationQuery query, BranchScope scope) {
         List<ValuationRow> rows = jdbc.query("""
             WITH valued AS (
                 SELECT sb.warehouse_id,
@@ -487,6 +500,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                   ON pp.product_presentation_id = sb.product_presentation_id
                 JOIN catalog.products p ON p.product_id = pp.product_id
                 WHERE sb.on_hand_quantity > 0
+                  AND (CAST(:globalAccess AS boolean) OR w.branch_id IN (:branchIds))
                   AND (CAST(:branchId AS uuid) IS NULL OR w.branch_id = CAST(:branchId AS uuid))
                   AND (CAST(:warehouseId AS uuid) IS NULL OR sb.warehouse_id = CAST(:warehouseId AS uuid))
             )
@@ -496,7 +510,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             FROM valued
             ORDER BY stock_value DESC, product_name, presentation_name
             LIMIT :limit
-            """, params(query), (rs, rowNum) -> new ValuationRow(
+            """, params(query, scope), (rs, rowNum) -> new ValuationRow(
             new StockValuationItem(
                 rs.getObject("warehouse_id", UUID.class),
                 rs.getString("warehouse_name"),
@@ -524,7 +538,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public List<ExpiringProductReport> expiringProducts(ExpiringProductsQuery query) {
+    public List<ExpiringProductReport> expiringProducts(ExpiringProductsQuery query, BranchScope scope) {
         return jdbc.query("""
             SELECT l.lot_id,
                    l.lot_number,
@@ -554,11 +568,12 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
               AND lb.on_hand_quantity > 0
               AND l.expires_at BETWEEN CAST(:asOf AS date)
                                    AND CAST(:asOf AS date) + CAST(:days AS integer)
+              AND (CAST(:globalAccess AS boolean) OR w.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR w.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR lb.warehouse_id = CAST(:warehouseId AS uuid))
             ORDER BY l.expires_at, product_name, presentation_name, l.lot_number
             LIMIT :limit
-            """, params(query), (rs, rowNum) -> new ExpiringProductReport(
+            """, params(query, scope), (rs, rowNum) -> new ExpiringProductReport(
             rs.getObject("lot_id", UUID.class),
             rs.getString("lot_number"),
             rs.getObject("warehouse_id", UUID.class),
@@ -577,7 +592,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
     }
 
     @Override
-    public ReturnsSummaryReport returnsSummary(PeriodReportQuery query) {
+    public ReturnsSummaryReport returnsSummary(PeriodReportQuery query, BranchScope scope) {
         List<ReturnSummaryRow> rows = jdbc.query("""
             WITH return_base AS (
                 SELECT r.return_id,
@@ -598,6 +613,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                        CASE WHEN CAST(:branchId AS uuid) IS NULL
                             THEN :defaultTimezone ELSE b.timezone END)::date
                       BETWEEN CAST(:from AS date) AND CAST(:to AS date)
+                  AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
                   AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
                   AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
                   AND (CAST(:customerId AS uuid) IS NULL OR so.customer_id = CAST(:customerId AS uuid))
@@ -625,7 +641,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                    SUM(returned_amount) OVER () AS total_returned_amount
             FROM periods
             ORDER BY period_start
-            """, params(query), (rs, rowNum) -> new ReturnSummaryRow(
+            """, params(query, scope), (rs, rowNum) -> new ReturnSummaryRow(
             new ReturnPeriodReport(
                 rs.getObject("period_start", java.time.LocalDate.class),
                 rs.getObject("period_end", java.time.LocalDate.class),
@@ -666,17 +682,19 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
         );
     }
 
-    private MapSqlParameterSource params(ReportFilter filter) {
+    private MapSqlParameterSource params(ReportFilter filter, BranchScope scope) {
         return new MapSqlParameterSource()
             .addValue("from", filter.from())
             .addValue("to", filter.to())
             .addValue("branchId", filter.branchId())
             .addValue("warehouseId", filter.warehouseId())
             .addValue("customerId", filter.customerId())
-            .addValue("limit", filter.limit());
+            .addValue("limit", filter.limit())
+            .addValue("globalAccess", scope.globalAccess())
+            .addValue("branchIds", branchIds(scope));
     }
 
-    private MapSqlParameterSource params(PeriodReportQuery query) {
+    private MapSqlParameterSource params(PeriodReportQuery query, BranchScope scope) {
         return new MapSqlParameterSource()
             .addValue("from", query.from())
             .addValue("to", query.to())
@@ -684,10 +702,12 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             .addValue("warehouseId", query.warehouseId())
             .addValue("customerId", query.customerId())
             .addValue("groupUnit", sqlUnit(query.groupBy()))
-            .addValue("defaultTimezone", DEFAULT_TIMEZONE);
+            .addValue("defaultTimezone", DEFAULT_TIMEZONE)
+            .addValue("globalAccess", scope.globalAccess())
+            .addValue("branchIds", branchIds(scope));
     }
 
-    private MapSqlParameterSource params(ProductProfitabilityQuery query) {
+    private MapSqlParameterSource params(ProductProfitabilityQuery query, BranchScope scope) {
         return new MapSqlParameterSource()
             .addValue("from", query.from())
             .addValue("to", query.to())
@@ -695,23 +715,33 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             .addValue("warehouseId", query.warehouseId())
             .addValue("customerId", query.customerId())
             .addValue("limit", query.limit())
-            .addValue("defaultTimezone", DEFAULT_TIMEZONE);
+            .addValue("defaultTimezone", DEFAULT_TIMEZONE)
+            .addValue("globalAccess", scope.globalAccess())
+            .addValue("branchIds", branchIds(scope));
     }
 
-    private MapSqlParameterSource params(StockValuationQuery query) {
+    private MapSqlParameterSource params(StockValuationQuery query, BranchScope scope) {
         return new MapSqlParameterSource()
             .addValue("branchId", query.branchId())
             .addValue("warehouseId", query.warehouseId())
-            .addValue("limit", query.limit());
+            .addValue("limit", query.limit())
+            .addValue("globalAccess", scope.globalAccess())
+            .addValue("branchIds", branchIds(scope));
     }
 
-    private MapSqlParameterSource params(ExpiringProductsQuery query) {
+    private MapSqlParameterSource params(ExpiringProductsQuery query, BranchScope scope) {
         return new MapSqlParameterSource()
             .addValue("branchId", query.branchId())
             .addValue("warehouseId", query.warehouseId())
             .addValue("days", query.days())
             .addValue("limit", query.limit())
-            .addValue("asOf", query.asOf());
+            .addValue("asOf", query.asOf())
+            .addValue("globalAccess", scope.globalAccess())
+            .addValue("branchIds", branchIds(scope));
+    }
+
+    private List<UUID> branchIds(BranchScope scope) {
+        return scope.branchIds().isEmpty() ? List.of(new UUID(0L, 0L)) : List.copyOf(scope.branchIds());
     }
 
     private String sqlUnit(com.odcc.tienda.modules.reports.application.query.ReportGroupBy groupBy) {

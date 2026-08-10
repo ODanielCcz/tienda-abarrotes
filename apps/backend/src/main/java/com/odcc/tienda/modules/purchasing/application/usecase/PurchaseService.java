@@ -19,6 +19,8 @@ import com.odcc.tienda.modules.purchasing.application.port.out.PurchaseRepositor
 import com.odcc.tienda.modules.purchasing.application.query.ListPurchasesQuery;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import lombok.RequiredArgsConstructor;
 
@@ -36,6 +38,45 @@ public class PurchaseService implements PurchaseUseCases {
     private final CreateInventoryReceiptUseCase inventoryReceiptUseCase;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccessPort;
+
+    @Override
+    public Purchase create(CreatePurchaseCommand command, UUID actorUserId) {
+        branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(command.warehouseId()));
+        return create(command);
+    }
+
+    @Override
+    public Purchase getById(UUID purchaseId, UUID actorUserId) {
+        Purchase purchase = getById(purchaseId);
+        requirePurchaseAccess(actorUserId, purchase);
+        return purchase;
+    }
+
+    @Override
+    public List<Purchase> list(ListPurchasesQuery query, UUID actorUserId) {
+        if (query != null && query.warehouseId() != null) {
+            branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(query.warehouseId()));
+        }
+        BranchScope scope = branchAccessPort.resolveScope(actorUserId);
+        List<Purchase> purchases = list(query);
+        if (scope.globalAccess()) return purchases;
+        return purchases.stream()
+            .filter(purchase -> scope.branchIds().contains(repository.findBranchIdByWarehouseId(purchase.warehouseId())))
+            .toList();
+    }
+
+    @Override
+    public Purchase confirm(UUID purchaseId, UUID actorUserId) {
+        requirePurchaseAccess(actorUserId, getById(purchaseId));
+        return confirm(purchaseId);
+    }
+
+    @Override
+    public InventoryReceipt receive(ReceivePurchaseCommand command, UUID actorUserId) {
+        requirePurchaseAccess(actorUserId, getById(command.purchaseId()));
+        return receiveInternal(command, actorUserId);
+    }
 
     @Override
     public Purchase create(CreatePurchaseCommand command) {
@@ -75,6 +116,10 @@ public class PurchaseService implements PurchaseUseCases {
 
     @Override
     public InventoryReceipt receive(ReceivePurchaseCommand command) {
+        return receiveInternal(command, null);
+    }
+
+    private InventoryReceipt receiveInternal(ReceivePurchaseCommand command, UUID actorUserId) {
         return transactionRunner.required(() -> {
             Purchase purchase = getById(command.purchaseId());
             if (!List.of("CONFIRMED", "PARTIALLY_RECEIVED").contains(purchase.status())) {
@@ -82,16 +127,19 @@ public class PurchaseService implements PurchaseUseCases {
             }
             validateReceive(command);
             boolean alreadyApplied = command.idempotencyKey() != null && repository.inventoryReceiptExists(command.idempotencyKey());
-            List<InventoryReceiptItemCommand> items = command.items() == null ? List.of() : command.items().stream().map(this::toInventoryItem).toList();
-            List<InventoryReceiptPalletCommand> pallets = command.pallets() == null ? List.of() : command.pallets().stream().map(this::toInventoryPallet).toList();
-            InventoryReceipt receipt = inventoryReceiptUseCase.execute(new CreateInventoryReceiptCommand(
+            List<InventoryReceiptItemCommand> items = command.items() == null ? List.of() : command.items().stream().map(item -> toInventoryItem(command.purchaseId(), item)).toList();
+            List<InventoryReceiptPalletCommand> pallets = command.pallets() == null ? List.of() : command.pallets().stream().map(pallet -> toInventoryPallet(command.purchaseId(), pallet)).toList();
+            CreateInventoryReceiptCommand receiptCommand = new CreateInventoryReceiptCommand(
                 purchase.warehouseId(),
                 purchase.supplierId(),
                 command.idempotencyKey(),
                 "Recepcion de compra " + purchase.purchaseId(),
                 items,
                 pallets
-            ));
+            );
+            InventoryReceipt receipt = actorUserId == null
+                ? inventoryReceiptUseCase.execute(receiptCommand)
+                : inventoryReceiptUseCase.execute(receiptCommand, actorUserId);
             if (!alreadyApplied) {
                 applyReceivedQuantities(command);
                 Purchase updated = repository.refreshStatusAfterReceive(purchase.purchaseId());
@@ -119,33 +167,41 @@ public class PurchaseService implements PurchaseUseCases {
         int simpleItems = command.items() == null ? 0 : command.items().size();
         int palletItems = command.pallets() == null ? 0 : command.pallets().stream().mapToInt(p -> p.items() == null ? 0 : p.items().size()).sum();
         if (simpleItems + palletItems == 0) throw new PurchasingException("La recepcion debe incluir items");
-        if (command.items() != null) command.items().forEach(this::validateReceivableQuantity);
+        if (command.items() != null) command.items().forEach(item -> validateReceivableQuantity(command.purchaseId(), item));
         if (command.pallets() != null) command.pallets().forEach(p -> {
             if (p.items() == null || p.items().isEmpty()) throw new PurchasingException("El pallet debe incluir items");
-            p.items().forEach(this::validateReceivableQuantity);
+            p.items().forEach(item -> validateReceivableQuantity(command.purchaseId(), item));
         });
     }
 
-    private void validateReceivableQuantity(ReceivePurchaseItemCommand command) {
+    private void requirePurchaseAccess(UUID actorUserId, Purchase purchase) {
+        branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(purchase.warehouseId()));
+    }
+
+    private void validateReceivableQuantity(UUID purchaseId, ReceivePurchaseItemCommand command) {
         if (command.purchaseItemId() == null) throw new PurchaseItemNotFoundException(null);
         if (command.quantity() == null || command.quantity().compareTo(ZERO) <= 0) throw new PurchasingException("La cantidad recibida debe ser mayor a cero");
-        PurchaseItem item = repository.findItemById(command.purchaseItemId());
+        PurchaseItem item = findOwnedItem(purchaseId, command.purchaseItemId());
         BigDecimal pending = item.quantity().subtract(item.receivedQuantity());
         if (command.quantity().compareTo(pending) > 0) throw new PurchasingException("No se puede recibir mas de lo comprado para el item " + command.purchaseItemId());
     }
 
-    private InventoryReceiptItemCommand toInventoryItem(ReceivePurchaseItemCommand command) {
-        PurchaseItem item = repository.findItemById(command.purchaseItemId());
+    private InventoryReceiptItemCommand toInventoryItem(UUID purchaseId, ReceivePurchaseItemCommand command) {
+        PurchaseItem item = findOwnedItem(purchaseId, command.purchaseItemId());
         return new InventoryReceiptItemCommand(item.productPresentationId(), command.lotNumber(), command.manufacturedAt(), command.expiresAt(), command.quantity(), item.unitCost());
     }
 
-    private InventoryReceiptPalletCommand toInventoryPallet(ReceivePurchasePalletCommand command) {
-        return new InventoryReceiptPalletCommand(command.externalPalletCode(), command.items().stream().map(this::toInventoryItem).toList());
+    private InventoryReceiptPalletCommand toInventoryPallet(UUID purchaseId, ReceivePurchasePalletCommand command) {
+        return new InventoryReceiptPalletCommand(command.externalPalletCode(), command.items().stream().map(item -> toInventoryItem(purchaseId, item)).toList());
     }
 
     private void applyReceivedQuantities(ReceivePurchaseCommand command) {
-        if (command.items() != null) command.items().forEach(item -> repository.addReceivedQuantity(item.purchaseItemId(), item.quantity()));
-        if (command.pallets() != null) command.pallets().forEach(pallet -> pallet.items().forEach(item -> repository.addReceivedQuantity(item.purchaseItemId(), item.quantity())));
+        if (command.items() != null) command.items().forEach(item -> repository.addReceivedQuantity(command.purchaseId(), item.purchaseItemId(), item.quantity()));
+        if (command.pallets() != null) command.pallets().forEach(pallet -> pallet.items().forEach(item -> repository.addReceivedQuantity(command.purchaseId(), item.purchaseItemId(), item.quantity())));
+    }
+
+    private PurchaseItem findOwnedItem(UUID purchaseId, UUID purchaseItemId) {
+        return repository.findItemById(purchaseId, purchaseItemId);
     }
 
     private boolean isNewReceiptForThisCall(InventoryReceipt receipt, List<InventoryReceiptItemCommand> items, List<InventoryReceiptPalletCommand> pallets) {

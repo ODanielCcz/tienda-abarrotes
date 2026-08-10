@@ -12,6 +12,8 @@ import com.odcc.tienda.modules.sales.application.port.out.CustomerRepositoryPort
 import com.odcc.tienda.modules.sales.application.query.ListCustomersQuery;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessDeniedException;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import lombok.RequiredArgsConstructor;
 
@@ -34,9 +36,11 @@ public class CustomerService implements CustomerUseCases {
     private final CustomerRepositoryPort repository;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccess;
 
     @Override
-    public Customer create(CreateCustomerCommand command) {
+    public Customer create(CreateCustomerCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return transactionRunner.required(() -> {
             String code = normalizeOptionalCode(command == null ? null : command.customerCode());
             if (code != null && repository.existsByCode(code)) throw new CustomerCodeAlreadyExistsException(code);
@@ -58,20 +62,24 @@ public class CustomerService implements CustomerUseCases {
     }
 
     @Override
-    public Customer getById(UUID customerId) {
+    public Customer getById(UUID customerId, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return repository.findById(customerId).orElseThrow(() -> new CustomerNotFoundException(customerId));
     }
 
     @Override
-    public List<Customer> list(ListCustomersQuery query) {
+    public List<Customer> list(ListCustomersQuery query, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return repository.findAll(query);
     }
 
     @Override
-    public Customer update(UpdateCustomerCommand command) {
+    public Customer update(UpdateCustomerCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return transactionRunner.required(() -> {
             if (command == null || command.customerId() == null) throw new SalesException("El cliente es obligatorio");
-            Customer current = getById(command.customerId());
+            Customer current = repository.findById(command.customerId())
+                .orElseThrow(() -> new CustomerNotFoundException(command.customerId()));
             String code = normalizeOptionalCode(command.customerCode());
             if (code != null && repository.existsByCodeAndIdNot(code, command.customerId())) throw new CustomerCodeAlreadyExistsException(code);
             Customer updated = repository.save(new Customer(
@@ -91,10 +99,12 @@ public class CustomerService implements CustomerUseCases {
     }
 
     @Override
-    public Customer changeStatus(ChangeCustomerStatusCommand command) {
+    public Customer changeStatus(ChangeCustomerStatusCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return transactionRunner.required(() -> {
             if (command == null || command.customerId() == null) throw new SalesException("El cliente es obligatorio");
-            Customer current = getById(command.customerId());
+            Customer current = repository.findById(command.customerId())
+                .orElseThrow(() -> new CustomerNotFoundException(command.customerId()));
             Customer updated = repository.save(new Customer(
                 current.customerId(),
                 current.customerCode(),
@@ -118,6 +128,12 @@ public class CustomerService implements CustomerUseCases {
         state.put("displayName", customer.displayName());
         state.put("status", customer.status());
         return state;
+    }
+
+    private void requireGlobalAccess(UUID actorUserId) {
+        if (!branchAccess.resolveScope(actorUserId).globalAccess()) {
+            throw new BranchAccessDeniedException();
+        }
     }
 
     private static String normalizeOptionalCode(String code) {

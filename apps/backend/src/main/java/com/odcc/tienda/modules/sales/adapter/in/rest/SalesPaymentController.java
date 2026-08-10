@@ -58,8 +58,8 @@ public class SalesPaymentController {
     @GetMapping
     @Operation(summary = "Consultar pagos de una venta")
     @PreAuthorize("hasAuthority('SALES_PAYMENT_READ')")
-    public ResponseEntity<ApiResponseDto<List<SalesPayment>>> list(@PathVariable UUID salesOrderId, HttpServletRequest servletRequest) {
-        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_PAYMENTS_FOUND", "Pagos consultados correctamente", useCases.listBySalesOrder(salesOrderId), servletRequest.getRequestURI()));
+    public ResponseEntity<ApiResponseDto<List<SalesPayment>>> list(@PathVariable UUID salesOrderId, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_PAYMENTS_FOUND", "Pagos consultados correctamente", useCases.listBySalesOrder(salesOrderId, currentUserId(jwt)), servletRequest.getRequestURI()));
     }
 
     private UUID currentUserId(Jwt jwt) {

@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,9 +43,10 @@ public class InventoryQueryController {
     public ResponseEntity<ApiResponseDto<List<StockBalanceView>>> findStock(
         @RequestParam(required = false) UUID warehouseId,
         @RequestParam(required = false) UUID productPresentationId,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        List<StockBalanceView> stock = queries.findStock(new StockQuery(warehouseId, productPresentationId));
+        List<StockBalanceView> stock = queries.findStock(new StockQuery(warehouseId, productPresentationId), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_STOCK_FOUND", "Stock consultado correctamente", stock, servletRequest.getRequestURI()));
     }
 
@@ -53,9 +56,10 @@ public class InventoryQueryController {
     public ResponseEntity<ApiResponseDto<List<StockBalanceView>>> findStockByPresentation(
         @PathVariable UUID productPresentationId,
         @RequestParam(required = false) UUID warehouseId,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        List<StockBalanceView> stock = queries.findStock(new StockQuery(warehouseId, productPresentationId));
+        List<StockBalanceView> stock = queries.findStock(new StockQuery(warehouseId, productPresentationId), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_STOCK_FOUND", "Stock de presentacion consultado correctamente", stock, servletRequest.getRequestURI()));
     }
 
@@ -68,9 +72,10 @@ public class InventoryQueryController {
         @RequestParam(required = false) String status,
         @RequestParam(required = false) LocalDate expiresBefore,
         @RequestParam(required = false) LocalDate expiresAfter,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        List<LotView> lots = queries.findLots(new LotQuery(warehouseId, productPresentationId, status, expiresBefore, expiresAfter));
+        List<LotView> lots = queries.findLots(new LotQuery(warehouseId, productPresentationId, status, expiresBefore, expiresAfter), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_LOTS_FOUND", "Lotes consultados correctamente", lots, servletRequest.getRequestURI()));
     }
 
@@ -79,9 +84,10 @@ public class InventoryQueryController {
     @PreAuthorize("hasAuthority('INVENTORY_LOT_READ')")
     public ResponseEntity<ApiResponseDto<LotView>> getLotById(
         @PathVariable UUID lotId,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        LotView lot = queries.getLotById(lotId);
+        LotView lot = queries.getLotById(lotId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_LOT_FOUND", "Lote consultado correctamente", lot, servletRequest.getRequestURI()));
     }
 
@@ -91,9 +97,10 @@ public class InventoryQueryController {
     public ResponseEntity<ApiResponseDto<List<PalletView>>> findPallets(
         @RequestParam(required = false) UUID warehouseId,
         @RequestParam(required = false) String status,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        List<PalletView> pallets = queries.findPallets(new PalletQuery(warehouseId, status));
+        List<PalletView> pallets = queries.findPallets(new PalletQuery(warehouseId, status), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_PALLETS_FOUND", "Pallets consultados correctamente", pallets, servletRequest.getRequestURI()));
     }
 
@@ -102,9 +109,10 @@ public class InventoryQueryController {
     @PreAuthorize("hasAuthority('INVENTORY_PALLET_READ')")
     public ResponseEntity<ApiResponseDto<PalletView>> getPalletById(
         @PathVariable UUID palletId,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        PalletView pallet = queries.getPalletById(palletId);
+        PalletView pallet = queries.getPalletById(palletId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_PALLET_FOUND", "Pallet consultado correctamente", pallet, servletRequest.getRequestURI()));
     }
 
@@ -115,9 +123,10 @@ public class InventoryQueryController {
         @RequestParam(required = false) UUID warehouseId,
         @RequestParam(required = false) String movementType,
         @RequestParam(required = false) String status,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        List<StockMovementView> movements = queries.findMovements(new StockMovementQuery(warehouseId, movementType, status));
+        List<StockMovementView> movements = queries.findMovements(new StockMovementQuery(warehouseId, movementType, status), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_MOVEMENTS_FOUND", "Movimientos de inventario consultados correctamente", movements, servletRequest.getRequestURI()));
     }
 
@@ -126,9 +135,15 @@ public class InventoryQueryController {
     @PreAuthorize("hasAuthority('INVENTORY_MOVEMENT_READ')")
     public ResponseEntity<ApiResponseDto<StockMovementView>> getMovementById(
         @PathVariable UUID movementId,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        StockMovementView movement = queries.getMovementById(movementId);
+        StockMovementView movement = queries.getMovementById(movementId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_MOVEMENT_FOUND", "Movimiento de inventario consultado correctamente", movement, servletRequest.getRequestURI()));
+    }
+
+    private UUID currentUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null) throw new IllegalArgumentException("No se pudo identificar al usuario autenticado");
+        return UUID.fromString(jwt.getSubject());
     }
 }

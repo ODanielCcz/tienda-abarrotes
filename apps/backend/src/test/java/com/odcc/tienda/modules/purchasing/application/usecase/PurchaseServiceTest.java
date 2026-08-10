@@ -8,10 +8,12 @@ import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseItem
 import com.odcc.tienda.modules.purchasing.application.command.ReceivePurchaseCommand;
 import com.odcc.tienda.modules.purchasing.application.command.ReceivePurchaseItemCommand;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchasingException;
+import com.odcc.tienda.modules.purchasing.application.exception.PurchaseItemMismatchException;
 import com.odcc.tienda.modules.purchasing.application.model.Purchase;
 import com.odcc.tienda.modules.purchasing.support.InMemoryPurchaseRepository;
 import com.odcc.tienda.shared.support.ImmediateTransactionRunner;
 import com.odcc.tienda.shared.support.InMemoryBusinessAuditPort;
+import com.odcc.tienda.shared.support.AllowAllBranchAccessPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +33,7 @@ class PurchaseServiceTest {
     @BeforeEach
     void setUp() {
         repository = new InMemoryPurchaseRepository();
-        service = new PurchaseService(repository, new FakeInventoryReceiptUseCase(), new ImmediateTransactionRunner(), new InMemoryBusinessAuditPort());
+        service = new PurchaseService(repository, new FakeInventoryReceiptUseCase(), new ImmediateTransactionRunner(), new InMemoryBusinessAuditPort(), new AllowAllBranchAccessPort());
     }
 
     @Test
@@ -59,6 +61,27 @@ class PurchaseServiceTest {
         Purchase purchase = service.confirm(createPurchase().purchaseId());
 
         assertThrows(PurchasingException.class, () -> service.receive(new ReceivePurchaseCommand(purchase.purchaseId(), UUID.randomUUID(), List.of(new ReceivePurchaseItemCommand(purchase.items().getFirst().purchaseItemId(), null, null, null, new BigDecimal("2"))), List.of())));
+    }
+
+    @Test
+    void shouldRejectItemThatBelongsToAnotherPurchase() {
+        Purchase target = service.confirm(createPurchase().purchaseId());
+        Purchase another = service.confirm(createPurchase().purchaseId());
+
+        ReceivePurchaseCommand command = new ReceivePurchaseCommand(
+            target.purchaseId(),
+            UUID.randomUUID(),
+            List.of(new ReceivePurchaseItemCommand(
+                another.items().getFirst().purchaseItemId(),
+                null,
+                null,
+                null,
+                BigDecimal.ONE
+            )),
+            List.of()
+        );
+
+        assertThrows(PurchaseItemMismatchException.class, () -> service.receive(command));
     }
 
     private Purchase createPurchase() {

@@ -40,7 +40,7 @@ public class CatalogFiscalClassificationController {
         HttpServletRequest servletRequest
     ) {
         useCases.updateProductFiscalClassification(new UpdateProductFiscalClassificationCommand(
-            productId, request.satProductServiceCode()));
+            productId, request.satProductServiceCode()), currentUserId(servletRequest));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "PRODUCT_FISCAL_CLASSIFICATION_UPDATED",
             "Clasificacion fiscal del producto actualizada correctamente",
             Map.of("productId", productId, "satProductServiceCode", request.satProductServiceCode().trim()),
@@ -55,10 +55,20 @@ public class CatalogFiscalClassificationController {
         @Valid @RequestBody UnitFiscalClassificationRequest request,
         HttpServletRequest servletRequest
     ) {
-        useCases.updateUnitFiscalClassification(new UpdateUnitFiscalClassificationCommand(unitId, request.satUnitCode()));
+        useCases.updateUnitFiscalClassification(
+            new UpdateUnitFiscalClassificationCommand(unitId, request.satUnitCode()),
+            currentUserId(servletRequest)
+        );
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "UNIT_FISCAL_CLASSIFICATION_UPDATED",
             "Clasificacion fiscal de la unidad actualizada correctamente",
             Map.of("unitId", unitId, "satUnitCode", request.satUnitCode().trim().toUpperCase()),
             servletRequest.getRequestURI()));
+    }
+
+    private static UUID currentUserId(HttpServletRequest request) {
+        if (request.getUserPrincipal() == null || request.getUserPrincipal().getName() == null) {
+            throw new IllegalStateException("El JWT no contiene usuario");
+        }
+        return UUID.fromString(request.getUserPrincipal().getName());
     }
 }

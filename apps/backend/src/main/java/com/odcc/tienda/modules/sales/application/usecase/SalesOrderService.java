@@ -5,6 +5,8 @@ import com.odcc.tienda.modules.sales.application.command.CreateSalesOrderItemCom
 import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderIdempotencyConflictException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundException;
+import com.odcc.tienda.modules.sales.application.exception.PriceNotConfiguredException;
+import com.odcc.tienda.modules.sales.application.exception.SalesPriceChangedException;
 import com.odcc.tienda.modules.sales.application.model.SalesOrder;
 import com.odcc.tienda.modules.sales.application.port.in.SalesOrderUseCases;
 import com.odcc.tienda.modules.sales.application.port.out.SalesOrderRepositoryPort;
@@ -12,6 +14,8 @@ import com.odcc.tienda.modules.sales.application.query.ListSalesOrdersQuery;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
@@ -30,10 +34,12 @@ public class SalesOrderService implements SalesOrderUseCases {
     private final SalesOrderRepositoryPort repository;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccessPort;
 
     @Override
-    public SalesOrder create(CreateSalesOrderCommand command) {
+    public SalesOrder create(CreateSalesOrderCommand command, UUID actorUserId) {
         validateCreate(command);
+        branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(command.warehouseId()));
         String fingerprint = fingerprint(command);
         return transactionRunner.required(() -> {
             if (repository.existsByIdempotencyKeyWithDifferentFingerprint(command.idempotencyKey(), fingerprint)) {
@@ -44,7 +50,7 @@ public class SalesOrderService implements SalesOrderUseCases {
             if (command.customerId() != null && !repository.customerIsActive(command.customerId())) {
                 throw new SalesException("El cliente no existe o no esta activo");
             }
-            SalesOrder order = repository.createConfirmed(command, fingerprint);
+            SalesOrder order = repository.createConfirmed(resolveServerPrices(command), fingerprint);
             Map<String, Object> after = new LinkedHashMap<>();
             after.put("orderNumber", order.orderNumber());
             after.put("total", order.total());
@@ -55,19 +61,25 @@ public class SalesOrderService implements SalesOrderUseCases {
     }
 
     @Override
-    public SalesOrder getById(UUID salesOrderId) {
-        return repository.findById(salesOrderId).orElseThrow(() -> new SalesOrderNotFoundException(salesOrderId));
+    public SalesOrder getById(UUID salesOrderId, UUID actorUserId) {
+        SalesOrder order = findById(salesOrderId);
+        branchAccessPort.requireAccess(actorUserId, order.branchId());
+        return order;
     }
 
     @Override
-    public List<SalesOrder> list(ListSalesOrdersQuery query) {
-        return repository.findAll(query);
+    public List<SalesOrder> list(ListSalesOrdersQuery query, UUID actorUserId) {
+        BranchScope scope = branchAccessPort.resolveScope(actorUserId);
+        if (query != null && query.warehouseId() != null) {
+            branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(query.warehouseId()));
+        }
+        return repository.findAll(query).stream().filter(order -> scope.allows(order.branchId())).toList();
     }
 
     @Override
-    public SalesOrder cancel(UUID salesOrderId) {
+    public SalesOrder cancel(UUID salesOrderId, UUID actorUserId) {
         return transactionRunner.required(() -> {
-            SalesOrder before = getById(salesOrderId);
+            SalesOrder before = getById(salesOrderId, actorUserId);
             SalesOrder cancelled = repository.cancel(salesOrderId);
             auditPort.record(new BusinessAuditEvent("SALES_ORDER_CANCELLED", "SALES_ORDER", cancelled.salesOrderId(), Map.of("status", before.status()), Map.of("status", cancelled.status()), Map.of()));
             return cancelled;
@@ -85,8 +97,49 @@ public class SalesOrderService implements SalesOrderUseCases {
             if (item.productPresentationId() == null) throw new SalesException("La presentacion es obligatoria");
             if (item.quantity() == null || item.quantity().compareTo(ZERO) <= 0) throw new SalesException("La cantidad debe ser mayor a cero");
             if (item.unitPrice() == null || item.unitPrice().compareTo(ZERO) < 0) throw new SalesException("El precio unitario no puede ser negativo");
-            if (item.discountAmount() != null && item.discountAmount().compareTo(ZERO) < 0) throw new SalesException("El descuento no puede ser negativo");
+            if (item.discountAmount() != null && item.discountAmount().compareTo(ZERO) != 0) {
+                throw new SalesException("Los descuentos manuales no estan soportados");
+            }
         });
+    }
+
+    private SalesOrder findById(UUID salesOrderId) {
+        return repository.findById(salesOrderId).orElseThrow(() -> new SalesOrderNotFoundException(salesOrderId));
+    }
+
+    private CreateSalesOrderCommand resolveServerPrices(CreateSalesOrderCommand command) {
+        String currency = normalize(command.currencyCode(), "MXN");
+        List<CreateSalesOrderItemCommand> items = command.items().stream()
+            .map(item -> {
+                BigDecimal currentPrice = repository.findCurrentPrice(
+                    command.warehouseId(),
+                    item.productPresentationId(),
+                    currency
+                ).orElseThrow(() -> new PriceNotConfiguredException(item.productPresentationId()));
+                if (item.unitPrice().compareTo(currentPrice) != 0) {
+                    throw new SalesPriceChangedException(
+                        item.productPresentationId(),
+                        item.unitPrice(),
+                        currentPrice
+                    );
+                }
+                return new CreateSalesOrderItemCommand(
+                    item.productPresentationId(),
+                    item.quantity(),
+                    currentPrice,
+                    ZERO
+                );
+            })
+            .toList();
+        return new CreateSalesOrderCommand(
+            command.warehouseId(),
+            command.customerId(),
+            command.deviceId(),
+            command.channel(),
+            currency,
+            command.idempotencyKey(),
+            items
+        );
     }
 
     private static String fingerprint(CreateSalesOrderCommand command) {

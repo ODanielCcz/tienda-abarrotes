@@ -13,6 +13,7 @@ import com.odcc.tienda.modules.inventory.application.model.StockMovementView;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public interface AdvancedInventoryUseCases {
     StockMovementView adjust(CreateInventoryAdjustmentCommand command);
@@ -27,5 +28,5 @@ public interface AdvancedInventoryUseCases {
 
     ReservationView releaseReservation(ReleaseReservationCommand command);
 
-    List<LotView> findExpiringLots(LocalDate expiresBefore);
+    List<LotView> findExpiringLots(LocalDate expiresBefore, UUID actorUserId);
 }

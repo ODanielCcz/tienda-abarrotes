@@ -23,4 +23,6 @@ public interface CashSessionRepositoryPort {
     List<CashMovement> findMovements(UUID cashSessionId);
 
     CashMovement createManualMovement(CreateCashMovementCommand command);
+
+    UUID findBranchIdByCashRegisterId(UUID cashRegisterId);
 }

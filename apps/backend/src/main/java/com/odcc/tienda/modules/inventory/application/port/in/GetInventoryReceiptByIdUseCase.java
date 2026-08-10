@@ -6,4 +6,8 @@ import java.util.UUID;
 
 public interface GetInventoryReceiptByIdUseCase {
     InventoryReceipt execute(UUID receiptId);
+
+    default InventoryReceipt execute(UUID receiptId, UUID actorUserId) {
+        return execute(receiptId);
+    }
 }

@@ -4,6 +4,7 @@ import com.odcc.tienda.modules.inventory.application.command.CreateInventoryRece
 import com.odcc.tienda.modules.inventory.application.command.InventoryReceiptItemCommand;
 import com.odcc.tienda.modules.inventory.application.command.InventoryReceiptPalletCommand;
 import com.odcc.tienda.modules.inventory.application.exception.InventoryReceiptException;
+import com.odcc.tienda.modules.inventory.application.exception.InventoryReceiptAlreadyExistsException;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptItem;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptPallet;
@@ -35,6 +36,11 @@ public class JdbcInventoryReceiptRepositoryAdapter implements InventoryReceiptRe
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     private final NamedParameterJdbcTemplate jdbc;
+
+    @Override
+    public UUID findBranchIdByWarehouseId(UUID warehouseId) {
+        return findWarehouse(warehouseId).branchId();
+    }
 
     @Override
     public Optional<InventoryReceipt> findByIdempotencyKey(UUID idempotencyKey, String fingerprint) {
@@ -78,10 +84,10 @@ public class JdbcInventoryReceiptRepositoryAdapter implements InventoryReceiptRe
     public InventoryReceipt create(CreateInventoryReceiptCommand command, String fingerprint) {
         WarehouseRow warehouse = findWarehouse(command.warehouseId());
         UUID movementId = UUID.randomUUID();
-        UUID idempotencyKey = command.idempotencyKey() == null ? UUID.randomUUID() : command.idempotencyKey();
+        UUID idempotencyKey = command.idempotencyKey();
         Instant receivedAt = Instant.now();
 
-        jdbc.update("""
+        List<UUID> claimedMovementIds = jdbc.query("""
             INSERT INTO inventory.stock_movements (
                 stock_movement_id, branch_id, warehouse_id, movement_type, status,
                 source_type, source_id, reason, idempotency_key, source_fingerprint, confirmed_at
@@ -89,6 +95,8 @@ public class JdbcInventoryReceiptRepositoryAdapter implements InventoryReceiptRe
                 :movementId, :branchId, :warehouseId, 'PURCHASE_RECEIPT', 'CONFIRMED',
                 'INVENTORY_RECEIPT', :movementId, :reason, :idempotencyKey, :fingerprint, :confirmedAt
             )
+            ON CONFLICT (idempotency_key) DO NOTHING
+            RETURNING stock_movement_id
             """, new MapSqlParameterSource()
             .addValue("movementId", movementId)
             .addValue("branchId", warehouse.branchId())
@@ -96,7 +104,14 @@ public class JdbcInventoryReceiptRepositoryAdapter implements InventoryReceiptRe
             .addValue("reason", command.reason())
             .addValue("idempotencyKey", idempotencyKey)
             .addValue("fingerprint", fingerprint)
-            .addValue("confirmedAt", Timestamp.from(receivedAt)));
+            .addValue("confirmedAt", Timestamp.from(receivedAt)),
+            (resultSet, rowNumber) -> resultSet.getObject("stock_movement_id", UUID.class));
+
+        if (claimedMovementIds.isEmpty()) {
+            Optional<InventoryReceipt> existing = findByIdempotencyKey(idempotencyKey, fingerprint);
+            if (existing.isPresent()) return existing.get();
+            throw new InventoryReceiptAlreadyExistsException(idempotencyKey);
+        }
 
         List<InventoryReceiptItem> simpleItems = new ArrayList<>();
         if (command.items() != null) {

@@ -43,7 +43,7 @@ public class CustomerController {
     @Operation(summary = "Crear cliente")
     @PreAuthorize("hasAuthority('SALES_CUSTOMER_CREATE')")
     public ResponseEntity<ApiResponseDto<Customer>> create(@Valid @RequestBody CreateCustomerRequest request, HttpServletRequest servletRequest) {
-        Customer customer = useCases.create(new CreateCustomerCommand(request.customerCode(), request.customerType(), request.displayName(), request.email(), request.phone()));
+        Customer customer = useCases.create(new CreateCustomerCommand(request.customerCode(), request.customerType(), request.displayName(), request.email(), request.phone()), currentUserId(servletRequest));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "CUSTOMER_CREATED", "Cliente creado correctamente", customer, servletRequest.getRequestURI()));
     }
 
@@ -51,7 +51,7 @@ public class CustomerController {
     @Operation(summary = "Listar clientes")
     @PreAuthorize("hasAuthority('SALES_CUSTOMER_READ')")
     public ResponseEntity<ApiResponseDto<List<Customer>>> list(@RequestParam(required = false) String search, @RequestParam(required = false) String customerType, @RequestParam(required = false) String status, HttpServletRequest servletRequest) {
-        List<Customer> customers = useCases.list(new ListCustomersQuery(search, customerType, status));
+        List<Customer> customers = useCases.list(new ListCustomersQuery(search, customerType, status), currentUserId(servletRequest));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CUSTOMERS_FOUND", "Clientes consultados correctamente", customers, servletRequest.getRequestURI()));
     }
 
@@ -59,7 +59,7 @@ public class CustomerController {
     @Operation(summary = "Consultar cliente por id")
     @PreAuthorize("hasAuthority('SALES_CUSTOMER_READ')")
     public ResponseEntity<ApiResponseDto<Customer>> getById(@PathVariable UUID customerId, HttpServletRequest servletRequest) {
-        Customer customer = useCases.getById(customerId);
+        Customer customer = useCases.getById(customerId, currentUserId(servletRequest));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CUSTOMER_FOUND", "Cliente consultado correctamente", customer, servletRequest.getRequestURI()));
     }
 
@@ -67,7 +67,7 @@ public class CustomerController {
     @Operation(summary = "Actualizar cliente")
     @PreAuthorize("hasAuthority('SALES_CUSTOMER_UPDATE')")
     public ResponseEntity<ApiResponseDto<Customer>> update(@PathVariable UUID customerId, @Valid @RequestBody UpdateCustomerRequest request, HttpServletRequest servletRequest) {
-        Customer customer = useCases.update(new UpdateCustomerCommand(customerId, request.customerCode(), request.customerType(), request.displayName(), request.email(), request.phone()));
+        Customer customer = useCases.update(new UpdateCustomerCommand(customerId, request.customerCode(), request.customerType(), request.displayName(), request.email(), request.phone()), currentUserId(servletRequest));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CUSTOMER_UPDATED", "Cliente actualizado correctamente", customer, servletRequest.getRequestURI()));
     }
 
@@ -75,7 +75,14 @@ public class CustomerController {
     @Operation(summary = "Cambiar estado de cliente")
     @PreAuthorize("hasAuthority('SALES_CUSTOMER_STATUS')")
     public ResponseEntity<ApiResponseDto<Customer>> changeStatus(@PathVariable UUID customerId, @Valid @RequestBody ChangeCustomerStatusRequest request, HttpServletRequest servletRequest) {
-        Customer customer = useCases.changeStatus(new ChangeCustomerStatusCommand(customerId, request.status()));
+        Customer customer = useCases.changeStatus(new ChangeCustomerStatusCommand(customerId, request.status()), currentUserId(servletRequest));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CUSTOMER_STATUS_UPDATED", "Estado de cliente actualizado correctamente", customer, servletRequest.getRequestURI()));
+    }
+
+    private static UUID currentUserId(HttpServletRequest request) {
+        if (request.getUserPrincipal() == null || request.getUserPrincipal().getName() == null) {
+            throw new IllegalStateException("El JWT no contiene usuario");
+        }
+        return UUID.fromString(request.getUserPrincipal().getName());
     }
 }

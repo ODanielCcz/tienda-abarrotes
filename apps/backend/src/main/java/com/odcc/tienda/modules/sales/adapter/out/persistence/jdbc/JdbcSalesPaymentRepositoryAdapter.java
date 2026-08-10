@@ -5,6 +5,7 @@ import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentOverpaidException;
+import com.odcc.tienda.modules.sales.application.exception.SalesPaymentIdempotencyConflictException;
 import com.odcc.tienda.modules.sales.application.model.SalesPayment;
 import com.odcc.tienda.modules.sales.application.port.out.SalesPaymentRepositoryPort;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +49,7 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
 
     @Override
     public SalesPayment createCaptured(CreateSalesPaymentCommand command, String fingerprint) {
-        OrderRow order = findOrder(command.salesOrderId());
+        OrderRow order = findOrderForUpdate(command.salesOrderId());
         if (!"CONFIRMED".equals(order.status())) throw new SalesException("Solo se pueden registrar pagos en ventas confirmadas");
         String method = normalize(command.paymentMethod(), "CASH");
         String currency = normalize(command.currencyCode(), order.currencyCode());
@@ -60,7 +61,7 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
 
         UUID paymentId = UUID.randomUUID();
         Instant now = Instant.now();
-        jdbc.update("""
+        List<UUID> inserted = jdbc.query("""
             INSERT INTO sales.payments (
                 payment_id, sales_order_id, payment_method, status, amount, provider_reference,
                 idempotency_key, source_fingerprint, paid_at, created_at
@@ -68,6 +69,8 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
                 :paymentId, :salesOrderId, :paymentMethod, 'CAPTURED', :amount, :reference,
                 :idempotencyKey, :fingerprint, :paidAt, :createdAt
             )
+            ON CONFLICT (idempotency_key) DO NOTHING
+            RETURNING payment_id
             """, new MapSqlParameterSource()
             .addValue("paymentId", paymentId)
             .addValue("salesOrderId", command.salesOrderId())
@@ -77,7 +80,14 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
             .addValue("idempotencyKey", command.idempotencyKey())
             .addValue("fingerprint", fingerprint)
             .addValue("paidAt", Timestamp.from(now))
-            .addValue("createdAt", Timestamp.from(now)));
+            .addValue("createdAt", Timestamp.from(now)),
+            (resultSet, rowNumber) -> resultSet.getObject("payment_id", UUID.class));
+
+        if (inserted.isEmpty()) {
+            Optional<SalesPayment> existing = findByIdempotencyKey(command.idempotencyKey(), fingerprint);
+            if (existing.isPresent()) return existing.get();
+            throw new SalesPaymentIdempotencyConflictException(command.idempotencyKey());
+        }
 
         if ("CASH".equals(method)) insertCashMovement(command.cashSessionId(), "SALE", "IN", amount, paymentId, command.createdBy(), command.reference(), "Pago de venta en efectivo");
         updatePaymentStatus(command.salesOrderId(), paidBefore.add(amount), order.total());
@@ -100,19 +110,21 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
 
     @Override
     public SalesPayment cancel(UUID paymentId, UUID cancelledBy) {
-        SalesPayment current = findById(paymentId).orElseThrow(() -> new SalesPaymentNotFoundException(paymentId));
+        SalesPayment current = findPaymentForUpdate(paymentId);
         if (!"CAPTURED".equals(current.status())) throw new SalesException("Solo se pueden cancelar pagos capturados");
-        OrderRow order = findOrder(current.salesOrderId());
-        if ("CASH".equals(current.paymentMethod())) {
-            if (current.cashSessionId() == null) throw new SalesException("El pago en efectivo no tiene sesion de caja asociada");
-            ensureOpenCashSession(current.cashSessionId(), order.branchId());
-            insertCashMovement(current.cashSessionId(), "REFUND", "OUT", money(current.amount()), paymentId, cancelledBy, current.reference(), "Cancelacion de pago en efectivo");
-        }
-        jdbc.update("""
+        OrderRow order = findOrderForUpdate(current.salesOrderId());
+        int updated = jdbc.update("""
             UPDATE sales.payments
             SET status = 'CANCELLED'
             WHERE payment_id = :paymentId
+              AND status = 'CAPTURED'
             """, new MapSqlParameterSource("paymentId", paymentId));
+        if (updated != 1) throw new SalesException("El pago ya fue procesado");
+        if ("CASH".equals(current.paymentMethod())) {
+            if (current.cashSessionId() == null) throw new SalesException("El pago en efectivo no tiene sesion de caja asociada");
+            ensureOpenCashSession(current.cashSessionId(), order.branchId());
+            insertCashMovement(current.cashSessionId(), "REFUND", "OUT", money(current.amount()), paymentId, cancelledBy, current.reference(), "Cancelacion de pago en efectivo", "PAYMENT_CANCEL", paymentId);
+        }
         updatePaymentStatusFromCapturedPayments(current.salesOrderId(), order.total());
         return findPayment(paymentId);
     }
@@ -122,6 +134,30 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
             return jdbc.queryForObject("SELECT sales_order_id, branch_id, status, payment_status, currency_code, total FROM sales.sales_orders WHERE sales_order_id = :id", new MapSqlParameterSource("id", salesOrderId), (rs, rowNum) -> new OrderRow(rs.getObject("sales_order_id", UUID.class), rs.getObject("branch_id", UUID.class), rs.getString("status"), rs.getString("payment_status"), trim(rs.getString("currency_code")), rs.getBigDecimal("total")));
         } catch (EmptyResultDataAccessException exception) {
             throw new SalesOrderNotFoundException(salesOrderId);
+        }
+    }
+
+    private OrderRow findOrderForUpdate(UUID salesOrderId) {
+        try {
+            return jdbc.queryForObject(
+                "SELECT sales_order_id, branch_id, status, payment_status, currency_code, total FROM sales.sales_orders WHERE sales_order_id = :id FOR UPDATE",
+                new MapSqlParameterSource("id", salesOrderId),
+                (rs, rowNum) -> new OrderRow(rs.getObject("sales_order_id", UUID.class), rs.getObject("branch_id", UUID.class), rs.getString("status"), rs.getString("payment_status"), trim(rs.getString("currency_code")), rs.getBigDecimal("total"))
+            );
+        } catch (EmptyResultDataAccessException exception) {
+            throw new SalesOrderNotFoundException(salesOrderId);
+        }
+    }
+
+    private SalesPayment findPaymentForUpdate(UUID paymentId) {
+        try {
+            return jdbc.queryForObject(
+                paymentSelect() + " WHERE p.payment_id = :id FOR UPDATE OF p",
+                new MapSqlParameterSource("id", paymentId),
+                this::mapPayment
+            );
+        } catch (EmptyResultDataAccessException exception) {
+            throw new SalesPaymentNotFoundException(paymentId);
         }
     }
 
@@ -147,13 +183,17 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
     }
 
     private void insertCashMovement(UUID cashSessionId, String movementType, String direction, BigDecimal amount, UUID paymentId, UUID createdBy, String reference, String reason) {
+        insertCashMovement(cashSessionId, movementType, direction, amount, paymentId, createdBy, reference, reason, null, null);
+    }
+
+    private void insertCashMovement(UUID cashSessionId, String movementType, String direction, BigDecimal amount, UUID paymentId, UUID createdBy, String reference, String reason, String sourceType, UUID sourceId) {
         jdbc.update("""
             INSERT INTO cash.cash_movements (
                 cash_movement_id, cash_session_id, movement_type, direction, amount,
-                payment_id, reference, reason, created_by
+                payment_id, reference, reason, created_by, source_type, source_id
             ) VALUES (
                 :id, :cashSessionId, :movementType, :direction, :amount,
-                :paymentId, :reference, :reason, :createdBy
+                :paymentId, :reference, :reason, :createdBy, :sourceType, :sourceId
             )
             """, new MapSqlParameterSource()
             .addValue("id", UUID.randomUUID())
@@ -164,7 +204,9 @@ public class JdbcSalesPaymentRepositoryAdapter implements SalesPaymentRepository
             .addValue("paymentId", paymentId)
             .addValue("reference", reference)
             .addValue("reason", reason)
-            .addValue("createdBy", createdBy));
+            .addValue("createdBy", createdBy)
+            .addValue("sourceType", sourceType)
+            .addValue("sourceId", sourceId));
     }
 
     private void updatePaymentStatus(UUID salesOrderId, BigDecimal paid, BigDecimal total) {

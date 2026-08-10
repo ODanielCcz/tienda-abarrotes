@@ -4,6 +4,7 @@ import com.odcc.tienda.modules.organization.application.port.in.OrganizationUseC
 import com.odcc.tienda.modules.organization.application.port.out.OrganizationRepositoryPort;
 import com.odcc.tienda.modules.organization.application.usecase.OrganizationService;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,8 +16,9 @@ public class OrganizationConfiguration {
     OrganizationUseCases organizationUseCases(
         OrganizationRepositoryPort repository,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        BranchAccessPort branchAccess
     ) {
-        return new OrganizationService(repository, transactionRunner, auditPort);
+        return new OrganizationService(repository, transactionRunner, auditPort, branchAccess);
     }
 }

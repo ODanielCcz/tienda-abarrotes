@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,6 +70,9 @@ public class JdbcSupplierRepositoryAdapter implements SupplierRepositoryPort {
 
     @Override
     public List<Supplier> findAll(ListSuppliersQuery query) {
+        String status = normalize(query == null ? null : query.status());
+        String search = normalize(query == null ? null : query.search());
+        String searchLike = search == null ? null : "%" + search + "%";
         return jdbc.query("""
             SELECT *
             FROM purchasing.suppliers
@@ -77,9 +81,9 @@ public class JdbcSupplierRepositoryAdapter implements SupplierRepositoryPort {
             ORDER BY legal_name
             LIMIT 200
             """, new MapSqlParameterSource()
-            .addValue("status", normalize(query == null ? null : query.status()))
-            .addValue("search", normalize(query == null ? null : query.search()))
-            .addValue("searchLike", query == null || query.search() == null || query.search().isBlank() ? null : "%" + query.search().trim() + "%"), this::mapSupplier);
+            .addValue("status", status, Types.VARCHAR)
+            .addValue("search", search, Types.VARCHAR)
+            .addValue("searchLike", searchLike, Types.VARCHAR), this::mapSupplier);
     }
 
     private MapSqlParameterSource params(Supplier supplier) {

@@ -14,4 +14,6 @@ public interface InventoryReceiptRepositoryPort {
     InventoryReceipt create(CreateInventoryReceiptCommand command, String fingerprint);
 
     Optional<InventoryReceipt> findById(UUID receiptId);
+
+    UUID findBranchIdByWarehouseId(UUID warehouseId);
 }

@@ -3,6 +3,7 @@ package com.odcc.tienda.modules.purchasing.support;
 import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseCommand;
 import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseItemCommand;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchaseItemNotFoundException;
+import com.odcc.tienda.modules.purchasing.application.exception.PurchaseItemMismatchException;
 import com.odcc.tienda.modules.purchasing.application.model.Purchase;
 import com.odcc.tienda.modules.purchasing.application.model.PurchaseItem;
 import com.odcc.tienda.modules.purchasing.application.port.out.PurchaseRepositoryPort;
@@ -18,6 +19,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public class InMemoryPurchaseRepository implements PurchaseRepositoryPort {
+
+    private static final UUID DEFAULT_BRANCH_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     private final Map<UUID, Purchase> purchases = new LinkedHashMap<>();
     private final Map<UUID, PurchaseItem> items = new LinkedHashMap<>();
@@ -75,15 +78,16 @@ public class InMemoryPurchaseRepository implements PurchaseRepositoryPort {
     }
 
     @Override
-    public PurchaseItem findItemById(UUID purchaseItemId) {
+    public PurchaseItem findItemById(UUID purchaseId, UUID purchaseItemId) {
         PurchaseItem item = items.get(purchaseItemId);
         if (item == null) throw new PurchaseItemNotFoundException(purchaseItemId);
+        if (!purchaseId.equals(item.purchaseId())) throw new PurchaseItemMismatchException(purchaseId, purchaseItemId);
         return item;
     }
 
     @Override
-    public void addReceivedQuantity(UUID purchaseItemId, BigDecimal quantity) {
-        PurchaseItem current = findItemById(purchaseItemId);
+    public void addReceivedQuantity(UUID purchaseId, UUID purchaseItemId, BigDecimal quantity) {
+        PurchaseItem current = findItemById(purchaseId, purchaseItemId);
         items.put(purchaseItemId, new PurchaseItem(current.purchaseItemId(), current.purchaseId(), current.productPresentationId(), current.lotId(), current.productNameSnapshot(), current.skuSnapshot(), current.quantity(), current.receivedQuantity().add(quantity), current.unitCost(), current.discountAmount(), current.taxAmount(), current.lineTotal()));
     }
 
@@ -94,6 +98,11 @@ public class InMemoryPurchaseRepository implements PurchaseRepositoryPort {
         Purchase updated = new Purchase(current.purchaseId(), current.branchId(), current.warehouseId(), current.supplierId(), current.supplierDocument(), complete ? "RECEIVED" : "PARTIALLY_RECEIVED", current.paymentStatus(), current.currencyCode(), current.subtotal(), current.discountTotal(), current.taxTotal(), current.total(), current.idempotencyKey(), current.purchasedAt(), current.confirmedAt(), current.createdAt(), current.items());
         purchases.put(purchaseId, updated);
         return updated;
+    }
+
+    @Override
+    public UUID findBranchIdByWarehouseId(UUID warehouseId) {
+        return DEFAULT_BRANCH_ID;
     }
 
     private Purchase withFreshItems(Purchase purchase) {

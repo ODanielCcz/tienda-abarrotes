@@ -23,10 +23,12 @@ public interface PurchaseRepositoryPort {
 
     Purchase confirm(UUID purchaseId);
 
-    PurchaseItem findItemById(UUID purchaseItemId);
+    PurchaseItem findItemById(UUID purchaseId, UUID purchaseItemId);
 
-    void addReceivedQuantity(UUID purchaseItemId, BigDecimal quantity);
+    void addReceivedQuantity(UUID purchaseId, UUID purchaseItemId, BigDecimal quantity);
 
     Purchase refreshStatusAfterReceive(UUID purchaseId);
+
+    UUID findBranchIdByWarehouseId(UUID warehouseId);
 }
 

@@ -27,4 +27,6 @@ public interface InventoryQueryRepositoryPort {
     List<StockMovementView> findMovements(StockMovementQuery query);
 
     Optional<StockMovementView> findMovementById(UUID movementId);
+
+    UUID findBranchIdByWarehouseId(UUID warehouseId);
 }

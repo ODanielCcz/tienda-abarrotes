@@ -22,9 +22,21 @@ public final class InMemorySalesOrderRepository implements SalesOrderRepositoryP
     private final Map<UUID, SalesOrder> orders = new LinkedHashMap<>();
     private final Map<UUID, String> fingerprintsByIdempotencyKey = new LinkedHashMap<>();
     private final Set<UUID> activeCustomers = new java.util.HashSet<>();
+    private final Map<UUID, BigDecimal> currentPrices = new LinkedHashMap<>();
+    private final Set<UUID> presentationsWithoutPrice = new java.util.HashSet<>();
 
     public void addActiveCustomer(UUID customerId) {
         activeCustomers.add(customerId);
+    }
+
+    public void setCurrentPrice(UUID presentationId, BigDecimal price) {
+        presentationsWithoutPrice.remove(presentationId);
+        currentPrices.put(presentationId, price);
+    }
+
+    public void removeCurrentPrice(UUID presentationId) {
+        currentPrices.remove(presentationId);
+        presentationsWithoutPrice.add(presentationId);
     }
 
     @Override
@@ -44,6 +56,17 @@ public final class InMemorySalesOrderRepository implements SalesOrderRepositoryP
     @Override
     public boolean customerIsActive(UUID customerId) {
         return customerId == null || activeCustomers.contains(customerId);
+    }
+
+    @Override
+    public Optional<BigDecimal> findCurrentPrice(UUID warehouseId, UUID productPresentationId, String currencyCode) {
+        if (presentationsWithoutPrice.contains(productPresentationId)) return Optional.empty();
+        return Optional.of(currentPrices.getOrDefault(productPresentationId, new BigDecimal("25.00")));
+    }
+
+    @Override
+    public UUID findBranchIdByWarehouseId(UUID warehouseId) {
+        return UUID.nameUUIDFromBytes(warehouseId.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @Override

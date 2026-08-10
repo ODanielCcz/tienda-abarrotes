@@ -10,13 +10,13 @@ import java.util.List;
 import java.util.UUID;
 
 public interface SupplierUseCases {
-    Supplier create(CreateSupplierCommand command);
+    Supplier create(CreateSupplierCommand command, UUID actorUserId);
 
-    Supplier getById(UUID supplierId);
+    Supplier getById(UUID supplierId, UUID actorUserId);
 
-    List<Supplier> list(ListSuppliersQuery query);
+    List<Supplier> list(ListSuppliersQuery query, UUID actorUserId);
 
-    Supplier update(UpdateSupplierCommand command);
+    Supplier update(UpdateSupplierCommand command, UUID actorUserId);
 
-    Supplier changeStatus(ChangeSupplierStatusCommand command);
+    Supplier changeStatus(ChangeSupplierStatusCommand command, UUID actorUserId);
 }

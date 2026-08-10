@@ -14,7 +14,10 @@ import com.odcc.tienda.modules.sales.application.exception.SalesPaymentIdempoten
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentOverpaidException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnNotFoundException;
+import com.odcc.tienda.modules.sales.application.exception.SalesReturnAlreadyProcessedException;
 import com.odcc.tienda.modules.sales.application.exception.StockInsufficientException;
+import com.odcc.tienda.modules.sales.application.exception.PriceNotConfiguredException;
+import com.odcc.tienda.modules.sales.application.exception.SalesPriceChangedException;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -50,9 +53,24 @@ public class SalesExceptionHandler {
         return error(HttpStatus.CONFLICT, "STOCK_INSUFFICIENT", exception.getMessage(), request);
     }
 
+    @ExceptionHandler(PriceNotConfiguredException.class)
+    public ResponseEntity<ApiResponseDto<Void>> priceNotConfigured(PriceNotConfiguredException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "PRICE_NOT_CONFIGURED", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(SalesPriceChangedException.class)
+    public ResponseEntity<ApiResponseDto<Void>> salesPriceChanged(SalesPriceChangedException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "SALES_PRICE_CHANGED", exception.getMessage(), request);
+    }
+
     @ExceptionHandler(SalesReturnNotFoundException.class)
     public ResponseEntity<ApiResponseDto<Void>> salesReturnNotFound(SalesReturnNotFoundException exception, HttpServletRequest request) {
         return error(HttpStatus.NOT_FOUND, "SALES_RETURN_NOT_FOUND", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(SalesReturnAlreadyProcessedException.class)
+    public ResponseEntity<ApiResponseDto<Void>> salesReturnAlreadyProcessed(SalesReturnAlreadyProcessedException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "SALES_RETURN_ALREADY_PROCESSED", exception.getMessage(), request);
     }
 
     @ExceptionHandler(SalesPaymentNotFoundException.class)

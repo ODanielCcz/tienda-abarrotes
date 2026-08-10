@@ -13,6 +13,8 @@ import com.odcc.tienda.modules.cash.application.query.ListCashSessionsQuery;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
@@ -27,10 +29,12 @@ public class CashSessionService implements CashSessionUseCases {
     private final CashSessionRepositoryPort repository;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccessPort;
 
     @Override
     public CashSession open(OpenCashSessionCommand command) {
         validateOpen(command);
+        branchAccessPort.requireAccess(command.openedBy(), repository.findBranchIdByCashRegisterId(command.cashRegisterId()));
         return transactionRunner.required(() -> {
             CashSession session = repository.open(command);
             auditPort.record(new BusinessAuditEvent("CASH_SESSION_OPENED", "CASH_SESSION", session.cashSessionId(), Map.of(), Map.of("status", session.status(), "openingAmount", session.openingAmount()), Map.of()));
@@ -39,20 +43,26 @@ public class CashSessionService implements CashSessionUseCases {
     }
 
     @Override
-    public CashSession getById(UUID cashSessionId) {
-        return repository.findById(cashSessionId).orElseThrow(() -> new CashSessionNotFoundException(cashSessionId));
+    public CashSession getById(UUID cashSessionId, UUID actorUserId) {
+        CashSession session = findById(cashSessionId);
+        branchAccessPort.requireAccess(actorUserId, session.branchId());
+        return session;
     }
 
     @Override
-    public List<CashSession> list(ListCashSessionsQuery query) {
-        return repository.findAll(query);
+    public List<CashSession> list(ListCashSessionsQuery query, UUID actorUserId) {
+        BranchScope scope = branchAccessPort.resolveScope(actorUserId);
+        if (query != null && query.cashRegisterId() != null) {
+            branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByCashRegisterId(query.cashRegisterId()));
+        }
+        return repository.findAll(query).stream().filter(session -> scope.allows(session.branchId())).toList();
     }
 
     @Override
     public CashSession close(CloseCashSessionCommand command) {
         validateClose(command);
         return transactionRunner.required(() -> {
-            CashSession before = getById(command.cashSessionId());
+            CashSession before = getById(command.cashSessionId(), command.closedBy());
             CashSession closed = repository.close(command);
             auditPort.record(new BusinessAuditEvent("CASH_SESSION_CLOSED", "CASH_SESSION", closed.cashSessionId(), Map.of("status", before.status()), Map.of("status", closed.status(), "expectedAmount", closed.expectedAmount(), "countedAmount", closed.countedAmount(), "differenceAmount", closed.differenceAmount()), Map.of()));
             return closed;
@@ -60,19 +70,24 @@ public class CashSessionService implements CashSessionUseCases {
     }
 
     @Override
-    public List<CashMovement> listMovements(UUID cashSessionId) {
-        getById(cashSessionId);
+    public List<CashMovement> listMovements(UUID cashSessionId, UUID actorUserId) {
+        getById(cashSessionId, actorUserId);
         return repository.findMovements(cashSessionId);
     }
 
     @Override
     public CashMovement createMovement(CreateCashMovementCommand command) {
         validateMovement(command);
+        getById(command.cashSessionId(), command.createdBy());
         return transactionRunner.required(() -> {
             CashMovement movement = repository.createManualMovement(command);
             auditPort.record(new BusinessAuditEvent("CASH_MOVEMENT_CREATED", "CASH_MOVEMENT", movement.cashMovementId(), Map.of(), Map.of("cashSessionId", movement.cashSessionId(), "movementType", movement.movementType(), "direction", movement.direction(), "amount", movement.amount()), Map.of()));
             return movement;
         });
+    }
+
+    private CashSession findById(UUID cashSessionId) {
+        return repository.findById(cashSessionId).orElseThrow(() -> new CashSessionNotFoundException(cashSessionId));
     }
 
     private void validateOpen(OpenCashSessionCommand command) {

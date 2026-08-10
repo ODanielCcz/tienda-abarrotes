@@ -217,9 +217,9 @@ class OrganizationApiIntegrationTest {
                         }
                         """.formatted(branchId, suffix, suffix))
             )
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("INVALID_ORGANIZATION_OPERATION"))
-            .andExpect(jsonPath("$.reason").value("Bad Request"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("BRANCH_ACCESS_DENIED"))
+            .andExpect(jsonPath("$.reason").value("Forbidden"))
             .andExpect(jsonPath("$.correlationId").exists());
 
         Integer auditCount = jdbcTemplate.queryForObject(
@@ -302,6 +302,71 @@ class OrganizationApiIntegrationTest {
 
         mockMvc.perform(get("/api/v1/organization/branches/{branchId}", branchId).header("Authorization", "Bearer " + token))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldRestrictAUserToAssignedActiveBranches() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        UUID branchA = UUID.randomUUID();
+        UUID branchB = UUID.randomUUID();
+        jdbcTemplate.update(
+            "INSERT INTO organization.branches (branch_id, code, name) VALUES (?, ?, ?), (?, ?, ?)",
+            branchA, "SCOPE-A-" + suffix, "Sucursal Scope A " + suffix,
+            branchB, "SCOPE-B-" + suffix, "Sucursal Scope B " + suffix
+        );
+
+        String roleCode = "BRANCH_READER_" + suffix;
+        jdbcTemplate.update(
+            "INSERT INTO iam.roles (code, name, description, is_system) VALUES (?, ?, ?, FALSE)",
+            roleCode, roleCode, "Lee solamente sucursales asignadas"
+        );
+        jdbcTemplate.update(
+            """
+                INSERT INTO iam.role_permissions (role_id, permission_id)
+                SELECT r.role_id, p.permission_id
+                FROM iam.roles r
+                JOIN iam.permissions p ON p.code = 'ORGANIZATION_BRANCH_READ'
+                WHERE r.code = ?
+                """,
+            roleCode
+        );
+        String restrictedUsername = "branch_reader_" + suffix.toLowerCase();
+        UUID restrictedUserId = insertUser(restrictedUsername, "correct-password", roleCode);
+        jdbcTemplate.update(
+            "INSERT INTO iam.user_branch_access (user_id, branch_id, status) VALUES (?, ?, 'ACTIVE')",
+            restrictedUserId, branchA
+        );
+        String restrictedToken = login(restrictedUsername, "correct-password");
+
+        mockMvc.perform(get("/api/v1/organization/branches/{branchId}", branchA)
+                .header("Authorization", "Bearer " + restrictedToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.branchId").value(branchA.toString()));
+
+        mockMvc.perform(get("/api/v1/organization/branches/{branchId}", branchB)
+                .header("Authorization", "Bearer " + restrictedToken))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("BRANCH_ACCESS_DENIED"))
+            .andExpect(jsonPath("$.correlationId").exists());
+
+        mockMvc.perform(get("/api/v1/organization/branches")
+                .header("Authorization", "Bearer " + restrictedToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(1))
+            .andExpect(jsonPath("$.data[0].branchId").value(branchA.toString()));
+
+        String adminUsername = "branch_admin_" + suffix.toLowerCase();
+        insertUser(adminUsername, "correct-password", "SYSTEM_ADMIN");
+        String adminToken = login(adminUsername, "correct-password");
+        mockMvc.perform(get("/api/v1/organization/branches/{branchId}", branchB)
+                .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isOk());
+
+        jdbcTemplate.update("UPDATE organization.branches SET status = 'INACTIVE' WHERE branch_id = ?", branchA);
+        mockMvc.perform(get("/api/v1/organization/branches/{branchId}", branchA)
+                .header("Authorization", "Bearer " + restrictedToken))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("BRANCH_ACCESS_DENIED"));
     }
 
     private String login(String username, String password) throws Exception {

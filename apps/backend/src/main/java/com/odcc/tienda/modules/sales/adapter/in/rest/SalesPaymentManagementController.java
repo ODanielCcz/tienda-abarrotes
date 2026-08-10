@@ -31,8 +31,8 @@ public class SalesPaymentManagementController {
     @GetMapping("/{paymentId}")
     @Operation(summary = "Consultar pago por id")
     @PreAuthorize("hasAuthority('SALES_PAYMENT_READ')")
-    public ResponseEntity<ApiResponseDto<SalesPayment>> getById(@PathVariable UUID paymentId, HttpServletRequest servletRequest) {
-        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_PAYMENT_FOUND", "Pago consultado correctamente", useCases.getById(paymentId), servletRequest.getRequestURI()));
+    public ResponseEntity<ApiResponseDto<SalesPayment>> getById(@PathVariable UUID paymentId, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_PAYMENT_FOUND", "Pago consultado correctamente", useCases.getById(paymentId, currentUserId(jwt)), servletRequest.getRequestURI()));
     }
 
     @PostMapping("/{paymentId}/cancel")

@@ -8,11 +8,11 @@ import java.util.List;
 import java.util.UUID;
 
 public interface SalesOrderUseCases {
-    SalesOrder create(CreateSalesOrderCommand command);
+    SalesOrder create(CreateSalesOrderCommand command, UUID actorUserId);
 
-    SalesOrder getById(UUID salesOrderId);
+    SalesOrder getById(UUID salesOrderId, UUID actorUserId);
 
-    List<SalesOrder> list(ListSalesOrdersQuery query);
+    List<SalesOrder> list(ListSalesOrdersQuery query, UUID actorUserId);
 
-    SalesOrder cancel(UUID salesOrderId);
+    SalesOrder cancel(UUID salesOrderId, UUID actorUserId);
 }

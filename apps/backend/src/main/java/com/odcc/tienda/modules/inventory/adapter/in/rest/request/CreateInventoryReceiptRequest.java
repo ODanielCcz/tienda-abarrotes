@@ -9,7 +9,7 @@ import java.util.UUID;
 public record CreateInventoryReceiptRequest(
     @NotNull(message = "El almacen es obligatorio") UUID warehouseId,
     UUID supplierId,
-    UUID idempotencyKey,
+    @NotNull(message = "La llave de idempotencia es obligatoria") UUID idempotencyKey,
     String reason,
     @Valid List<InventoryReceiptItemRequest> items,
     @Valid List<InventoryReceiptPalletRequest> pallets

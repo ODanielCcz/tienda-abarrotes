@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,6 +42,7 @@ public class SalesOrderController {
     @PreAuthorize("hasAuthority('SALES_ORDER_CREATE')")
     public ResponseEntity<ApiResponseDto<SalesOrder>> create(
         @Valid @RequestBody CreateSalesOrderRequest request,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
         SalesOrder salesOrder = useCases.create(new CreateSalesOrderCommand(
@@ -50,7 +53,7 @@ public class SalesOrderController {
             request.currencyCode(),
             request.idempotencyKey(),
             request.items().stream().map(this::toItemCommand).toList()
-        ));
+        ), currentUserId(jwt));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(
             HttpStatus.CREATED,
@@ -68,9 +71,10 @@ public class SalesOrderController {
         @RequestParam(required = false) UUID warehouseId,
         @RequestParam(required = false) UUID customerId,
         @RequestParam(required = false) String status,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        List<SalesOrder> salesOrders = useCases.list(new ListSalesOrdersQuery(warehouseId, customerId, status));
+        List<SalesOrder> salesOrders = useCases.list(new ListSalesOrdersQuery(warehouseId, customerId, status), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "SALES_ORDERS_FOUND",
@@ -85,9 +89,10 @@ public class SalesOrderController {
     @PreAuthorize("hasAuthority('SALES_ORDER_READ')")
     public ResponseEntity<ApiResponseDto<SalesOrder>> getById(
         @PathVariable UUID salesOrderId,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        SalesOrder salesOrder = useCases.getById(salesOrderId);
+        SalesOrder salesOrder = useCases.getById(salesOrderId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "SALES_ORDER_FOUND",
@@ -102,9 +107,10 @@ public class SalesOrderController {
     @PreAuthorize("hasAuthority('SALES_ORDER_CANCEL')")
     public ResponseEntity<ApiResponseDto<SalesOrder>> cancel(
         @PathVariable UUID salesOrderId,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        SalesOrder salesOrder = useCases.cancel(salesOrderId);
+        SalesOrder salesOrder = useCases.cancel(salesOrderId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "SALES_ORDER_CANCELLED",
@@ -121,5 +127,10 @@ public class SalesOrderController {
             request.unitPrice(),
             request.discountAmount()
         );
+    }
+
+    private static UUID currentUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null) throw new IllegalStateException("El JWT no contiene usuario");
+        return UUID.fromString(jwt.getSubject());
     }
 }

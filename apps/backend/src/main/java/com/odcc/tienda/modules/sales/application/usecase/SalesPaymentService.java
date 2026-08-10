@@ -12,6 +12,7 @@ import com.odcc.tienda.modules.sales.application.port.out.SalesPaymentRepository
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
@@ -28,10 +29,12 @@ public class SalesPaymentService implements SalesPaymentUseCases {
     private final SalesOrderRepositoryPort salesOrderRepository;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccessPort;
 
     @Override
     public SalesPayment create(CreateSalesPaymentCommand command) {
         validate(command);
+        requireOrderAccess(command.salesOrderId(), command.createdBy());
         String fingerprint = fingerprint(command);
         return transactionRunner.required(() -> {
             if (repository.existsByIdempotencyKeyWithDifferentFingerprint(command.idempotencyKey(), fingerprint)) throw new SalesPaymentIdempotencyConflictException(command.idempotencyKey());
@@ -44,16 +47,18 @@ public class SalesPaymentService implements SalesPaymentUseCases {
     }
 
     @Override
-    public List<SalesPayment> listBySalesOrder(UUID salesOrderId) {
+    public List<SalesPayment> listBySalesOrder(UUID salesOrderId, UUID actorUserId) {
         if (salesOrderId == null) throw new SalesException("La venta es obligatoria");
-        if (salesOrderRepository.findById(salesOrderId).isEmpty()) throw new SalesOrderNotFoundException(salesOrderId);
+        requireOrderAccess(salesOrderId, actorUserId);
         return repository.findBySalesOrderId(salesOrderId);
     }
 
     @Override
-    public SalesPayment getById(UUID paymentId) {
+    public SalesPayment getById(UUID paymentId, UUID actorUserId) {
         if (paymentId == null) throw new SalesException("El pago es obligatorio");
-        return repository.findById(paymentId).orElseThrow(() -> new SalesPaymentNotFoundException(paymentId));
+        SalesPayment payment = repository.findById(paymentId).orElseThrow(() -> new SalesPaymentNotFoundException(paymentId));
+        requireOrderAccess(payment.salesOrderId(), actorUserId);
+        return payment;
     }
 
     @Override
@@ -61,11 +66,17 @@ public class SalesPaymentService implements SalesPaymentUseCases {
         if (paymentId == null) throw new SalesException("El pago es obligatorio");
         if (cancelledBy == null) throw new SalesException("El usuario que cancela el pago es obligatorio");
         return transactionRunner.required(() -> {
-            SalesPayment before = getById(paymentId);
+            SalesPayment before = getById(paymentId, cancelledBy);
             SalesPayment cancelled = repository.cancel(paymentId, cancelledBy);
             auditPort.record(new BusinessAuditEvent("SALES_PAYMENT_CANCELLED", "SALES_PAYMENT", cancelled.paymentId(), Map.of("status", before.status()), Map.of("status", cancelled.status(), "salesOrderId", cancelled.salesOrderId(), "amount", cancelled.amount()), Map.of()));
             return cancelled;
         });
+    }
+
+    private void requireOrderAccess(UUID salesOrderId, UUID actorUserId) {
+        var order = salesOrderRepository.findById(salesOrderId)
+            .orElseThrow(() -> new SalesOrderNotFoundException(salesOrderId));
+        branchAccessPort.requireAccess(actorUserId, order.branchId());
     }
 
     private void validate(CreateSalesPaymentCommand command) {

@@ -1,5 +1,7 @@
 package com.odcc.tienda.modules.inventory.adapter.out.persistence.jdbc;
 
+import com.odcc.tienda.modules.inventory.application.exception.InventoryResourceNotFoundException;
+
 import com.odcc.tienda.modules.inventory.application.model.LotView;
 import com.odcc.tienda.modules.inventory.application.model.PalletItemView;
 import com.odcc.tienda.modules.inventory.application.model.PalletView;
@@ -12,6 +14,7 @@ import com.odcc.tienda.modules.inventory.application.query.PalletQuery;
 import com.odcc.tienda.modules.inventory.application.query.StockMovementQuery;
 import com.odcc.tienda.modules.inventory.application.query.StockQuery;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -34,6 +37,16 @@ import java.util.UUID;
 public class JdbcInventoryQueryRepositoryAdapter implements InventoryQueryRepositoryPort {
 
     private final NamedParameterJdbcTemplate jdbc;
+
+    @Override
+    public UUID findBranchIdByWarehouseId(UUID warehouseId) {
+        try {
+            return jdbc.queryForObject("SELECT branch_id FROM organization.warehouses WHERE warehouse_id = :warehouseId",
+                new MapSqlParameterSource("warehouseId", warehouseId), UUID.class);
+        } catch (EmptyResultDataAccessException exception) {
+            throw new InventoryResourceNotFoundException("un almacen", warehouseId);
+        }
+    }
 
     @Override
     public List<StockBalanceView> findStock(StockQuery query) {

@@ -57,8 +57,8 @@ public class SalesReturnController {
     @GetMapping("/sales/returns/{returnId}")
     @Operation(summary = "Consultar devolucion por id")
     @PreAuthorize("hasAuthority('SALES_RETURN_READ')")
-    public ResponseEntity<ApiResponseDto<SalesReturn>> getById(@PathVariable UUID returnId, HttpServletRequest servletRequest) {
-        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_RETURN_FOUND", "Devolucion consultada correctamente", useCases.getById(returnId), servletRequest.getRequestURI()));
+    public ResponseEntity<ApiResponseDto<SalesReturn>> getById(@PathVariable UUID returnId, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_RETURN_FOUND", "Devolucion consultada correctamente", useCases.getById(returnId, currentUserId(jwt)), servletRequest.getRequestURI()));
     }
 
     @PostMapping("/sales/returns/{returnId}/confirm")
@@ -78,8 +78,8 @@ public class SalesReturnController {
     @PostMapping("/sales/returns/{returnId}/cancel")
     @Operation(summary = "Cancelar borrador de devolucion")
     @PreAuthorize("hasAuthority('SALES_RETURN_CANCEL')")
-    public ResponseEntity<ApiResponseDto<SalesReturn>> cancel(@PathVariable UUID returnId, HttpServletRequest servletRequest) {
-        SalesReturn salesReturn = useCases.cancel(returnId);
+    public ResponseEntity<ApiResponseDto<SalesReturn>> cancel(@PathVariable UUID returnId, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        SalesReturn salesReturn = useCases.cancel(returnId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_RETURN_CANCELLED", "Devolucion cancelada correctamente", salesReturn, servletRequest.getRequestURI()));
     }
 

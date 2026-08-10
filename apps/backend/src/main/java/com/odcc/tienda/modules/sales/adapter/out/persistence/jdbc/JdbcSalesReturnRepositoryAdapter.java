@@ -6,6 +6,7 @@ import com.odcc.tienda.modules.sales.application.command.CreateSalesReturnItemCo
 import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnNotFoundException;
+import com.odcc.tienda.modules.sales.application.exception.SalesReturnAlreadyProcessedException;
 import com.odcc.tienda.modules.sales.application.model.SalesReturn;
 import com.odcc.tienda.modules.sales.application.model.SalesReturnItem;
 import com.odcc.tienda.modules.sales.application.port.out.SalesReturnRepositoryPort;
@@ -22,6 +23,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Comparator;
 
 @Repository
 @RequiredArgsConstructor
@@ -77,15 +79,29 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
 
     @Override
     public SalesReturn confirm(ConfirmSalesReturnCommand command) {
-        SalesReturn salesReturn = findById(command.returnId()).orElseThrow(() -> new SalesReturnNotFoundException(command.returnId()));
-        if (!"DRAFT".equals(salesReturn.status())) throw new SalesException("Solo se pueden confirmar devoluciones en borrador");
+        SalesReturn salesReturn = findByIdForUpdate(command.returnId());
+        if (!"DRAFT".equals(salesReturn.status())) throw new SalesReturnAlreadyProcessedException(command.returnId());
         OrderRow order = findOrder(salesReturn.salesOrderId());
+        List<SalesReturnItem> lockedItems = salesReturn.items().stream()
+            .sorted(Comparator.comparing(SalesReturnItem::salesOrderItemId))
+            .toList();
+        for (SalesReturnItem item : lockedItems) {
+            findOrderItemForUpdate(order.salesOrderId(), item.salesOrderItemId());
+        }
+        for (SalesReturnItem item : lockedItems) {
+            OrderItemRow orderItem = findOrderItem(order.salesOrderId(), item.salesOrderItemId());
+            ensureReturnQuantityAvailableForConfirm(salesReturn.returnId(), orderItem, item.quantity());
+        }
+        int claimed = jdbc.update(
+            "UPDATE sales.returns SET status = 'CONFIRMED', confirmed_at = clock_timestamp() WHERE return_id = :returnId AND status = 'DRAFT'",
+            new MapSqlParameterSource("returnId", salesReturn.returnId())
+        );
+        if (claimed != 1) throw new SalesReturnAlreadyProcessedException(command.returnId());
         UUID movementId = UUID.randomUUID();
         insertStockMovement(movementId, order.branchId(), order.warehouseId(), "SALE_RETURN", "SALES_RETURN", salesReturn.returnId(), "Devolucion de venta " + order.orderNumber(), command.confirmedBy());
 
-        for (SalesReturnItem item : salesReturn.items()) {
+        for (SalesReturnItem item : lockedItems) {
             OrderItemRow orderItem = findOrderItem(order.salesOrderId(), item.salesOrderItemId());
-            ensureReturnQuantityAvailableForConfirm(salesReturn.returnId(), orderItem, item.quantity());
             BigDecimal before = currentStock(order.warehouseId(), orderItem.productPresentationId());
             upStock(order.warehouseId(), orderItem.productPresentationId(), item.quantity(), orderItem.unitCost());
             BigDecimal after = before.add(item.quantity());
@@ -93,7 +109,6 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
             insertStockMovementItem(movementId, orderItem.productPresentationId(), orderItem.lotId(), item.quantity(), orderItem.unitCost(), before, after, "IN");
         }
 
-        jdbc.update("UPDATE sales.returns SET status = 'CONFIRMED', confirmed_at = clock_timestamp() WHERE return_id = :returnId", new MapSqlParameterSource("returnId", salesReturn.returnId()));
         SalesReturn confirmedReturn = findById(salesReturn.returnId()).orElseThrow();
         updateSalesOrderReturnStatus(order.salesOrderId());
         maybeInsertCashRefund(order, confirmedReturn, command.cashSessionId(), command.confirmedBy());
@@ -102,10 +117,32 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
 
     @Override
     public SalesReturn cancel(UUID returnId) {
-        SalesReturn salesReturn = findById(returnId).orElseThrow(() -> new SalesReturnNotFoundException(returnId));
-        if (!"DRAFT".equals(salesReturn.status())) throw new SalesException("Solo se pueden cancelar devoluciones en borrador");
-        jdbc.update("UPDATE sales.returns SET status = 'CANCELLED' WHERE return_id = :returnId", new MapSqlParameterSource("returnId", returnId));
+        SalesReturn salesReturn = findByIdForUpdate(returnId);
+        if (!"DRAFT".equals(salesReturn.status())) throw new SalesReturnAlreadyProcessedException(returnId);
+        int updated = jdbc.update("UPDATE sales.returns SET status = 'CANCELLED' WHERE return_id = :returnId AND status = 'DRAFT'", new MapSqlParameterSource("returnId", returnId));
+        if (updated != 1) throw new SalesReturnAlreadyProcessedException(returnId);
         return findById(returnId).orElseThrow();
+    }
+
+    private SalesReturn findByIdForUpdate(UUID returnId) {
+        try {
+            SalesReturn salesReturn = jdbc.queryForObject(
+                "SELECT * FROM sales.returns WHERE return_id = :returnId FOR UPDATE",
+                new MapSqlParameterSource("returnId", returnId),
+                this::mapReturnWithoutItems
+            );
+            return withItems(salesReturn);
+        } catch (EmptyResultDataAccessException exception) {
+            throw new SalesReturnNotFoundException(returnId);
+        }
+    }
+
+    private void findOrderItemForUpdate(UUID salesOrderId, UUID salesOrderItemId) {
+        jdbc.queryForObject(
+            "SELECT sales_order_item_id FROM sales.sales_order_items WHERE sales_order_id = :salesOrderId AND sales_order_item_id = :salesOrderItemId FOR UPDATE",
+            new MapSqlParameterSource().addValue("salesOrderId", salesOrderId).addValue("salesOrderItemId", salesOrderItemId),
+            UUID.class
+        );
     }
 
     private OrderRow findOrder(UUID salesOrderId) {
@@ -186,10 +223,10 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
         jdbc.update("""
             INSERT INTO cash.cash_movements (
                 cash_movement_id, cash_session_id, movement_type, direction, amount,
-                payment_id, reference, reason, created_by
+                payment_id, reference, reason, created_by, source_type, source_id
             ) VALUES (
                 :id, :cashSessionId, 'REFUND', 'OUT', :amount,
-                :paymentId, :reference, :reason, :createdBy
+                :paymentId, :reference, :reason, :createdBy, 'SALES_RETURN', :sourceId
             )
             """, new MapSqlParameterSource()
             .addValue("id", UUID.randomUUID())
@@ -198,7 +235,8 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
             .addValue("paymentId", cashPayment.paymentId())
             .addValue("reference", "Devolucion " + salesReturn.returnId())
             .addValue("reason", salesReturn.reason())
-            .addValue("createdBy", createdBy));
+            .addValue("createdBy", createdBy)
+            .addValue("sourceId", salesReturn.returnId()));
         if (isFullReturn(order.salesOrderId())) {
             jdbc.update("UPDATE sales.sales_orders SET payment_status = 'REFUNDED' WHERE sales_order_id = :salesOrderId", new MapSqlParameterSource("salesOrderId", order.salesOrderId()));
         }

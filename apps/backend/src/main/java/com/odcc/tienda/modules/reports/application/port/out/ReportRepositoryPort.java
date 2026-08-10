@@ -17,31 +17,32 @@ import com.odcc.tienda.modules.reports.application.query.PeriodReportQuery;
 import com.odcc.tienda.modules.reports.application.query.ProductProfitabilityQuery;
 import com.odcc.tienda.modules.reports.application.query.ReportFilter;
 import com.odcc.tienda.modules.reports.application.query.StockValuationQuery;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 
 import java.util.List;
 
 public interface ReportRepositoryPort {
-    SalesSummaryReport salesSummary(ReportFilter filter);
+    SalesSummaryReport salesSummary(ReportFilter filter, BranchScope scope);
 
-    List<TopProductReport> topProducts(ReportFilter filter);
+    List<TopProductReport> topProducts(ReportFilter filter, BranchScope scope);
 
-    List<CustomerSalesReport> customerSales(ReportFilter filter);
+    List<CustomerSalesReport> customerSales(ReportFilter filter, BranchScope scope);
 
-    List<LowStockReport> lowStock(ReportFilter filter);
+    List<LowStockReport> lowStock(ReportFilter filter, BranchScope scope);
 
-    List<InventoryMovementReport> inventoryMovements(ReportFilter filter);
+    List<InventoryMovementReport> inventoryMovements(ReportFilter filter, BranchScope scope);
 
-    List<CashSummaryReport> cashSummary(ReportFilter filter);
+    List<CashSummaryReport> cashSummary(ReportFilter filter, BranchScope scope);
 
-    List<SalesByPeriodReport> salesByPeriod(PeriodReportQuery query);
+    List<SalesByPeriodReport> salesByPeriod(PeriodReportQuery query, BranchScope scope);
 
-    GrossMarginReport grossMargin(PeriodReportQuery query);
+    GrossMarginReport grossMargin(PeriodReportQuery query, BranchScope scope);
 
-    List<ProductProfitabilityReport> productProfitability(ProductProfitabilityQuery query);
+    List<ProductProfitabilityReport> productProfitability(ProductProfitabilityQuery query, BranchScope scope);
 
-    StockValuationReport stockValuation(StockValuationQuery query);
+    StockValuationReport stockValuation(StockValuationQuery query, BranchScope scope);
 
-    List<ExpiringProductReport> expiringProducts(ExpiringProductsQuery query);
+    List<ExpiringProductReport> expiringProducts(ExpiringProductsQuery query, BranchScope scope);
 
-    ReturnsSummaryReport returnsSummary(PeriodReportQuery query);
+    ReturnsSummaryReport returnsSummary(PeriodReportQuery query, BranchScope scope);
 }

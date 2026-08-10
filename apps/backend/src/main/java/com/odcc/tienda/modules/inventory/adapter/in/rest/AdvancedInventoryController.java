@@ -140,9 +140,10 @@ public class AdvancedInventoryController {
     @PreAuthorize("hasAuthority('INVENTORY_EXPIRING_LOT_READ')")
     public ResponseEntity<ApiResponseDto<List<LotView>>> expiringLots(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiresBefore,
+        @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        List<LotView> lots = useCases.findExpiringLots(expiresBefore);
+        List<LotView> lots = useCases.findExpiringLots(expiresBefore, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_EXPIRING_LOTS_FOUND", "Lotes proximos a caducar consultados correctamente", lots, servletRequest.getRequestURI()));
     }
 

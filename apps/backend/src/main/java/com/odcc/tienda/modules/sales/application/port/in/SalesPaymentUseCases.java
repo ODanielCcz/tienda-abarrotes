@@ -9,9 +9,9 @@ import java.util.UUID;
 public interface SalesPaymentUseCases {
     SalesPayment create(CreateSalesPaymentCommand command);
 
-    List<SalesPayment> listBySalesOrder(UUID salesOrderId);
+    List<SalesPayment> listBySalesOrder(UUID salesOrderId, UUID actorUserId);
 
-    SalesPayment getById(UUID paymentId);
+    SalesPayment getById(UUID paymentId, UUID actorUserId);
 
     SalesPayment cancel(UUID paymentId, UUID cancelledBy);
 }

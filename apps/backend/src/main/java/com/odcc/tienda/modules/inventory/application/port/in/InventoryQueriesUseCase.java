@@ -26,4 +26,12 @@ public interface InventoryQueriesUseCase {
     List<StockMovementView> findMovements(StockMovementQuery query);
 
     StockMovementView getMovementById(UUID movementId);
+
+    default List<StockBalanceView> findStock(StockQuery query, UUID actorUserId) { return findStock(query); }
+    default List<LotView> findLots(LotQuery query, UUID actorUserId) { return findLots(query); }
+    default LotView getLotById(UUID lotId, UUID actorUserId) { return getLotById(lotId); }
+    default List<PalletView> findPallets(PalletQuery query, UUID actorUserId) { return findPallets(query); }
+    default PalletView getPalletById(UUID palletId, UUID actorUserId) { return getPalletById(palletId); }
+    default List<StockMovementView> findMovements(StockMovementQuery query, UUID actorUserId) { return findMovements(query); }
+    default StockMovementView getMovementById(UUID movementId, UUID actorUserId) { return getMovementById(movementId); }
 }

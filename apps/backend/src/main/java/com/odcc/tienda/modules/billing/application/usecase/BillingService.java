@@ -19,6 +19,9 @@ import com.odcc.tienda.modules.billing.application.port.in.BillingUseCases;
 import com.odcc.tienda.modules.billing.application.port.out.BillingRepositoryPort;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessDeniedException;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import lombok.RequiredArgsConstructor;
 
@@ -41,11 +44,13 @@ public final class BillingService implements BillingUseCases {
     private final BillingRepositoryPort repository;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccess;
 
     @Override
-    public IssuerProfile createIssuerProfile(CreateIssuerProfileCommand command) {
+    public IssuerProfile createIssuerProfile(CreateIssuerProfileCommand command, UUID actorUserId) {
         CreateIssuerProfileCommand normalized = normalize(command);
         validateIssuer(normalized);
+        branchAccess.requireAccess(actorUserId, normalized.branchId());
         requireActiveBranch(normalized.branchId());
         if (repository.activeIssuerExists(normalized.branchId(), null)) {
             throw new BillingConflictException("La sucursal ya tiene un perfil emisor activo");
@@ -58,22 +63,29 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public List<IssuerProfile> listIssuerProfiles(UUID branchId, String status) {
-        return repository.listIssuerProfiles(branchId, normalizeStatusFilter(status));
+    public List<IssuerProfile> listIssuerProfiles(UUID branchId, String status, UUID actorUserId) {
+        if (branchId != null) branchAccess.requireAccess(actorUserId, branchId);
+        BranchScope scope = branchAccess.resolveScope(actorUserId);
+        return repository.listIssuerProfiles(branchId, normalizeStatusFilter(status)).stream()
+            .filter(profile -> scope.allows(profile.branchId()))
+            .toList();
     }
 
     @Override
-    public IssuerProfile getIssuerProfile(UUID issuerProfileId) {
+    public IssuerProfile getIssuerProfile(UUID issuerProfileId, UUID actorUserId) {
         if (issuerProfileId == null) throw new BillingException("El perfil emisor es obligatorio");
-        return repository.findIssuerProfile(issuerProfileId)
+        IssuerProfile profile = repository.findIssuerProfile(issuerProfileId)
             .orElseThrow(() -> new BillingNotFoundException("el perfil emisor " + issuerProfileId));
+        branchAccess.requireAccess(actorUserId, profile.branchId());
+        return profile;
     }
 
     @Override
-    public IssuerProfile updateIssuerProfile(UpdateIssuerProfileCommand command) {
+    public IssuerProfile updateIssuerProfile(UpdateIssuerProfileCommand command, UUID actorUserId) {
         UpdateIssuerProfileCommand normalized = normalize(command);
         validateIssuer(normalized);
-        IssuerProfile current = getIssuerProfile(normalized.issuerProfileId());
+        IssuerProfile current = getIssuerProfile(normalized.issuerProfileId(), actorUserId);
+        branchAccess.requireAccess(actorUserId, normalized.branchId());
         requireActiveBranch(normalized.branchId());
         return transactionRunner.required(() -> {
             IssuerProfile updated = repository.updateIssuerProfile(normalized);
@@ -83,9 +95,9 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public IssuerProfile changeIssuerProfileStatus(ChangeStatusCommand command) {
+    public IssuerProfile changeIssuerProfileStatus(ChangeStatusCommand command, UUID actorUserId) {
         validateStatusCommand(command);
-        IssuerProfile current = getIssuerProfile(command.resourceId());
+        IssuerProfile current = getIssuerProfile(command.resourceId(), actorUserId);
         String status = normalizeStatus(command.status());
         if ("ACTIVE".equals(status)) {
             requireActiveBranch(current.branchId());
@@ -102,7 +114,8 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public FiscalProfile createFiscalProfile(CreateFiscalProfileCommand command) {
+    public FiscalProfile createFiscalProfile(CreateFiscalProfileCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         CreateFiscalProfileCommand normalized = normalize(command);
         validateFiscalProfile(normalized);
         requireActiveCustomer(normalized.customerId());
@@ -114,22 +127,25 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public List<FiscalProfile> listFiscalProfiles(UUID customerId, String status) {
+    public List<FiscalProfile> listFiscalProfiles(UUID customerId, String status, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return repository.listFiscalProfiles(customerId, normalizeStatusFilter(status));
     }
 
     @Override
-    public FiscalProfile getFiscalProfile(UUID fiscalProfileId) {
+    public FiscalProfile getFiscalProfile(UUID fiscalProfileId, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         if (fiscalProfileId == null) throw new BillingException("El perfil fiscal es obligatorio");
         return repository.findFiscalProfile(fiscalProfileId)
             .orElseThrow(() -> new BillingNotFoundException("el perfil fiscal " + fiscalProfileId));
     }
 
     @Override
-    public FiscalProfile updateFiscalProfile(UpdateFiscalProfileCommand command) {
+    public FiscalProfile updateFiscalProfile(UpdateFiscalProfileCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         UpdateFiscalProfileCommand normalized = normalize(command);
         validateFiscalProfile(normalized);
-        FiscalProfile current = getFiscalProfile(normalized.fiscalProfileId());
+        FiscalProfile current = getFiscalProfile(normalized.fiscalProfileId(), actorUserId);
         requireActiveCustomer(normalized.customerId());
         return transactionRunner.required(() -> {
             FiscalProfile updated = repository.updateFiscalProfile(normalized);
@@ -139,9 +155,10 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public FiscalProfile changeFiscalProfileStatus(ChangeStatusCommand command) {
+    public FiscalProfile changeFiscalProfileStatus(ChangeStatusCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         validateStatusCommand(command);
-        FiscalProfile current = getFiscalProfile(command.resourceId());
+        FiscalProfile current = getFiscalProfile(command.resourceId(), actorUserId);
         String status = normalizeStatus(command.status());
         if ("ACTIVE".equals(status)) requireActiveCustomer(current.customerId());
         return transactionRunner.required(() -> {
@@ -153,7 +170,8 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public void updateProductFiscalClassification(UpdateProductFiscalClassificationCommand command) {
+    public void updateProductFiscalClassification(UpdateProductFiscalClassificationCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         if (command == null || command.productId() == null) throw new BillingException("El producto es obligatorio");
         String code = normalizeRequired(command.satProductServiceCode(), "El codigo SAT del producto es obligatorio");
         if (!SAT_PRODUCT_PATTERN.matcher(code).matches()) throw new BillingException("El codigo SAT del producto debe contener 8 digitos");
@@ -166,7 +184,8 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public void updateUnitFiscalClassification(UpdateUnitFiscalClassificationCommand command) {
+    public void updateUnitFiscalClassification(UpdateUnitFiscalClassificationCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         if (command == null || command.unitId() == null) throw new BillingException("La unidad de medida es obligatoria");
         String code = normalizeRequired(command.satUnitCode(), "El codigo SAT de unidad es obligatorio");
         if (!SAT_UNIT_PATTERN.matcher(code).matches()) throw new BillingException("El codigo SAT de unidad es invalido");
@@ -179,16 +198,18 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public FiscalDocument createFiscalDocument(CreateFiscalDocumentCommand command) {
+    public FiscalDocument createFiscalDocument(CreateFiscalDocumentCommand command, UUID actorUserId) {
         validateCreateDocument(command);
         FiscalDocumentSource source = repository.findFiscalDocumentSource(command.salesOrderId())
             .orElseThrow(() -> new BillingNotFoundException("la venta " + command.salesOrderId()));
+        branchAccess.requireAccess(actorUserId, source.branchId());
         if (!"CONFIRMED".equals(source.orderStatus()) || !"PAID".equals(source.paymentStatus())) {
             throw new BillingConflictException("La venta debe estar confirmada y completamente pagada");
         }
         if (source.customerId() == null) throw new BillingConflictException("La venta debe tener un cliente para facturarse");
-        IssuerProfile issuer = getIssuerProfile(command.issuerProfileId());
-        FiscalProfile receiver = getFiscalProfile(command.fiscalProfileId());
+        IssuerProfile issuer = getIssuerProfile(command.issuerProfileId(), actorUserId);
+        FiscalProfile receiver = repository.findFiscalProfile(command.fiscalProfileId())
+            .orElseThrow(() -> new BillingNotFoundException("el perfil fiscal " + command.fiscalProfileId()));
         if (!"ACTIVE".equals(issuer.status())) throw new BillingConflictException("El perfil emisor no esta activo");
         if (!"ACTIVE".equals(receiver.status())) throw new BillingConflictException("El perfil fiscal del cliente no esta activo");
         if (!issuer.branchId().equals(source.branchId())) throw new BillingConflictException("El perfil emisor no pertenece a la sucursal de la venta");
@@ -209,20 +230,32 @@ public final class BillingService implements BillingUseCases {
     }
 
     @Override
-    public List<FiscalDocument> listFiscalDocuments(UUID salesOrderId, String status) {
-        return repository.listFiscalDocuments(salesOrderId, normalizeDocumentStatus(status));
+    public List<FiscalDocument> listFiscalDocuments(UUID salesOrderId, String status, UUID actorUserId) {
+        if (salesOrderId != null) {
+            FiscalDocumentSource source = repository.findFiscalDocumentSource(salesOrderId)
+                .orElseThrow(() -> new BillingNotFoundException("la venta " + salesOrderId));
+            branchAccess.requireAccess(actorUserId, source.branchId());
+        }
+        BranchScope scope = branchAccess.resolveScope(actorUserId);
+        return repository.listFiscalDocuments(salesOrderId, normalizeDocumentStatus(status)).stream()
+            .filter(document -> repository.findFiscalDocumentSource(document.salesOrderId())
+                .map(source -> scope.allows(source.branchId()))
+                .orElse(false))
+            .toList();
     }
 
     @Override
-    public FiscalDocument getFiscalDocument(UUID fiscalDocumentId) {
+    public FiscalDocument getFiscalDocument(UUID fiscalDocumentId, UUID actorUserId) {
         if (fiscalDocumentId == null) throw new BillingException("El documento fiscal es obligatorio");
-        return repository.findFiscalDocument(fiscalDocumentId)
+        FiscalDocument document = repository.findFiscalDocument(fiscalDocumentId)
             .orElseThrow(() -> new BillingNotFoundException("el documento fiscal " + fiscalDocumentId));
+        requireDocumentAccess(document, actorUserId);
+        return document;
     }
 
     @Override
-    public FiscalDocument markFiscalDocumentReady(UUID fiscalDocumentId) {
-        FiscalDocument current = getFiscalDocument(fiscalDocumentId);
+    public FiscalDocument markFiscalDocumentReady(UUID fiscalDocumentId, UUID actorUserId) {
+        FiscalDocument current = getFiscalDocument(fiscalDocumentId, actorUserId);
         if (!"DRAFT".equals(current.status())) throw new BillingConflictException("Solo un documento DRAFT puede marcarse como READY");
         return transactionRunner.required(() -> {
             FiscalDocument ready = repository.markFiscalDocumentReady(fiscalDocumentId);
@@ -235,6 +268,18 @@ public final class BillingService implements BillingUseCases {
     private void requireActiveBranch(UUID branchId) {
         if (branchId == null || !repository.branchIsActive(branchId)) {
             throw new BillingNotFoundException("una sucursal activa con id " + branchId);
+        }
+    }
+
+    private void requireDocumentAccess(FiscalDocument document, UUID actorUserId) {
+        FiscalDocumentSource source = repository.findFiscalDocumentSource(document.salesOrderId())
+            .orElseThrow(() -> new BillingNotFoundException("la venta " + document.salesOrderId()));
+        branchAccess.requireAccess(actorUserId, source.branchId());
+    }
+
+    private void requireGlobalAccess(UUID actorUserId) {
+        if (!branchAccess.resolveScope(actorUserId).globalAccess()) {
+            throw new BranchAccessDeniedException();
         }
     }
 

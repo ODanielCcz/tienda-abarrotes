@@ -10,13 +10,13 @@ import java.util.List;
 import java.util.UUID;
 
 public interface CustomerUseCases {
-    Customer create(CreateCustomerCommand command);
+    Customer create(CreateCustomerCommand command, UUID actorUserId);
 
-    Customer getById(UUID customerId);
+    Customer getById(UUID customerId, UUID actorUserId);
 
-    List<Customer> list(ListCustomersQuery query);
+    List<Customer> list(ListCustomersQuery query, UUID actorUserId);
 
-    Customer update(UpdateCustomerCommand command);
+    Customer update(UpdateCustomerCommand command, UUID actorUserId);
 
-    Customer changeStatus(ChangeCustomerStatusCommand command);
+    Customer changeStatus(ChangeCustomerStatusCommand command, UUID actorUserId);
 }

@@ -12,6 +12,8 @@ import com.odcc.tienda.modules.purchasing.application.port.out.SupplierRepositor
 import com.odcc.tienda.modules.purchasing.application.query.ListSuppliersQuery;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessDeniedException;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import lombok.RequiredArgsConstructor;
 
@@ -31,9 +33,11 @@ public class SupplierService implements SupplierUseCases {
     private final SupplierRepositoryPort repository;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccessPort;
 
     @Override
-    public Supplier create(CreateSupplierCommand command) {
+    public Supplier create(CreateSupplierCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return transactionRunner.required(() -> {
             String code = normalizeCode(command.supplierCode());
             if (repository.existsByCode(code)) throw new SupplierCodeAlreadyExistsException(code);
@@ -45,19 +49,23 @@ public class SupplierService implements SupplierUseCases {
     }
 
     @Override
-    public Supplier getById(UUID supplierId) {
+    public Supplier getById(UUID supplierId, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return repository.findById(supplierId).orElseThrow(() -> new SupplierNotFoundException(supplierId));
     }
 
     @Override
-    public List<Supplier> list(ListSuppliersQuery query) {
+    public List<Supplier> list(ListSuppliersQuery query, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return repository.findAll(query);
     }
 
     @Override
-    public Supplier update(UpdateSupplierCommand command) {
+    public Supplier update(UpdateSupplierCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return transactionRunner.required(() -> {
-            Supplier current = getById(command.supplierId());
+            Supplier current = repository.findById(command.supplierId())
+                .orElseThrow(() -> new SupplierNotFoundException(command.supplierId()));
             String code = normalizeCode(command.supplierCode());
             if (repository.existsByCodeAndIdNot(code, command.supplierId())) throw new SupplierCodeAlreadyExistsException(code);
             Supplier updated = repository.save(new Supplier(current.supplierId(), code, normalizeRequired(command.legalName(), "La razon social es obligatoria"), normalize(command.tradeName()), normalize(command.taxId()), normalize(command.email()), normalize(command.phone()), nonNegative(command.creditDays()), current.status(), current.createdAt(), Instant.now()));
@@ -67,14 +75,22 @@ public class SupplierService implements SupplierUseCases {
     }
 
     @Override
-    public Supplier changeStatus(ChangeSupplierStatusCommand command) {
+    public Supplier changeStatus(ChangeSupplierStatusCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         return transactionRunner.required(() -> {
-            Supplier current = getById(command.supplierId());
+            Supplier current = repository.findById(command.supplierId())
+                .orElseThrow(() -> new SupplierNotFoundException(command.supplierId()));
             String status = normalizeStatus(command.status());
             Supplier updated = repository.save(new Supplier(current.supplierId(), current.supplierCode(), current.legalName(), current.tradeName(), current.taxId(), current.email(), current.phone(), current.creditDays(), status, current.createdAt(), Instant.now()));
             auditPort.record(new BusinessAuditEvent("SUPPLIER_STATUS_CHANGED", "SUPPLIER", updated.supplierId(), state(current), state(updated), Map.of()));
             return updated;
         });
+    }
+
+    private void requireGlobalAccess(UUID actorUserId) {
+        if (!branchAccessPort.resolveScope(actorUserId).globalAccess()) {
+            throw new BranchAccessDeniedException();
+        }
     }
 
     private static Map<String, Object> state(Supplier supplier) {

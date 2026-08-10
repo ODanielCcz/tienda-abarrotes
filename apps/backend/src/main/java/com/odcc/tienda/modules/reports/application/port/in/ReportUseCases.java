@@ -19,29 +19,30 @@ import com.odcc.tienda.modules.reports.application.query.ReportFilter;
 import com.odcc.tienda.modules.reports.application.query.StockValuationQuery;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface ReportUseCases {
-    SalesSummaryReport salesSummary(ReportFilter filter);
+    SalesSummaryReport salesSummary(ReportFilter filter, UUID actorUserId);
 
-    List<TopProductReport> topProducts(ReportFilter filter);
+    List<TopProductReport> topProducts(ReportFilter filter, UUID actorUserId);
 
-    List<CustomerSalesReport> customerSales(ReportFilter filter);
+    List<CustomerSalesReport> customerSales(ReportFilter filter, UUID actorUserId);
 
-    List<LowStockReport> lowStock(ReportFilter filter);
+    List<LowStockReport> lowStock(ReportFilter filter, UUID actorUserId);
 
-    List<InventoryMovementReport> inventoryMovements(ReportFilter filter);
+    List<InventoryMovementReport> inventoryMovements(ReportFilter filter, UUID actorUserId);
 
-    List<CashSummaryReport> cashSummary(ReportFilter filter);
+    List<CashSummaryReport> cashSummary(ReportFilter filter, UUID actorUserId);
 
-    List<SalesByPeriodReport> salesByPeriod(PeriodReportQuery query);
+    List<SalesByPeriodReport> salesByPeriod(PeriodReportQuery query, UUID actorUserId);
 
-    GrossMarginReport grossMargin(PeriodReportQuery query);
+    GrossMarginReport grossMargin(PeriodReportQuery query, UUID actorUserId);
 
-    List<ProductProfitabilityReport> productProfitability(ProductProfitabilityQuery query);
+    List<ProductProfitabilityReport> productProfitability(ProductProfitabilityQuery query, UUID actorUserId);
 
-    StockValuationReport stockValuation(StockValuationQuery query);
+    StockValuationReport stockValuation(StockValuationQuery query, UUID actorUserId);
 
-    List<ExpiringProductReport> expiringProducts(ExpiringProductsQuery query);
+    List<ExpiringProductReport> expiringProducts(ExpiringProductsQuery query, UUID actorUserId);
 
-    ReturnsSummaryReport returnsSummary(PeriodReportQuery query);
+    ReturnsSummaryReport returnsSummary(PeriodReportQuery query, UUID actorUserId);
 }

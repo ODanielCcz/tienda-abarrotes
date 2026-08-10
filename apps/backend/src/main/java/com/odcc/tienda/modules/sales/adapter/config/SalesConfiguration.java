@@ -17,6 +17,7 @@ import com.odcc.tienda.modules.sales.application.usecase.SalesPaymentService;
 import com.odcc.tienda.modules.sales.application.usecase.SalesReturnService;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -36,18 +37,20 @@ public class SalesConfiguration {
     CustomerUseCases customerUseCases(
         CustomerRepositoryPort repository,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        BranchAccessPort branchAccessPort
     ) {
-        return new CustomerService(repository, transactionRunner, auditPort);
+        return new CustomerService(repository, transactionRunner, auditPort, branchAccessPort);
     }
 
     @Bean
     SalesOrderUseCases salesOrderUseCases(
         SalesOrderRepositoryPort repository,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        BranchAccessPort branchAccessPort
     ) {
-        return new SalesOrderService(repository, transactionRunner, auditPort);
+        return new SalesOrderService(repository, transactionRunner, auditPort, branchAccessPort);
     }
 
     @Bean
@@ -55,17 +58,20 @@ public class SalesConfiguration {
         SalesPaymentRepositoryPort repository,
         SalesOrderRepositoryPort salesOrderRepository,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        BranchAccessPort branchAccessPort
     ) {
-        return new SalesPaymentService(repository, salesOrderRepository, transactionRunner, auditPort);
+        return new SalesPaymentService(repository, salesOrderRepository, transactionRunner, auditPort, branchAccessPort);
     }
 
     @Bean
     SalesReturnUseCases salesReturnUseCases(
         SalesReturnRepositoryPort repository,
+        SalesOrderRepositoryPort salesOrderRepository,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        BranchAccessPort branchAccessPort
     ) {
-        return new SalesReturnService(repository, transactionRunner, auditPort);
+        return new SalesReturnService(repository, transactionRunner, auditPort, salesOrderRepository, branchAccessPort);
     }
 }

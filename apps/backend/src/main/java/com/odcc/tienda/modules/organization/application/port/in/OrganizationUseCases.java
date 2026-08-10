@@ -25,27 +25,27 @@ import java.util.List;
 import java.util.UUID;
 
 public interface OrganizationUseCases {
-    BranchView createBranch(CreateBranchCommand command);
-    List<BranchView> listBranches(BranchStatus status);
-    BranchView getBranch(UUID branchId);
-    BranchView updateBranch(UpdateBranchCommand command);
-    BranchView changeBranchStatus(ChangeBranchStatusCommand command);
+    BranchView createBranch(CreateBranchCommand command, UUID actorUserId);
+    List<BranchView> listBranches(BranchStatus status, UUID actorUserId);
+    BranchView getBranch(UUID branchId, UUID actorUserId);
+    BranchView updateBranch(UpdateBranchCommand command, UUID actorUserId);
+    BranchView changeBranchStatus(ChangeBranchStatusCommand command, UUID actorUserId);
 
-    WarehouseView createWarehouse(CreateWarehouseCommand command);
-    List<WarehouseView> listWarehouses(UUID branchId, WarehouseStatus status);
-    WarehouseView getWarehouse(UUID warehouseId);
-    WarehouseView updateWarehouse(UpdateWarehouseCommand command);
-    WarehouseView changeWarehouseStatus(ChangeWarehouseStatusCommand command);
+    WarehouseView createWarehouse(CreateWarehouseCommand command, UUID actorUserId);
+    List<WarehouseView> listWarehouses(UUID branchId, WarehouseStatus status, UUID actorUserId);
+    WarehouseView getWarehouse(UUID warehouseId, UUID actorUserId);
+    WarehouseView updateWarehouse(UpdateWarehouseCommand command, UUID actorUserId);
+    WarehouseView changeWarehouseStatus(ChangeWarehouseStatusCommand command, UUID actorUserId);
 
-    CashRegisterView createCashRegister(CreateCashRegisterCommand command);
-    List<CashRegisterView> listCashRegisters(UUID branchId, CashRegisterStatus status);
-    CashRegisterView getCashRegister(UUID cashRegisterId);
-    CashRegisterView updateCashRegister(UpdateCashRegisterCommand command);
-    CashRegisterView changeCashRegisterStatus(ChangeCashRegisterStatusCommand command);
+    CashRegisterView createCashRegister(CreateCashRegisterCommand command, UUID actorUserId);
+    List<CashRegisterView> listCashRegisters(UUID branchId, CashRegisterStatus status, UUID actorUserId);
+    CashRegisterView getCashRegister(UUID cashRegisterId, UUID actorUserId);
+    CashRegisterView updateCashRegister(UpdateCashRegisterCommand command, UUID actorUserId);
+    CashRegisterView changeCashRegisterStatus(ChangeCashRegisterStatusCommand command, UUID actorUserId);
 
-    DeviceView createDevice(CreateDeviceCommand command);
-    List<DeviceView> listDevices(UUID branchId, DeviceStatus status);
-    DeviceView getDevice(UUID deviceId);
-    DeviceView updateDevice(UpdateDeviceCommand command);
-    DeviceView changeDeviceStatus(ChangeDeviceStatusCommand command);
+    DeviceView createDevice(CreateDeviceCommand command, UUID actorUserId);
+    List<DeviceView> listDevices(UUID branchId, DeviceStatus status, UUID actorUserId);
+    DeviceView getDevice(UUID deviceId, UUID actorUserId);
+    DeviceView updateDevice(UpdateDeviceCommand command, UUID actorUserId);
+    DeviceView changeDeviceStatus(ChangeDeviceStatusCommand command, UUID actorUserId);
 }

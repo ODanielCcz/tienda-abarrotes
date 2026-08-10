@@ -52,7 +52,7 @@ public class BillingController {
     ) {
         IssuerProfile result = useCases.createIssuerProfile(new CreateIssuerProfileCommand(
             request.branchId(), request.rfc(), request.legalName(), request.postalCode(),
-            request.fiscalRegimeCode(), request.defaultSeries()));
+            request.fiscalRegimeCode(), request.defaultSeries()), currentUserId(servletRequest));
         return created("ISSUER_PROFILE_CREATED", "Perfil emisor creado correctamente", result, servletRequest);
     }
 
@@ -65,7 +65,7 @@ public class BillingController {
         HttpServletRequest servletRequest
     ) {
         return ok("ISSUER_PROFILES_FOUND", "Perfiles emisores consultados correctamente",
-            useCases.listIssuerProfiles(branchId, status), servletRequest);
+            useCases.listIssuerProfiles(branchId, status, currentUserId(servletRequest)), servletRequest);
     }
 
     @GetMapping("/issuer-profiles/{issuerProfileId}")
@@ -75,7 +75,7 @@ public class BillingController {
         @PathVariable UUID issuerProfileId, HttpServletRequest servletRequest
     ) {
         return ok("ISSUER_PROFILE_FOUND", "Perfil emisor consultado correctamente",
-            useCases.getIssuerProfile(issuerProfileId), servletRequest);
+            useCases.getIssuerProfile(issuerProfileId, currentUserId(servletRequest)), servletRequest);
     }
 
     @PutMapping("/issuer-profiles/{issuerProfileId}")
@@ -88,7 +88,7 @@ public class BillingController {
     ) {
         IssuerProfile result = useCases.updateIssuerProfile(new UpdateIssuerProfileCommand(
             issuerProfileId, request.branchId(), request.rfc(), request.legalName(),
-            request.postalCode(), request.fiscalRegimeCode(), request.defaultSeries()));
+            request.postalCode(), request.fiscalRegimeCode(), request.defaultSeries()), currentUserId(servletRequest));
         return ok("ISSUER_PROFILE_UPDATED", "Perfil emisor actualizado correctamente", result, servletRequest);
     }
 
@@ -101,7 +101,7 @@ public class BillingController {
         HttpServletRequest servletRequest
     ) {
         return ok("ISSUER_PROFILE_STATUS_UPDATED", "Estado del perfil emisor actualizado correctamente",
-            useCases.changeIssuerProfileStatus(new ChangeStatusCommand(issuerProfileId, request.status())), servletRequest);
+            useCases.changeIssuerProfileStatus(new ChangeStatusCommand(issuerProfileId, request.status()), currentUserId(servletRequest)), servletRequest);
     }
 
     @PostMapping("/fiscal-profiles")
@@ -112,7 +112,7 @@ public class BillingController {
     ) {
         FiscalProfile result = useCases.createFiscalProfile(new CreateFiscalProfileCommand(
             request.customerId(), request.rfc(), request.legalName(), request.postalCode(),
-            request.fiscalRegimeCode(), request.cfdiUseCode(), request.email()));
+            request.fiscalRegimeCode(), request.cfdiUseCode(), request.email()), currentUserId(servletRequest));
         return created("FISCAL_PROFILE_CREATED", "Perfil fiscal creado correctamente", result, servletRequest);
     }
 
@@ -125,7 +125,7 @@ public class BillingController {
         HttpServletRequest servletRequest
     ) {
         return ok("FISCAL_PROFILES_FOUND", "Perfiles fiscales consultados correctamente",
-            useCases.listFiscalProfiles(customerId, status), servletRequest);
+            useCases.listFiscalProfiles(customerId, status, currentUserId(servletRequest)), servletRequest);
     }
 
     @GetMapping("/fiscal-profiles/{fiscalProfileId}")
@@ -135,7 +135,7 @@ public class BillingController {
         @PathVariable UUID fiscalProfileId, HttpServletRequest servletRequest
     ) {
         return ok("FISCAL_PROFILE_FOUND", "Perfil fiscal consultado correctamente",
-            useCases.getFiscalProfile(fiscalProfileId), servletRequest);
+            useCases.getFiscalProfile(fiscalProfileId, currentUserId(servletRequest)), servletRequest);
     }
 
     @PutMapping("/fiscal-profiles/{fiscalProfileId}")
@@ -148,7 +148,7 @@ public class BillingController {
     ) {
         FiscalProfile result = useCases.updateFiscalProfile(new UpdateFiscalProfileCommand(
             fiscalProfileId, request.customerId(), request.rfc(), request.legalName(),
-            request.postalCode(), request.fiscalRegimeCode(), request.cfdiUseCode(), request.email()));
+            request.postalCode(), request.fiscalRegimeCode(), request.cfdiUseCode(), request.email()), currentUserId(servletRequest));
         return ok("FISCAL_PROFILE_UPDATED", "Perfil fiscal actualizado correctamente", result, servletRequest);
     }
 
@@ -161,7 +161,7 @@ public class BillingController {
         HttpServletRequest servletRequest
     ) {
         return ok("FISCAL_PROFILE_STATUS_UPDATED", "Estado del perfil fiscal actualizado correctamente",
-            useCases.changeFiscalProfileStatus(new ChangeStatusCommand(fiscalProfileId, request.status())), servletRequest);
+            useCases.changeFiscalProfileStatus(new ChangeStatusCommand(fiscalProfileId, request.status()), currentUserId(servletRequest)), servletRequest);
     }
 
     @PostMapping("/fiscal-documents")
@@ -172,7 +172,7 @@ public class BillingController {
     ) {
         FiscalDocument result = useCases.createFiscalDocument(new CreateFiscalDocumentCommand(
             request.salesOrderId(), request.issuerProfileId(), request.fiscalProfileId(),
-            request.series(), request.folio(), request.paymentFormCode(), request.paymentMethodCode()));
+            request.series(), request.folio(), request.paymentFormCode(), request.paymentMethodCode()), currentUserId(servletRequest));
         return created("FISCAL_DOCUMENT_CREATED", "Documento fiscal creado correctamente", result, servletRequest);
     }
 
@@ -185,7 +185,7 @@ public class BillingController {
         HttpServletRequest servletRequest
     ) {
         return ok("FISCAL_DOCUMENTS_FOUND", "Documentos fiscales consultados correctamente",
-            useCases.listFiscalDocuments(salesOrderId, status), servletRequest);
+            useCases.listFiscalDocuments(salesOrderId, status, currentUserId(servletRequest)), servletRequest);
     }
 
     @GetMapping("/fiscal-documents/{fiscalDocumentId}")
@@ -195,7 +195,7 @@ public class BillingController {
         @PathVariable UUID fiscalDocumentId, HttpServletRequest servletRequest
     ) {
         return ok("FISCAL_DOCUMENT_FOUND", "Documento fiscal consultado correctamente",
-            useCases.getFiscalDocument(fiscalDocumentId), servletRequest);
+            useCases.getFiscalDocument(fiscalDocumentId, currentUserId(servletRequest)), servletRequest);
     }
 
     @PostMapping("/fiscal-documents/{fiscalDocumentId}/ready")
@@ -205,7 +205,7 @@ public class BillingController {
         @PathVariable UUID fiscalDocumentId, HttpServletRequest servletRequest
     ) {
         return ok("FISCAL_DOCUMENT_READY", "Documento fiscal marcado como listo",
-            useCases.markFiscalDocumentReady(fiscalDocumentId), servletRequest);
+            useCases.markFiscalDocumentReady(fiscalDocumentId, currentUserId(servletRequest)), servletRequest);
     }
 
     private <T> ResponseEntity<ApiResponseDto<T>> created(String code, String message, T data, HttpServletRequest request) {
@@ -215,5 +215,12 @@ public class BillingController {
 
     private <T> ResponseEntity<ApiResponseDto<T>> ok(String code, String message, T data, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, code, message, data, request.getRequestURI()));
+    }
+
+    private static UUID currentUserId(HttpServletRequest request) {
+        if (request.getUserPrincipal() == null || request.getUserPrincipal().getName() == null) {
+            throw new IllegalStateException("El JWT no contiene usuario");
+        }
+        return UUID.fromString(request.getUserPrincipal().getName());
     }
 }

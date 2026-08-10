@@ -230,6 +230,21 @@ public class JdbcAdvancedInventoryRepositoryAdapter implements AdvancedInventory
             """, new MapSqlParameterSource("expiresBefore", Date.valueOf(expiresBefore)), this::mapLot);
     }
 
+    @Override
+    public UUID findBranchIdByWarehouseId(UUID warehouseId) {
+        return findWarehouse(warehouseId).branchId();
+    }
+
+    @Override
+    public UUID findBranchIdByCountId(UUID inventoryCountId) {
+        return findBranchIdByWarehouseId(findCount(inventoryCountId).warehouseId());
+    }
+
+    @Override
+    public UUID findBranchIdByReservationId(UUID reservationId) {
+        return findReservation(reservationId).branchId();
+    }
+
     private WarehouseRow findWarehouse(UUID warehouseId) {
         try {
             return jdbc.queryForObject("SELECT warehouse_id, branch_id FROM organization.warehouses WHERE warehouse_id = :id AND status = 'ACTIVE'", new MapSqlParameterSource("id", warehouseId), (rs, rowNum) -> new WarehouseRow(rs.getObject("warehouse_id", UUID.class), rs.getObject("branch_id", UUID.class)));

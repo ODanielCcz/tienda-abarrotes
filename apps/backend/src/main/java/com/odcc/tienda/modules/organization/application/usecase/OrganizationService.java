@@ -27,6 +27,9 @@ import com.odcc.tienda.modules.organization.domain.model.DeviceStatus;
 import com.odcc.tienda.modules.organization.domain.model.WarehouseStatus;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessDeniedException;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import lombok.RequiredArgsConstructor;
 
@@ -40,9 +43,11 @@ public class OrganizationService implements OrganizationUseCases {
     private final OrganizationRepositoryPort repository;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccess;
 
     @Override
-    public BranchView createBranch(CreateBranchCommand command) {
+    public BranchView createBranch(CreateBranchCommand command, UUID actorUserId) {
+        requireGlobalAccess(actorUserId);
         validateBranch(command.code(), command.name(), command.currencyCode());
         String code = normalize(command.code());
         ensureBranchCodeAvailable(code, null);
@@ -54,18 +59,23 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public List<BranchView> listBranches(BranchStatus status) {
-        return repository.listBranches(status);
+    public List<BranchView> listBranches(BranchStatus status, UUID actorUserId) {
+        BranchScope scope = branchAccess.resolveScope(actorUserId);
+        return repository.listBranches(status).stream()
+            .filter(branch -> scope.allows(branch.branchId()))
+            .toList();
     }
 
     @Override
-    public BranchView getBranch(UUID branchId) {
+    public BranchView getBranch(UUID branchId, UUID actorUserId) {
+        branchAccess.requireAccess(actorUserId, branchId);
         return findBranch(branchId);
     }
 
     @Override
-    public BranchView updateBranch(UpdateBranchCommand command) {
+    public BranchView updateBranch(UpdateBranchCommand command, UUID actorUserId) {
         if (command == null || command.branchId() == null) throw new OrganizationException("La sucursal es obligatoria");
+        branchAccess.requireAccess(actorUserId, command.branchId());
         validateBranch(command.code(), command.name(), command.currencyCode());
         BranchView current = findBranch(command.branchId());
         String code = normalize(command.code());
@@ -78,8 +88,9 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public BranchView changeBranchStatus(ChangeBranchStatusCommand command) {
+    public BranchView changeBranchStatus(ChangeBranchStatusCommand command, UUID actorUserId) {
         if (command == null || command.branchId() == null) throw new OrganizationException("La sucursal es obligatoria");
+        branchAccess.requireAccess(actorUserId, command.branchId());
         if (command.status() == null) throw new OrganizationException("El estado de la sucursal es obligatorio");
         BranchView current = findBranch(command.branchId());
         return transactionRunner.required(() -> {
@@ -90,8 +101,9 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public WarehouseView createWarehouse(CreateWarehouseCommand command) {
+    public WarehouseView createWarehouse(CreateWarehouseCommand command, UUID actorUserId) {
         validateWarehouse(command.branchId(), command.code(), command.name());
+        branchAccess.requireAccess(actorUserId, command.branchId());
         BranchView branch = findActiveBranch(command.branchId());
         String code = normalize(command.code());
         ensureWarehouseCodeAvailable(branch.branchId(), code, null);
@@ -103,20 +115,31 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public List<WarehouseView> listWarehouses(UUID branchId, WarehouseStatus status) {
-        return repository.listWarehouses(branchId, status);
+    public List<WarehouseView> listWarehouses(UUID branchId, WarehouseStatus status, UUID actorUserId) {
+        if (branchId != null) {
+            branchAccess.requireAccess(actorUserId, branchId);
+            return repository.listWarehouses(branchId, status);
+        }
+        BranchScope scope = branchAccess.resolveScope(actorUserId);
+        return repository.listWarehouses(null, status).stream()
+            .filter(warehouse -> scope.allows(warehouse.branchId()))
+            .toList();
     }
 
     @Override
-    public WarehouseView getWarehouse(UUID warehouseId) {
-        return findWarehouse(warehouseId);
+    public WarehouseView getWarehouse(UUID warehouseId, UUID actorUserId) {
+        WarehouseView warehouse = findWarehouse(warehouseId);
+        branchAccess.requireAccess(actorUserId, warehouse.branchId());
+        return warehouse;
     }
 
     @Override
-    public WarehouseView updateWarehouse(UpdateWarehouseCommand command) {
+    public WarehouseView updateWarehouse(UpdateWarehouseCommand command, UUID actorUserId) {
         if (command == null || command.warehouseId() == null) throw new OrganizationException("El almacen es obligatorio");
         validateWarehouse(command.branchId(), command.code(), command.name());
         WarehouseView current = findWarehouse(command.warehouseId());
+        branchAccess.requireAccess(actorUserId, current.branchId());
+        branchAccess.requireAccess(actorUserId, command.branchId());
         BranchView branch = findActiveBranch(command.branchId());
         String code = normalize(command.code());
         ensureWarehouseCodeAvailable(branch.branchId(), code, command.warehouseId());
@@ -128,10 +151,11 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public WarehouseView changeWarehouseStatus(ChangeWarehouseStatusCommand command) {
+    public WarehouseView changeWarehouseStatus(ChangeWarehouseStatusCommand command, UUID actorUserId) {
         if (command == null || command.warehouseId() == null) throw new OrganizationException("El almacen es obligatorio");
         if (command.status() == null) throw new OrganizationException("El estado del almacen es obligatorio");
         WarehouseView current = findWarehouse(command.warehouseId());
+        branchAccess.requireAccess(actorUserId, current.branchId());
         return transactionRunner.required(() -> {
             WarehouseView warehouse = repository.changeWarehouseStatus(command);
             audit("WAREHOUSE_STATUS_CHANGED", "WAREHOUSE", warehouse.warehouseId(), Map.of("status", current.status().name()), Map.of("status", warehouse.status().name()));
@@ -140,8 +164,9 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public CashRegisterView createCashRegister(CreateCashRegisterCommand command) {
+    public CashRegisterView createCashRegister(CreateCashRegisterCommand command, UUID actorUserId) {
         validateCashRegister(command.branchId(), command.code(), command.name());
+        branchAccess.requireAccess(actorUserId, command.branchId());
         BranchView branch = findActiveBranch(command.branchId());
         validateActiveDeviceForBranch(command.deviceId(), branch.branchId());
         String code = normalize(command.code());
@@ -154,20 +179,31 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public List<CashRegisterView> listCashRegisters(UUID branchId, CashRegisterStatus status) {
-        return repository.listCashRegisters(branchId, status);
+    public List<CashRegisterView> listCashRegisters(UUID branchId, CashRegisterStatus status, UUID actorUserId) {
+        if (branchId != null) {
+            branchAccess.requireAccess(actorUserId, branchId);
+            return repository.listCashRegisters(branchId, status);
+        }
+        BranchScope scope = branchAccess.resolveScope(actorUserId);
+        return repository.listCashRegisters(null, status).stream()
+            .filter(register -> scope.allows(register.branchId()))
+            .toList();
     }
 
     @Override
-    public CashRegisterView getCashRegister(UUID cashRegisterId) {
-        return findCashRegister(cashRegisterId);
+    public CashRegisterView getCashRegister(UUID cashRegisterId, UUID actorUserId) {
+        CashRegisterView register = findCashRegister(cashRegisterId);
+        branchAccess.requireAccess(actorUserId, register.branchId());
+        return register;
     }
 
     @Override
-    public CashRegisterView updateCashRegister(UpdateCashRegisterCommand command) {
+    public CashRegisterView updateCashRegister(UpdateCashRegisterCommand command, UUID actorUserId) {
         if (command == null || command.cashRegisterId() == null) throw new OrganizationException("La caja registradora es obligatoria");
         validateCashRegister(command.branchId(), command.code(), command.name());
         CashRegisterView current = findCashRegister(command.cashRegisterId());
+        branchAccess.requireAccess(actorUserId, current.branchId());
+        branchAccess.requireAccess(actorUserId, command.branchId());
         BranchView branch = findActiveBranch(command.branchId());
         validateActiveDeviceForBranch(command.deviceId(), branch.branchId());
         String code = normalize(command.code());
@@ -180,10 +216,11 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public CashRegisterView changeCashRegisterStatus(ChangeCashRegisterStatusCommand command) {
+    public CashRegisterView changeCashRegisterStatus(ChangeCashRegisterStatusCommand command, UUID actorUserId) {
         if (command == null || command.cashRegisterId() == null) throw new OrganizationException("La caja registradora es obligatoria");
         if (command.status() == null) throw new OrganizationException("El estado de la caja registradora es obligatorio");
         CashRegisterView current = findCashRegister(command.cashRegisterId());
+        branchAccess.requireAccess(actorUserId, current.branchId());
         return transactionRunner.required(() -> {
             CashRegisterView register = repository.changeCashRegisterStatus(command);
             audit("CASH_REGISTER_STATUS_CHANGED", "CASH_REGISTER", register.cashRegisterId(), Map.of("status", current.status().name()), Map.of("status", register.status().name()));
@@ -192,8 +229,9 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public DeviceView createDevice(CreateDeviceCommand command) {
+    public DeviceView createDevice(CreateDeviceCommand command, UUID actorUserId) {
         validateDevice(command.branchId(), command.deviceCode(), command.deviceType());
+        branchAccess.requireAccess(actorUserId, command.branchId());
         BranchView branch = findActiveBranch(command.branchId());
         validateActiveWarehouseForBranch(command.warehouseId(), branch.branchId());
         String code = normalize(command.deviceCode());
@@ -206,20 +244,31 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public List<DeviceView> listDevices(UUID branchId, DeviceStatus status) {
-        return repository.listDevices(branchId, status);
+    public List<DeviceView> listDevices(UUID branchId, DeviceStatus status, UUID actorUserId) {
+        if (branchId != null) {
+            branchAccess.requireAccess(actorUserId, branchId);
+            return repository.listDevices(branchId, status);
+        }
+        BranchScope scope = branchAccess.resolveScope(actorUserId);
+        return repository.listDevices(null, status).stream()
+            .filter(device -> scope.allows(device.branchId()))
+            .toList();
     }
 
     @Override
-    public DeviceView getDevice(UUID deviceId) {
-        return findDevice(deviceId);
+    public DeviceView getDevice(UUID deviceId, UUID actorUserId) {
+        DeviceView device = findDevice(deviceId);
+        branchAccess.requireAccess(actorUserId, device.branchId());
+        return device;
     }
 
     @Override
-    public DeviceView updateDevice(UpdateDeviceCommand command) {
+    public DeviceView updateDevice(UpdateDeviceCommand command, UUID actorUserId) {
         if (command == null || command.deviceId() == null) throw new OrganizationException("El dispositivo es obligatorio");
         validateDevice(command.branchId(), command.deviceCode(), command.deviceType());
         DeviceView current = findDevice(command.deviceId());
+        branchAccess.requireAccess(actorUserId, current.branchId());
+        branchAccess.requireAccess(actorUserId, command.branchId());
         BranchView branch = findActiveBranch(command.branchId());
         validateActiveWarehouseForBranch(command.warehouseId(), branch.branchId());
         String code = normalize(command.deviceCode());
@@ -232,10 +281,11 @@ public class OrganizationService implements OrganizationUseCases {
     }
 
     @Override
-    public DeviceView changeDeviceStatus(ChangeDeviceStatusCommand command) {
+    public DeviceView changeDeviceStatus(ChangeDeviceStatusCommand command, UUID actorUserId) {
         if (command == null || command.deviceId() == null) throw new OrganizationException("El dispositivo es obligatorio");
         if (command.status() == null) throw new OrganizationException("El estado del dispositivo es obligatorio");
         DeviceView current = findDevice(command.deviceId());
+        branchAccess.requireAccess(actorUserId, current.branchId());
         return transactionRunner.required(() -> {
             DeviceView device = repository.changeDeviceStatus(command);
             audit("DEVICE_STATUS_CHANGED", "DEVICE", device.deviceId(), Map.of("status", current.status().name()), Map.of("status", device.status().name()));
@@ -246,6 +296,12 @@ public class OrganizationService implements OrganizationUseCases {
     private BranchView findBranch(UUID branchId) {
         if (branchId == null) throw new OrganizationException("La sucursal es obligatoria");
         return repository.findBranch(branchId).orElseThrow(() -> new OrganizationResourceNotFoundException("una sucursal", branchId));
+    }
+
+    private void requireGlobalAccess(UUID actorUserId) {
+        if (!branchAccess.resolveScope(actorUserId).globalAccess()) {
+            throw new BranchAccessDeniedException();
+        }
     }
 
     private BranchView findActiveBranch(UUID branchId) {

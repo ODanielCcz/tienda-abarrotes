@@ -4,6 +4,7 @@ import com.odcc.tienda.modules.purchasing.adapter.in.rest.PurchaseController;
 import com.odcc.tienda.modules.purchasing.adapter.in.rest.SupplierController;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchaseItemNotFoundException;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchaseNotFoundException;
+import com.odcc.tienda.modules.purchasing.application.exception.PurchaseItemMismatchException;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchasingException;
 import com.odcc.tienda.modules.purchasing.application.exception.SupplierCodeAlreadyExistsException;
 import com.odcc.tienda.modules.purchasing.application.exception.SupplierNotFoundException;
@@ -30,6 +31,11 @@ public class PurchasingExceptionHandler {
     @ExceptionHandler(PurchaseItemNotFoundException.class)
     public ResponseEntity<ApiResponseDto<Void>> purchaseItemNotFound(PurchaseItemNotFoundException exception, HttpServletRequest request) {
         return error(HttpStatus.NOT_FOUND, "PURCHASE_ITEM_NOT_FOUND", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(PurchaseItemMismatchException.class)
+    public ResponseEntity<ApiResponseDto<Void>> purchaseItemMismatch(PurchaseItemMismatchException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "PURCHASE_ITEM_MISMATCH", exception.getMessage(), request);
     }
 
     @ExceptionHandler(SupplierCodeAlreadyExistsException.class)

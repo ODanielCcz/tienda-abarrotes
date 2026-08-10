@@ -3,6 +3,7 @@ package com.odcc.tienda.modules.purchasing.adapter.out.persistence.jdbc;
 import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseCommand;
 import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseItemCommand;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchaseItemNotFoundException;
+import com.odcc.tienda.modules.purchasing.application.exception.PurchaseItemMismatchException;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchasingException;
 import com.odcc.tienda.modules.purchasing.application.model.Purchase;
 import com.odcc.tienda.modules.purchasing.application.model.PurchaseItem;
@@ -30,6 +31,19 @@ public class JdbcPurchaseRepositoryAdapter implements PurchaseRepositoryPort {
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
 
     private final NamedParameterJdbcTemplate jdbc;
+
+    @Override
+    public UUID findBranchIdByWarehouseId(UUID warehouseId) {
+        try {
+            return jdbc.queryForObject("""
+                SELECT branch_id
+                FROM organization.warehouses
+                WHERE warehouse_id = :warehouseId
+                """, new MapSqlParameterSource("warehouseId", warehouseId), UUID.class);
+        } catch (EmptyResultDataAccessException exception) {
+            throw new PurchasingException("El almacen no existe");
+        }
+    }
 
     @Override
     public Optional<Purchase> findByIdempotencyKey(UUID idempotencyKey) {
@@ -128,22 +142,35 @@ public class JdbcPurchaseRepositoryAdapter implements PurchaseRepositoryPort {
     }
 
     @Override
-    public PurchaseItem findItemById(UUID purchaseItemId) {
+    public PurchaseItem findItemById(UUID purchaseId, UUID purchaseItemId) {
         try {
-            return jdbc.queryForObject("SELECT * FROM purchasing.purchase_items WHERE purchase_item_id = :id", new MapSqlParameterSource("id", purchaseItemId), this::mapItem);
+            return jdbc.queryForObject(
+                "SELECT * FROM purchasing.purchase_items WHERE purchase_id = :purchaseId AND purchase_item_id = :id",
+                new MapSqlParameterSource("purchaseId", purchaseId).addValue("id", purchaseItemId),
+                this::mapItem
+            );
         } catch (EmptyResultDataAccessException exception) {
+            Integer existing = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM purchasing.purchase_items WHERE purchase_item_id = :id",
+                new MapSqlParameterSource("id", purchaseItemId),
+                Integer.class
+            );
+            if (existing != null && existing > 0) {
+                throw new PurchaseItemMismatchException(purchaseId, purchaseItemId);
+            }
             throw new PurchaseItemNotFoundException(purchaseItemId);
         }
     }
 
     @Override
-    public void addReceivedQuantity(UUID purchaseItemId, BigDecimal quantity) {
+    public void addReceivedQuantity(UUID purchaseId, UUID purchaseItemId, BigDecimal quantity) {
         int updated = jdbc.update("""
             UPDATE purchasing.purchase_items
             SET received_quantity = received_quantity + :quantity
-            WHERE purchase_item_id = :id
+            WHERE purchase_id = :purchaseId
+              AND purchase_item_id = :id
               AND received_quantity + :quantity <= quantity
-            """, new MapSqlParameterSource().addValue("id", purchaseItemId).addValue("quantity", quantity));
+            """, new MapSqlParameterSource().addValue("purchaseId", purchaseId).addValue("id", purchaseItemId).addValue("quantity", quantity));
         if (updated == 0) throw new PurchasingException("No fue posible actualizar la cantidad recibida del item " + purchaseItemId);
     }
 

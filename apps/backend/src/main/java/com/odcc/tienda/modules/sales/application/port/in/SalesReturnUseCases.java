@@ -10,9 +10,9 @@ public interface SalesReturnUseCases {
 
     SalesReturn create(CreateSalesReturnCommand command);
 
-    SalesReturn getById(UUID returnId);
+    SalesReturn getById(UUID returnId, UUID actorUserId);
 
     SalesReturn confirm(ConfirmSalesReturnCommand command);
 
-    SalesReturn cancel(UUID returnId);
+    SalesReturn cancel(UUID returnId, UUID actorUserId);
 }

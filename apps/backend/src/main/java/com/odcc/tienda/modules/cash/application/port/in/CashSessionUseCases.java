@@ -13,13 +13,13 @@ import java.util.UUID;
 public interface CashSessionUseCases {
     CashSession open(OpenCashSessionCommand command);
 
-    CashSession getById(UUID cashSessionId);
+    CashSession getById(UUID cashSessionId, UUID actorUserId);
 
-    List<CashSession> list(ListCashSessionsQuery query);
+    List<CashSession> list(ListCashSessionsQuery query, UUID actorUserId);
 
     CashSession close(CloseCashSessionCommand command);
 
-    List<CashMovement> listMovements(UUID cashSessionId);
+    List<CashMovement> listMovements(UUID cashSessionId, UUID actorUserId);
 
     CashMovement createMovement(CreateCashMovementCommand command);
 }

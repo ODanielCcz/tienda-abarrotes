@@ -4,6 +4,7 @@ import com.odcc.tienda.modules.cash.adapter.in.rest.CashSessionController;
 import com.odcc.tienda.modules.cash.application.exception.CashException;
 import com.odcc.tienda.modules.cash.application.exception.CashSessionAlreadyOpenException;
 import com.odcc.tienda.modules.cash.application.exception.CashSessionNotFoundException;
+import com.odcc.tienda.modules.cash.application.exception.CashSessionAlreadyClosedException;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,11 @@ public class CashExceptionHandler {
     @ExceptionHandler(CashSessionAlreadyOpenException.class)
     public ResponseEntity<ApiResponseDto<Void>> alreadyOpen(CashSessionAlreadyOpenException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "CASH_SESSION_ALREADY_OPEN", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(CashSessionAlreadyClosedException.class)
+    public ResponseEntity<ApiResponseDto<Void>> alreadyClosed(CashSessionAlreadyClosedException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "CASH_SESSION_ALREADY_CLOSED", exception.getMessage(), request);
     }
 
     @ExceptionHandler(CashException.class)

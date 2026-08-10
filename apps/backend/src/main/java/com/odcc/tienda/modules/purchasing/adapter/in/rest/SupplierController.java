@@ -18,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,40 +44,44 @@ public class SupplierController {
     @PostMapping
     @Operation(summary = "Crear proveedor")
     @PreAuthorize("hasAuthority('PURCHASING_SUPPLIER_CREATE')")
-    public ResponseEntity<ApiResponseDto<Supplier>> create(@Valid @RequestBody CreateSupplierRequest request, HttpServletRequest servletRequest) {
-        Supplier supplier = useCases.create(new CreateSupplierCommand(request.supplierCode(), request.legalName(), request.tradeName(), request.taxId(), request.email(), request.phone(), request.creditDays()));
+    public ResponseEntity<ApiResponseDto<Supplier>> create(@Valid @RequestBody CreateSupplierRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        Supplier supplier = useCases.create(new CreateSupplierCommand(request.supplierCode(), request.legalName(), request.tradeName(), request.taxId(), request.email(), request.phone(), request.creditDays()), currentUserId(jwt));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "SUPPLIER_CREATED", "Proveedor creado correctamente", supplier, servletRequest.getRequestURI()));
     }
 
     @GetMapping
     @Operation(summary = "Listar proveedores")
     @PreAuthorize("hasAuthority('PURCHASING_SUPPLIER_READ')")
-    public ResponseEntity<ApiResponseDto<List<Supplier>>> list(@RequestParam(required = false) String search, @RequestParam(required = false) String status, HttpServletRequest servletRequest) {
-        List<Supplier> suppliers = useCases.list(new ListSuppliersQuery(search, status));
+    public ResponseEntity<ApiResponseDto<List<Supplier>>> list(@RequestParam(required = false) String search, @RequestParam(required = false) String status, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        List<Supplier> suppliers = useCases.list(new ListSuppliersQuery(search, status), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SUPPLIERS_FOUND", "Proveedores consultados correctamente", suppliers, servletRequest.getRequestURI()));
     }
 
     @GetMapping("/{supplierId}")
     @Operation(summary = "Consultar proveedor por id")
     @PreAuthorize("hasAuthority('PURCHASING_SUPPLIER_READ')")
-    public ResponseEntity<ApiResponseDto<Supplier>> getById(@PathVariable UUID supplierId, HttpServletRequest servletRequest) {
-        Supplier supplier = useCases.getById(supplierId);
+    public ResponseEntity<ApiResponseDto<Supplier>> getById(@PathVariable UUID supplierId, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        Supplier supplier = useCases.getById(supplierId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SUPPLIER_FOUND", "Proveedor consultado correctamente", supplier, servletRequest.getRequestURI()));
     }
 
     @PutMapping("/{supplierId}")
     @Operation(summary = "Actualizar proveedor")
     @PreAuthorize("hasAuthority('PURCHASING_SUPPLIER_UPDATE')")
-    public ResponseEntity<ApiResponseDto<Supplier>> update(@PathVariable UUID supplierId, @Valid @RequestBody UpdateSupplierRequest request, HttpServletRequest servletRequest) {
-        Supplier supplier = useCases.update(new UpdateSupplierCommand(supplierId, request.supplierCode(), request.legalName(), request.tradeName(), request.taxId(), request.email(), request.phone(), request.creditDays()));
+    public ResponseEntity<ApiResponseDto<Supplier>> update(@PathVariable UUID supplierId, @Valid @RequestBody UpdateSupplierRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        Supplier supplier = useCases.update(new UpdateSupplierCommand(supplierId, request.supplierCode(), request.legalName(), request.tradeName(), request.taxId(), request.email(), request.phone(), request.creditDays()), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SUPPLIER_UPDATED", "Proveedor actualizado correctamente", supplier, servletRequest.getRequestURI()));
     }
 
     @PatchMapping("/{supplierId}/status")
     @Operation(summary = "Cambiar estado de proveedor")
     @PreAuthorize("hasAuthority('PURCHASING_SUPPLIER_STATUS')")
-    public ResponseEntity<ApiResponseDto<Supplier>> changeStatus(@PathVariable UUID supplierId, @Valid @RequestBody ChangeSupplierStatusRequest request, HttpServletRequest servletRequest) {
-        Supplier supplier = useCases.changeStatus(new ChangeSupplierStatusCommand(supplierId, request.status()));
+    public ResponseEntity<ApiResponseDto<Supplier>> changeStatus(@PathVariable UUID supplierId, @Valid @RequestBody ChangeSupplierStatusRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        Supplier supplier = useCases.changeStatus(new ChangeSupplierStatusCommand(supplierId, request.status()), currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SUPPLIER_STATUS_UPDATED", "Estado de proveedor actualizado correctamente", supplier, servletRequest.getRequestURI()));
+    }
+
+    private static UUID currentUserId(Jwt jwt) {
+        return jwt == null ? null : UUID.fromString(jwt.getSubject());
     }
 }
