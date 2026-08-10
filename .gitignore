@@ -41,3 +41,5 @@ data/local-only/*
 *.backup
 database/logs/
 
+# Worktrees locales de Git
+.worktrees/
