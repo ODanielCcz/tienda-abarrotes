@@ -23,6 +23,10 @@ val lombokMapstructBindingVersion = "0.2.0"
 val springdocVersion = "3.0.0"
 val archUnitVersion = "1.4.2"
 
+extra["jackson-2-bom.version"] = "2.21.5"
+extra["jackson-bom.version"] = "3.1.5"
+extra["postgresql.version"] = "42.7.12"
+
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")

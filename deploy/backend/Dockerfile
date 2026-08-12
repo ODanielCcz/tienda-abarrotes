@@ -2,7 +2,9 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-RUN addgroup -S tienda && adduser -S tienda -G tienda
+RUN apk upgrade --no-cache \
+    && addgroup -S tienda \
+    && adduser -S tienda -G tienda
 
 COPY apps/backend/build/libs/*.jar /app/tienda-abarrotes-backend.jar
 
