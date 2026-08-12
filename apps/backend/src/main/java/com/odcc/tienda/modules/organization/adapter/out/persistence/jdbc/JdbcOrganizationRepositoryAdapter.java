@@ -90,6 +90,21 @@ public class JdbcOrganizationRepositoryAdapter implements OrganizationRepository
     }
 
     @Override
+    public Optional<BranchView> findBranchForUpdate(UUID branchId) {
+        try {
+            return Optional.of(jdbc.queryForObject("""
+                SELECT branch_id, code, name, legal_name, timezone,
+                       currency_code, status, created_at, updated_at
+                FROM organization.branches
+                WHERE branch_id = :id
+                FOR UPDATE
+                """, new MapSqlParameterSource("id", branchId), this::mapBranch));
+        } catch (EmptyResultDataAccessException exception) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public BranchView updateBranch(UpdateBranchCommand command) {
         try {
             int updated = jdbc.update("""

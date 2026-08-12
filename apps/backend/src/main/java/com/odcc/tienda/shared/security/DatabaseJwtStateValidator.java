@@ -9,6 +9,9 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -32,6 +35,17 @@ public final class DatabaseJwtStateValidator implements OAuth2TokenValidator<Jwt
         }
         if (tokenVersion == null) return revoked();
 
+        Set<String> tokenAuthorities;
+        try {
+            List<String> authorityClaims = token.getClaimAsStringList("authorities");
+            if (authorityClaims == null) return revoked();
+            tokenAuthorities = Set.copyOf(authorityClaims);
+        } catch (RuntimeException exception) {
+            return revoked();
+        }
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource("userId", userId)
+            .addValue("authVersion", tokenVersion);
         Integer valid = jdbc.queryForObject(
             """
                 SELECT COUNT(*)
@@ -40,11 +54,48 @@ public final class DatabaseJwtStateValidator implements OAuth2TokenValidator<Jwt
                   AND status = 'ACTIVE'
                   AND auth_version = :authVersion
                 """,
-            new MapSqlParameterSource("userId", userId)
-                .addValue("authVersion", tokenVersion),
+            parameters,
             Integer.class
         );
-        return valid != null && valid == 1
+        if (valid == null || valid != 1) return revoked();
+
+        Set<String> currentAuthorities = new HashSet<>(jdbc.queryForList(
+            """
+                SELECT effective.authority
+                FROM (
+                    SELECT 'ROLE_' || role.code AS authority
+                    FROM iam.user_roles user_role
+                    JOIN iam.roles role ON role.role_id = user_role.role_id
+                    WHERE user_role.user_id = :userId
+                      AND role.status = 'ACTIVE'
+                      AND (
+                          user_role.valid_until IS NULL
+                          OR user_role.valid_until > clock_timestamp()
+                      )
+
+                    UNION
+
+                    SELECT permission.code AS authority
+                    FROM iam.user_roles user_role
+                    JOIN iam.roles role ON role.role_id = user_role.role_id
+                    JOIN iam.role_permissions role_permission
+                      ON role_permission.role_id = role.role_id
+                    JOIN iam.permissions permission
+                      ON permission.permission_id = role_permission.permission_id
+                    WHERE user_role.user_id = :userId
+                      AND role.status = 'ACTIVE'
+                      AND (
+                          user_role.valid_until IS NULL
+                          OR user_role.valid_until > clock_timestamp()
+                      )
+                ) effective
+                ORDER BY effective.authority
+                """,
+            parameters,
+            String.class
+        ));
+
+        return currentAuthorities.equals(tokenAuthorities)
             ? OAuth2TokenValidatorResult.success()
             : revoked();
     }

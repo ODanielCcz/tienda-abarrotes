@@ -5,6 +5,7 @@ import com.odcc.tienda.modules.inventory.application.command.InventoryCountItemC
 import com.odcc.tienda.modules.inventory.application.model.InventoryCountView;
 import com.odcc.tienda.modules.inventory.application.port.in.AdvancedInventoryUseCases;
 import com.odcc.tienda.modules.sales.application.command.UpsertSalesCartCommand;
+import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.model.SalesCart;
 import com.odcc.tienda.modules.sales.application.port.in.SalesCartUseCases;
 import com.odcc.tienda.modules.sync.application.command.SyncCommands.AcknowledgeCheckpointCommand;
@@ -223,15 +224,20 @@ public final class SyncService implements SyncUseCases {
                 decimal(item, "quantity"),
                 decimal(item, "unitPriceSnapshot")
             )).toList();
-        SalesCart cart = salesCartUseCases.upsert(new UpsertSalesCartCommand(
-            cartId,
-            uuid(payload, "customerId", false),
-            branchId,
-            device.deviceId(),
-            string(payload, "currencyCode", false),
-            instant(payload, "expiresAt"),
-            items
-        ));
+        SalesCart cart;
+        try {
+            cart = salesCartUseCases.upsert(new UpsertSalesCartCommand(
+                cartId,
+                uuid(payload, "customerId", false),
+                branchId,
+                device.deviceId(),
+                string(payload, "currencyCode", false),
+                instant(payload, "expiresAt"),
+                items
+            ));
+        } catch (SalesException exception) {
+            throw new SyncConflictException(exception.getMessage());
+        }
         return Map.of(
             "aggregateId", cart.cartId(),
             "cartId", cart.cartId(),
@@ -248,6 +254,9 @@ public final class SyncService implements SyncUseCases {
         if (!"ACTIVE".equals(device.status())) throw new SyncConflictException("El dispositivo no esta activo");
         if (!"MOBILE_EMPLOYEE".equals(device.deviceType())) {
             throw new SyncConflictException("Sync v1 solo permite dispositivos MOBILE_EMPLOYEE");
+        }
+        if (!repository.userOwnsDevice(actorUserId, device.deviceId())) {
+            throw new SyncConflictException("El dispositivo no esta vinculado al usuario autenticado");
         }
         if (!repository.userCanAccessBranch(actorUserId, device.branchId())) {
             throw new SyncConflictException("El usuario no tiene acceso a la sucursal del dispositivo");
@@ -302,6 +311,7 @@ public final class SyncService implements SyncUseCases {
 
     private static Map<String, Object> requireMergedPayload(Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) throw new SyncException("MERGED requiere un payload combinado");
+        validatePayload(payload, 1, new int[] {0});
         return payload;
     }
 

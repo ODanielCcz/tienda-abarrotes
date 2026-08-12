@@ -90,10 +90,15 @@ public class OrganizationService implements OrganizationUseCases {
     @Override
     public BranchView changeBranchStatus(ChangeBranchStatusCommand command, UUID actorUserId) {
         if (command == null || command.branchId() == null) throw new OrganizationException("La sucursal es obligatoria");
-        branchAccess.requireAccess(actorUserId, command.branchId());
         if (command.status() == null) throw new OrganizationException("El estado de la sucursal es obligatorio");
-        BranchView current = findBranch(command.branchId());
         return transactionRunner.required(() -> {
+            BranchView current = repository.findBranchForUpdate(command.branchId())
+                .orElseThrow(() -> new OrganizationResourceNotFoundException("una sucursal", command.branchId()));
+            if (current.status() == BranchStatus.INACTIVE && command.status() == BranchStatus.ACTIVE) {
+                requireGlobalAccess(actorUserId);
+            } else {
+                branchAccess.requireAccess(actorUserId, command.branchId());
+            }
             BranchView branch = repository.changeBranchStatus(command);
             audit("BRANCH_STATUS_CHANGED", "BRANCH", branch.branchId(), Map.of("status", current.status().name()), Map.of("status", branch.status().name()));
             return branch;

@@ -19,7 +19,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -81,7 +80,7 @@ public class JdbcPurchaseRepositoryAdapter implements PurchaseRepositoryPort {
             ) VALUES (
                 :purchaseId, :branchId, :warehouseId, :supplierId, :supplierDocument, 'DRAFT',
                 'PENDING', :currencyCode, :subtotal, :discountTotal, :taxTotal, :total,
-                :idempotencyKey, :purchasedAt, :createdAt
+                :idempotencyKey, clock_timestamp(), clock_timestamp()
             )
             """, new MapSqlParameterSource()
             .addValue("purchaseId", purchaseId)
@@ -94,13 +93,20 @@ public class JdbcPurchaseRepositoryAdapter implements PurchaseRepositoryPort {
             .addValue("discountTotal", totals.discount())
             .addValue("taxTotal", totals.tax())
             .addValue("total", totals.total())
-            .addValue("idempotencyKey", command.idempotencyKey())
-            .addValue("purchasedAt", Instant.now())
-            .addValue("createdAt", Instant.now()));
+            .addValue("idempotencyKey", command.idempotencyKey()));
         for (CreatePurchaseItemCommand item : command.items()) {
             insertItem(purchaseId, item);
         }
         return findById(purchaseId).orElseThrow();
+    }
+
+    @Override
+    public void lockIdempotencyKey(UUID idempotencyKey) {
+        jdbc.queryForObject(
+            "SELECT pg_advisory_xact_lock(hashtextextended(CAST(:key AS text), 0))",
+            new MapSqlParameterSource("key", idempotencyKey),
+            (resultSet, rowNumber) -> Boolean.TRUE
+        );
     }
 
     @Override

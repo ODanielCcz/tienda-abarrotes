@@ -33,7 +33,11 @@ public interface UserManagementRepositoryPort {
 
     Set<String> findActiveRoleCodes(Set<String> roleCodes);
 
+    Set<String> findPermissionCodesForRoles(Set<String> roleCodes);
+
     void replaceRoles(UUID userId, Set<String> roleCodes);
+
+    void lockSystemAdminMutations();
 
     long countActiveSystemAdminsExcluding(UUID excludedUserId);
 

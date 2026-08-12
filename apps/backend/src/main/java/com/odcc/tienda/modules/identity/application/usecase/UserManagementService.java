@@ -32,6 +32,9 @@ import com.odcc.tienda.modules.identity.domain.model.RoleStatus;
 import com.odcc.tienda.modules.identity.domain.model.UserAccountStatus;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessDeniedException;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import lombok.RequiredArgsConstructor;
 
@@ -60,6 +63,7 @@ public class UserManagementService implements UserManagementUseCases {
     private final PasswordHashingPort passwordHashingPort;
     private final TransactionRunner transactionRunner;
     private final BusinessAuditPort auditPort;
+    private final BranchAccessPort branchAccess;
 
     @Override
     public ManagedUser create(CreateUserCommand command) {
@@ -69,6 +73,7 @@ public class UserManagementService implements UserManagementUseCases {
             String password = normalizeRequired(command == null ? null : command.password(), "La contraseña es obligatoria", 255);
             Set<String> roleCodes = normalizeRoleCodes(command == null ? null : command.roleCodes());
             validateRolesExist(roleCodes);
+            requireGlobalAccess(command.actorUserId());
 
             if (repository.existsByUsername(username)) {
                 throw new UserAlreadyExistsException(username);
@@ -99,6 +104,7 @@ public class UserManagementService implements UserManagementUseCases {
         return transactionRunner.required(() -> {
             if (command == null || command.userId() == null) throw new IdentityException("El usuario es obligatorio");
             ManagedUser current = getById(command.userId());
+            requireActorCanMutateTarget(command.actorUserId(), current);
             String username = normalizeUsername(command.username());
             String displayName = normalizeRequired(command.displayName(), "El nombre visible es obligatorio", DISPLAY_NAME_MAX_LENGTH);
 
@@ -114,7 +120,9 @@ public class UserManagementService implements UserManagementUseCases {
     public ManagedUser changeStatus(ChangeUserStatusCommand command) {
         return transactionRunner.required(() -> {
             if (command == null || command.userId() == null || command.status() == null) throw new IdentityException("El usuario y estado son obligatorios");
+            repository.lockSystemAdminMutations();
             ManagedUser current = getById(command.userId());
+            requireActorCanMutateTarget(command.currentUserId(), current);
             if (command.userId().equals(command.currentUserId()) && command.status() != UserAccountStatus.ACTIVE) throw new SelfDisableNotAllowedException();
             if (repository.hasSystemAdminRole(command.userId()) && command.status() != UserAccountStatus.ACTIVE && repository.countActiveSystemAdminsExcluding(command.userId()) == 0) throw new LastSystemAdminException();
 
@@ -129,6 +137,7 @@ public class UserManagementService implements UserManagementUseCases {
         return transactionRunner.required(() -> {
             if (command == null || command.userId() == null) throw new IdentityException("El usuario es obligatorio");
             ManagedUser current = getById(command.userId());
+            requireActorCanMutateTarget(command.actorUserId(), current);
             String password = normalizeRequired(command.password(), "La contraseña es obligatoria", 255);
             ManagedUser updated = repository.updatePassword(command.userId(), passwordHashingPort.hash(password));
             auditPort.record(new BusinessAuditEvent("USER_PASSWORD_CHANGED", "USER", updated.userId(), state(current), state(updated), Map.of()));
@@ -140,9 +149,18 @@ public class UserManagementService implements UserManagementUseCases {
     public ManagedUser assignRoles(AssignUserRolesCommand command) {
         return transactionRunner.required(() -> {
             if (command == null || command.userId() == null) throw new IdentityException("El usuario es obligatorio");
+            repository.lockSystemAdminMutations();
             ManagedUser current = getById(command.userId());
             Set<String> roleCodes = normalizeRoleCodes(command.roleCodes());
             validateRolesExist(roleCodes);
+
+            BranchScope actorScope = requireActorCanMutateTarget(command.actorUserId(), current);
+            if (current.roles().equals(roleCodes)) return current;
+
+            requireAssignableRoles(command.actorUserId(), roleCodes, actorScope);
+            if (command.userId().equals(command.actorUserId()) && !current.roles().containsAll(roleCodes)) {
+                throw new BranchAccessDeniedException();
+            }
 
             if (current.roles().contains(SYSTEM_ADMIN_ROLE) && !roleCodes.contains(SYSTEM_ADMIN_ROLE) && repository.countActiveSystemAdminsExcluding(command.userId()) == 0) throw new LastSystemAdminException();
 
@@ -160,6 +178,15 @@ public class UserManagementService implements UserManagementUseCases {
             ManagedUser current = getById(command.userId());
             Set<UUID> branchIds = normalizeBranchIds(command.branchIds());
             validateBranchesExistAndActive(branchIds);
+
+            BranchScope actorScope = resolveActorScope(command.actorUserId());
+            if (!actorScope.globalAccess()) {
+                boolean expandsTarget = !current.branchIds().containsAll(branchIds);
+                boolean controlsCurrentScope = actorScope.branchIds().containsAll(current.branchIds());
+                if (expandsTarget || !controlsCurrentScope || current.roles().contains(SYSTEM_ADMIN_ROLE)) {
+                    throw new BranchAccessDeniedException();
+                }
+            }
 
             repository.replaceUserBranches(command.userId(), branchIds);
             ManagedUser updated = getById(command.userId());
@@ -218,6 +245,7 @@ public class UserManagementService implements UserManagementUseCases {
     public RoleDetail assignRolePermissions(AssignRolePermissionsCommand command) {
         return transactionRunner.required(() -> {
             if (command == null || command.roleId() == null) throw new IdentityException("El rol es obligatorio");
+            requireGlobalAccess(command.actorUserId());
             RoleDetail current = getRole(command.roleId());
             if (SYSTEM_ADMIN_ROLE.equals(current.code())) throw new SystemRoleProtectedException("No se pueden modificar los permisos del rol SYSTEM_ADMIN desde este endpoint");
             Set<String> permissionCodes = normalizePermissionCodes(command.permissionCodes());
@@ -242,6 +270,37 @@ public class UserManagementService implements UserManagementUseCases {
 
     private RoleDetail getRole(UUID roleId) {
         return repository.findRoleById(roleId).orElseThrow(() -> new RoleNotFoundException(roleId.toString()));
+    }
+
+    private BranchScope resolveActorScope(UUID actorUserId) {
+        if (actorUserId == null) throw new BranchAccessDeniedException();
+        BranchScope scope = branchAccess.resolveScope(actorUserId);
+        if (scope == null) throw new BranchAccessDeniedException();
+        return scope;
+    }
+
+    private void requireGlobalAccess(UUID actorUserId) {
+        if (!resolveActorScope(actorUserId).globalAccess()) throw new BranchAccessDeniedException();
+    }
+
+    private BranchScope requireActorCanMutateTarget(UUID actorUserId, ManagedUser target) {
+        BranchScope actorScope = resolveActorScope(actorUserId);
+        if (actorScope.globalAccess()) return actorScope;
+        if (target.roles().contains(SYSTEM_ADMIN_ROLE)
+            || target.branchIds().isEmpty()
+            || !actorScope.branchIds().containsAll(target.branchIds())) {
+            throw new BranchAccessDeniedException();
+        }
+        return actorScope;
+    }
+
+    private void requireAssignableRoles(UUID actorUserId, Set<String> roleCodes, BranchScope actorScope) {
+        if (actorScope.globalAccess()) return;
+        if (roleCodes.contains(SYSTEM_ADMIN_ROLE)) throw new BranchAccessDeniedException();
+
+        ManagedUser actor = getById(actorUserId);
+        Set<String> grantedPermissions = repository.findPermissionCodesForRoles(roleCodes);
+        if (!actor.permissions().containsAll(grantedPermissions)) throw new BranchAccessDeniedException();
     }
 
     private void validateRolesExist(Set<String> roleCodes) {

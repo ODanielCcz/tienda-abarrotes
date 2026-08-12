@@ -6,10 +6,12 @@ import com.odcc.tienda.modules.inventory.application.command.InventoryReceiptPal
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
 import com.odcc.tienda.modules.inventory.application.port.in.CreateInventoryReceiptUseCase;
 import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseCommand;
+import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseItemCommand;
 import com.odcc.tienda.modules.purchasing.application.command.ReceivePurchaseCommand;
 import com.odcc.tienda.modules.purchasing.application.command.ReceivePurchaseItemCommand;
 import com.odcc.tienda.modules.purchasing.application.command.ReceivePurchasePalletCommand;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchaseItemNotFoundException;
+import com.odcc.tienda.modules.purchasing.application.exception.PurchaseIdempotencyConflictException;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchaseNotFoundException;
 import com.odcc.tienda.modules.purchasing.application.exception.PurchasingException;
 import com.odcc.tienda.modules.purchasing.application.model.Purchase;
@@ -26,7 +28,9 @@ import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -42,8 +46,7 @@ public class PurchaseService implements PurchaseUseCases {
 
     @Override
     public Purchase create(CreatePurchaseCommand command, UUID actorUserId) {
-        branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(command.warehouseId()));
-        return create(command);
+        return createInternal(command, actorUserId);
     }
 
     @Override
@@ -80,16 +83,34 @@ public class PurchaseService implements PurchaseUseCases {
 
     @Override
     public Purchase create(CreatePurchaseCommand command) {
+        return createInternal(command, null);
+    }
+
+    private Purchase createInternal(CreatePurchaseCommand command, UUID actorUserId) {
         return transactionRunner.required(() -> {
             validateCreate(command);
             if (command.idempotencyKey() != null) {
+                repository.lockIdempotencyKey(command.idempotencyKey());
                 var existing = repository.findByIdempotencyKey(command.idempotencyKey());
-                if (existing.isPresent()) return existing.get();
+                if (existing.isPresent()) {
+                    return resolveIdempotentReplay(command, actorUserId, existing.get());
+                }
+            }
+            if (actorUserId != null) {
+                branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(command.warehouseId()));
             }
             Purchase purchase = repository.create(command);
             auditPort.record(new BusinessAuditEvent("PURCHASE_CREATED", "PURCHASE", purchase.purchaseId(), Map.of(), Map.of("status", purchase.status(), "total", purchase.total()), Map.of()));
             return purchase;
         });
+    }
+
+    private Purchase resolveIdempotentReplay(CreatePurchaseCommand command, UUID actorUserId, Purchase persisted) {
+        if (actorUserId != null) branchAccessPort.requireAccess(actorUserId, persisted.branchId());
+        if (!fingerprint(command).equals(fingerprint(persisted))) {
+            throw new PurchaseIdempotencyConflictException();
+        }
+        return persisted;
     }
 
     @Override
@@ -175,7 +196,7 @@ public class PurchaseService implements PurchaseUseCases {
     }
 
     private void requirePurchaseAccess(UUID actorUserId, Purchase purchase) {
-        branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(purchase.warehouseId()));
+        branchAccessPort.requireAccess(actorUserId, purchase.branchId());
     }
 
     private void validateReceivableQuantity(UUID purchaseId, ReceivePurchaseItemCommand command) {
@@ -208,6 +229,63 @@ public class PurchaseService implements PurchaseUseCases {
         int expected = items.size() + pallets.stream().mapToInt(p -> p.items().size()).sum();
         int actual = receipt.items().size() + receipt.pallets().stream().mapToInt(p -> p.items().size()).sum();
         return actual == expected;
+    }
+
+    private static PurchaseFingerprint fingerprint(CreatePurchaseCommand command) {
+        return new PurchaseFingerprint(
+            command.warehouseId(),
+            command.supplierId(),
+            normalizeDocument(command.supplierDocument()),
+            normalizeCurrency(command.currencyCode()),
+            command.items().stream().map(PurchaseService::itemFingerprint).sorted().toList()
+        );
+    }
+
+    private static PurchaseFingerprint fingerprint(Purchase purchase) {
+        return new PurchaseFingerprint(
+            purchase.warehouseId(),
+            purchase.supplierId(),
+            normalizeDocument(purchase.supplierDocument()),
+            normalizeCurrency(purchase.currencyCode()),
+            purchase.items().stream().map(PurchaseService::itemFingerprint).sorted().toList()
+        );
+    }
+
+    private static String itemFingerprint(CreatePurchaseItemCommand item) {
+        return Objects.toString(item.productPresentationId(), "") + ':'
+            + number(item.quantity()) + ':'
+            + number(item.unitCost()) + ':'
+            + number(item.discountAmount()) + ':'
+            + number(item.taxAmount());
+    }
+
+    private static String itemFingerprint(PurchaseItem item) {
+        return Objects.toString(item.productPresentationId(), "") + ':'
+            + number(item.quantity()) + ':'
+            + number(item.unitCost()) + ':'
+            + number(item.discountAmount()) + ':'
+            + number(item.taxAmount());
+    }
+
+    private static String normalizeDocument(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static String normalizeCurrency(String value) {
+        return value == null || value.isBlank() ? "MXN" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String number(BigDecimal value) {
+        return (value == null ? ZERO : value).stripTrailingZeros().toPlainString();
+    }
+
+    private record PurchaseFingerprint(
+        UUID warehouseId,
+        UUID supplierId,
+        String supplierDocument,
+        String currencyCode,
+        List<String> items
+    ) {
     }
 }
 

@@ -17,6 +17,9 @@ public interface PurchaseRepositoryPort {
 
     Purchase create(CreatePurchaseCommand command);
 
+    default void lockIdempotencyKey(UUID idempotencyKey) {
+    }
+
     Optional<Purchase> findById(UUID purchaseId);
 
     List<Purchase> findAll(ListPurchasesQuery query);

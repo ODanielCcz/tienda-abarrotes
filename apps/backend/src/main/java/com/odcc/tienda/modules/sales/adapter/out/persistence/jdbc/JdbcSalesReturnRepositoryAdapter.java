@@ -7,6 +7,7 @@ import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnAlreadyProcessedException;
+import com.odcc.tienda.modules.sales.application.exception.SalesReturnOrderConflictException;
 import com.odcc.tienda.modules.sales.application.model.SalesReturn;
 import com.odcc.tienda.modules.sales.application.model.SalesReturnItem;
 import com.odcc.tienda.modules.sales.application.port.out.SalesReturnRepositoryPort;
@@ -82,6 +83,9 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
         SalesReturn salesReturn = findByIdForUpdate(command.returnId());
         if (!"DRAFT".equals(salesReturn.status())) throw new SalesReturnAlreadyProcessedException(command.returnId());
         OrderRow order = findOrder(salesReturn.salesOrderId());
+        if (!List.of("CONFIRMED", "PARTIALLY_RETURNED").contains(order.status())) {
+            throw new SalesReturnOrderConflictException();
+        }
         List<SalesReturnItem> lockedItems = salesReturn.items().stream()
             .sorted(Comparator.comparing(SalesReturnItem::salesOrderItemId))
             .toList();
@@ -151,6 +155,7 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
                 SELECT sales_order_id, order_number, branch_id, warehouse_id, status, payment_status, total
                 FROM sales.sales_orders
                 WHERE sales_order_id = :salesOrderId
+                FOR UPDATE
                 """, new MapSqlParameterSource("salesOrderId", salesOrderId), (rs, rowNum) -> new OrderRow(
                 rs.getObject("sales_order_id", UUID.class),
                 rs.getString("order_number"),

@@ -3,6 +3,7 @@ package com.odcc.tienda.modules.sales.adapter.out.persistence.jdbc;
 import com.odcc.tienda.modules.sales.application.command.CreateSalesOrderCommand;
 import com.odcc.tienda.modules.sales.application.command.CreateSalesOrderItemCommand;
 import com.odcc.tienda.modules.sales.application.exception.SalesException;
+import com.odcc.tienda.modules.sales.application.exception.SalesOrderCancellationConflictException;
 import com.odcc.tienda.modules.sales.application.exception.StockInsufficientException;
 import com.odcc.tienda.modules.sales.application.model.SalesOrder;
 import com.odcc.tienda.modules.sales.application.model.SalesOrderItem;
@@ -197,8 +198,30 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
 
     @Override
     public SalesOrder cancel(UUID salesOrderId) {
+        lockForCancellation(salesOrderId);
+        int claimed = jdbc.update("""
+            UPDATE sales.sales_orders
+            SET status = 'CANCELLED',
+                payment_status = 'CANCELLED',
+                cancelled_at = clock_timestamp()
+            WHERE sales_order_id = :id
+              AND status = 'CONFIRMED'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sales.returns r
+                  WHERE r.sales_order_id = sales.sales_orders.sales_order_id
+                    AND r.status <> 'CANCELLED'
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sales.payments p
+                  WHERE p.sales_order_id = sales.sales_orders.sales_order_id
+                    AND p.status = 'CAPTURED'
+              )
+            """, new MapSqlParameterSource("id", salesOrderId));
+        if (claimed != 1) throw new SalesOrderCancellationConflictException();
+
         SalesOrder order = findById(salesOrderId).orElseThrow(() -> new SalesException("No existe la venta " + salesOrderId));
-        if (!"CONFIRMED".equals(order.status())) throw new SalesException("Solo se pueden cancelar ventas confirmadas");
         UUID movementId = UUID.randomUUID();
         insertStockMovement(movementId, order.branchId(), order.warehouseId(), "SALE_RETURN", "SALES_ORDER_CANCEL", order.salesOrderId(), "Cancelacion " + order.orderNumber());
         for (SalesOrderItem item : order.items()) {
@@ -210,8 +233,19 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
             if (item.lotId() != null) upLot(order.warehouseId(), item.lotId(), item.quantity());
             insertStockMovementItem(movementId, item.productPresentationId(), item.lotId(), item.quantity(), item.unitCost(), before, after, "IN");
         }
-        jdbc.update("UPDATE sales.sales_orders SET status = 'CANCELLED', payment_status = 'CANCELLED', cancelled_at = clock_timestamp() WHERE sales_order_id = :id", new MapSqlParameterSource("id", salesOrderId));
         return findById(salesOrderId).orElseThrow();
+    }
+
+    private void lockForCancellation(UUID salesOrderId) {
+        try {
+            jdbc.queryForObject(
+                "SELECT sales_order_id FROM sales.sales_orders WHERE sales_order_id = :id FOR UPDATE",
+                new MapSqlParameterSource("id", salesOrderId),
+                UUID.class
+            );
+        } catch (EmptyResultDataAccessException exception) {
+            throw new SalesOrderCancellationConflictException();
+        }
     }
 
     private List<Allocation> allocate(UUID warehouseId, PresentationRow presentation, BigDecimal quantity) {

@@ -15,6 +15,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -214,7 +216,7 @@ class UserManagementApiIntegrationTest {
             Integer.class,
             adminId
         );
-        assertEquals(5, auditCount);
+        assertEquals(4, auditCount);
     }
 
     @Test
@@ -282,6 +284,298 @@ class UserManagementApiIntegrationTest {
             )
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("IDENTITY_LAST_SYSTEM_ADMIN"));
+    }
+
+    @Test
+    void delegatedUserCannotGrantSystemAdminRole() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String delegatedRole = "ROLE_DELEGATED_" + suffix;
+        createRoleWithPermissions(delegatedRole, "IDENTITY_USER_ROLE_ASSIGN");
+        insertUser("delegated_roles_" + suffix.toLowerCase(), "correct-password", delegatedRole, "ACTIVE");
+        UUID targetUserId = insertUser("role_target_" + suffix.toLowerCase(), "correct-password", "CATALOG_MANAGER", "ACTIVE");
+        String token = login("delegated_roles_" + suffix.toLowerCase(), "correct-password");
+
+        mockMvc.perform(
+                put("/api/v1/identity/users/{userId}/roles", targetUserId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "roleCodes": ["SYSTEM_ADMIN"]
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden());
+
+        Integer grants = jdbcTemplate.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM iam.user_roles user_role
+                JOIN iam.roles role ON role.role_id = user_role.role_id
+                WHERE user_role.user_id = ? AND role.code = 'SYSTEM_ADMIN'
+                """,
+            Integer.class,
+            targetUserId
+        );
+        assertEquals(0, grants);
+    }
+
+    @Test
+    void delegatedUserCannotGrantCustomRoleWithPermissionsItDoesNotHold() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String delegatedRole = "ROLE_ASSIGNER_" + suffix;
+        String privilegedRole = "ROLE_PASSWORD_ADMIN_" + suffix;
+        createRoleWithPermissions(delegatedRole, "IDENTITY_USER_ROLE_ASSIGN");
+        createRoleWithPermissions(privilegedRole, "IDENTITY_USER_PASSWORD_CHANGE");
+        insertUser("delegated_assigner_" + suffix.toLowerCase(), "correct-password", delegatedRole, "ACTIVE");
+        UUID targetUserId = insertUser("custom_role_target_" + suffix.toLowerCase(), "correct-password", "CATALOG_MANAGER", "ACTIVE");
+        String token = login("delegated_assigner_" + suffix.toLowerCase(), "correct-password");
+
+        mockMvc.perform(
+                put("/api/v1/identity/users/{userId}/roles", targetUserId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "roleCodes": ["%s"]
+                        }
+                        """.formatted(privilegedRole))
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotCreateAccountWithRolePermissionsItDoesNotHold() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String delegatedRole = "ROLE_CREATOR_" + suffix;
+        String privilegedRole = "ROLE_ACCOUNT_ADMIN_" + suffix;
+        String actorUsername = "delegated_creator_" + suffix.toLowerCase();
+        createRoleWithPermissions(delegatedRole, "IDENTITY_USER_CREATE");
+        createRoleWithPermissions(privilegedRole, "IDENTITY_USER_PASSWORD_CHANGE");
+        insertUser(actorUsername, "correct-password", delegatedRole, "ACTIVE");
+        String token = login(actorUsername, "correct-password");
+
+        mockMvc.perform(
+                post("/api/v1/identity/users")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "username": "created_privileged_%s",
+                          "displayName": "Created Privileged",
+                          "password": "Temporary123!",
+                          "roleCodes": ["%s"]
+                        }
+                        """.formatted(suffix.toLowerCase(), privilegedRole))
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotCreateAccountEvenWithEquivalentRolePermissions() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String delegatedRole = "ROLE_EQUIVALENT_CREATOR_" + suffix;
+        String actorUsername = "equivalent_creator_" + suffix.toLowerCase();
+        createRoleWithPermissions(delegatedRole, "IDENTITY_USER_CREATE");
+        insertUser(actorUsername, "correct-password", delegatedRole, "ACTIVE");
+        String token = login(actorUsername, "correct-password");
+
+        mockMvc.perform(
+                post("/api/v1/identity/users")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "username": "created_equivalent_%s",
+                          "displayName": "Created Equivalent",
+                          "password": "Temporary123!",
+                          "roleCodes": ["%s"]
+                        }
+                        """.formatted(suffix.toLowerCase(), delegatedRole))
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotUpdateSystemAdminAccount() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String delegatedRole = "ROLE_USER_EDITOR_" + suffix;
+        String actorUsername = "delegated_editor_" + suffix.toLowerCase();
+        createRoleWithPermissions(delegatedRole, "IDENTITY_USER_UPDATE");
+        insertUser(actorUsername, "correct-password", delegatedRole, "ACTIVE");
+        UUID targetUserId = insertUser("protected_update_" + suffix.toLowerCase(), "correct-password", "SYSTEM_ADMIN", "ACTIVE");
+        String token = login(actorUsername, "correct-password");
+
+        mockMvc.perform(
+                put("/api/v1/identity/users/{userId}", targetUserId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "username": "changed_admin_%s",
+                          "displayName": "Changed Admin"
+                        }
+                        """.formatted(suffix.toLowerCase()))
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotChangeSystemAdminPassword() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String delegatedRole = "ROLE_PASSWORD_EDITOR_" + suffix;
+        String actorUsername = "delegated_password_" + suffix.toLowerCase();
+        createRoleWithPermissions(delegatedRole, "IDENTITY_USER_PASSWORD_CHANGE");
+        insertUser(actorUsername, "correct-password", delegatedRole, "ACTIVE");
+        UUID targetUserId = insertUser("protected_password_" + suffix.toLowerCase(), "correct-password", "SYSTEM_ADMIN", "ACTIVE");
+        String token = login(actorUsername, "correct-password");
+
+        mockMvc.perform(
+                post("/api/v1/identity/users/{userId}/password", targetUserId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "password": "Compromised123!"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotChangeSystemAdminStatus() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String delegatedRole = "ROLE_STATUS_EDITOR_" + suffix;
+        String actorUsername = "delegated_status_" + suffix.toLowerCase();
+        createRoleWithPermissions(delegatedRole, "IDENTITY_USER_STATUS");
+        insertUser(actorUsername, "correct-password", delegatedRole, "ACTIVE");
+        UUID targetUserId = insertUser("protected_status_" + suffix.toLowerCase(), "correct-password", "SYSTEM_ADMIN", "ACTIVE");
+        insertUser("backup_admin_" + suffix.toLowerCase(), "correct-password", "SYSTEM_ADMIN", "ACTIVE");
+        String token = login(actorUsername, "correct-password");
+
+        mockMvc.perform(
+                patch("/api/v1/identity/users/{userId}/status", targetUserId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "status": "LOCKED"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotUpdateAccountOutsideItsBranchScope() throws Exception {
+        CrossBranchFixture fixture = createCrossBranchFixture("UPDATE", "IDENTITY_USER_UPDATE");
+        String token = login(fixture.actorUsername(), "correct-password");
+
+        mockMvc.perform(
+                put("/api/v1/identity/users/{userId}", fixture.targetUserId())
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "username": "cross_branch_changed_%s",
+                          "displayName": "Cross Branch Changed"
+                        }
+                        """.formatted(fixture.suffix().toLowerCase()))
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotChangePasswordOutsideItsBranchScope() throws Exception {
+        CrossBranchFixture fixture = createCrossBranchFixture("PASSWORD", "IDENTITY_USER_PASSWORD_CHANGE");
+        String token = login(fixture.actorUsername(), "correct-password");
+
+        mockMvc.perform(
+                post("/api/v1/identity/users/{userId}/password", fixture.targetUserId())
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "password": "CrossBranch123!"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotChangeStatusOutsideItsBranchScope() throws Exception {
+        CrossBranchFixture fixture = createCrossBranchFixture("STATUS", "IDENTITY_USER_STATUS");
+        String token = login(fixture.actorUsername(), "correct-password");
+
+        mockMvc.perform(
+                patch("/api/v1/identity/users/{userId}/status", fixture.targetUserId())
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "status": "LOCKED"
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delegatedUserCannotChangeRolesOutsideItsBranchScope() throws Exception {
+        CrossBranchFixture fixture = createCrossBranchFixture("ROLES", "IDENTITY_USER_ROLE_ASSIGN");
+        String token = login(fixture.actorUsername(), "correct-password");
+
+        mockMvc.perform(
+                put("/api/v1/identity/users/{userId}/roles", fixture.targetUserId())
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "roleCodes": []
+                        }
+                        """)
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void identicalRoleAssignmentPreservesValidUntil() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toLowerCase();
+        String username = "temporary_admin_" + suffix;
+        UUID userId = insertUser(username, "correct-password", "SYSTEM_ADMIN", "ACTIVE");
+        Instant validUntil = Instant.now().plusSeconds(3600);
+        jdbcTemplate.update(
+            "UPDATE iam.user_roles SET valid_until = ? WHERE user_id = ?",
+            Timestamp.from(validUntil),
+            userId
+        );
+        Timestamp persistedBefore = jdbcTemplate.queryForObject(
+            "SELECT valid_until FROM iam.user_roles WHERE user_id = ?",
+            Timestamp.class,
+            userId
+        );
+        String token = login(username, "correct-password");
+
+        mockMvc.perform(
+                put("/api/v1/identity/users/{userId}/roles", userId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "roleCodes": ["SYSTEM_ADMIN"]
+                        }
+                        """)
+            )
+            .andExpect(status().isOk());
+
+        Timestamp persistedAfter = jdbcTemplate.queryForObject(
+            "SELECT valid_until FROM iam.user_roles WHERE user_id = ?",
+            Timestamp.class,
+            userId
+        );
+        assertEquals(persistedBefore, persistedAfter);
     }
 
     @Test
@@ -534,5 +828,47 @@ class UserManagementApiIntegrationTest {
             roleCode,
             roleCode
         );
+    }
+
+    private void createRoleWithPermissions(String roleCode, String... permissionCodes) {
+        createRoleWithoutPermissions(roleCode);
+        for (String permissionCode : permissionCodes) {
+            jdbcTemplate.update(
+                """
+                    INSERT INTO iam.role_permissions (role_id, permission_id)
+                    SELECT role.role_id, permission.permission_id
+                    FROM iam.roles role
+                    CROSS JOIN iam.permissions permission
+                    WHERE role.code = ? AND permission.code = ?
+                    """,
+                roleCode,
+                permissionCode
+            );
+        }
+    }
+
+    private CrossBranchFixture createCrossBranchFixture(String purpose, String permissionCode) {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String delegatedRole = "ROLE_" + purpose + "_" + suffix;
+        String actorUsername = "actor_" + purpose.toLowerCase() + "_" + suffix.toLowerCase();
+        createRoleWithPermissions(delegatedRole, permissionCode);
+        UUID actorUserId = insertUser(actorUsername, "correct-password", delegatedRole, "ACTIVE");
+        UUID targetUserId = insertUser("target_" + purpose.toLowerCase() + "_" + suffix.toLowerCase(), "correct-password", "CATALOG_MANAGER", "ACTIVE");
+        UUID actorBranchId = insertBranch("ACT_" + suffix, "Actor Branch " + suffix, "ACTIVE");
+        UUID targetBranchId = insertBranch("TGT_" + suffix, "Target Branch " + suffix, "ACTIVE");
+        jdbcTemplate.update(
+            "INSERT INTO iam.user_branch_access (user_id, branch_id, status) VALUES (?, ?, 'ACTIVE')",
+            actorUserId,
+            actorBranchId
+        );
+        jdbcTemplate.update(
+            "INSERT INTO iam.user_branch_access (user_id, branch_id, status) VALUES (?, ?, 'ACTIVE')",
+            targetUserId,
+            targetBranchId
+        );
+        return new CrossBranchFixture(suffix, actorUsername, targetUserId);
+    }
+
+    private record CrossBranchFixture(String suffix, String actorUsername, UUID targetUserId) {
     }
 }

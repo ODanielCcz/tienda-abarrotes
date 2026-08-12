@@ -29,6 +29,7 @@ public interface OrganizationRepositoryPort {
     BranchView createBranch(CreateBranchCommand command);
     List<BranchView> listBranches(BranchStatus status);
     Optional<BranchView> findBranch(UUID branchId);
+    Optional<BranchView> findBranchForUpdate(UUID branchId);
     BranchView updateBranch(UpdateBranchCommand command);
     BranchView changeBranchStatus(ChangeBranchStatusCommand command);
     boolean branchCodeExists(String code, UUID excludedBranchId);

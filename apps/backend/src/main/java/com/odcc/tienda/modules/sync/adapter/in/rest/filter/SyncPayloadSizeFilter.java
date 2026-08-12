@@ -23,6 +23,8 @@ public final class SyncPayloadSizeFilter extends OncePerRequestFilter {
 
     private static final int MAX_BYTES = 256 * 1024;
     private static final String INBOX_PATH = "/api/v1/sync/inbox";
+    private static final String CONFLICTS_PATH = "/api/v1/sync/conflicts/";
+    private static final String RESOLVE_SUFFIX = "/resolve";
 
     private final ObjectProvider<SecurityErrorWriter> errorWriterProvider;
 
@@ -32,7 +34,8 @@ public final class SyncPayloadSizeFilter extends OncePerRequestFilter {
         HttpServletResponse response,
         FilterChain filterChain
     ) throws ServletException, IOException {
-        if (!HttpMethod.POST.matches(request.getMethod()) || !INBOX_PATH.equals(request.getRequestURI())) {
+        String pathWithinApplication = pathWithinApplication(request);
+        if (!HttpMethod.POST.matches(request.getMethod()) || !isLimitedPath(pathWithinApplication)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -41,6 +44,35 @@ public final class SyncPayloadSizeFilter extends OncePerRequestFilter {
             return;
         }
         filterChain.doFilter(new LimitedRequest(request), response);
+    }
+
+    private static boolean isLimitedPath(String requestUri) {
+        if (INBOX_PATH.equals(requestUri)) return true;
+        if (!requestUri.startsWith(CONFLICTS_PATH) || !requestUri.endsWith(RESOLVE_SUFFIX)) return false;
+        String conflictId = requestUri.substring(CONFLICTS_PATH.length(), requestUri.length() - RESOLVE_SUFFIX.length());
+        return !conflictId.isBlank() && conflictId.indexOf('/') < 0;
+    }
+
+    private static String pathWithinApplication(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        String path = contextPath != null && !contextPath.isEmpty() && requestUri.startsWith(contextPath)
+            ? requestUri.substring(contextPath.length())
+            : requestUri;
+        StringBuilder normalized = new StringBuilder(path.length());
+        boolean matrixParameter = false;
+        for (int index = 0; index < path.length(); index++) {
+            char character = path.charAt(index);
+            if (character == ';') {
+                matrixParameter = true;
+            } else if (character == '/') {
+                matrixParameter = false;
+                normalized.append(character);
+            } else if (!matrixParameter) {
+                normalized.append(character);
+            }
+        }
+        return normalized.toString();
     }
 
     private void writeTooLarge(HttpServletRequest request, HttpServletResponse response) throws IOException {

@@ -75,8 +75,8 @@ public class UserManagementController {
     @PostMapping("/users")
     @Operation(summary = "Crear usuario")
     @PreAuthorize("hasAuthority('IDENTITY_USER_CREATE')")
-    public ResponseEntity<ApiResponseDto<ManagedUser>> createUser(@Valid @RequestBody CreateUserRequest request, HttpServletRequest servletRequest) {
-        ManagedUser user = useCases.create(new CreateUserCommand(request.username(), request.displayName(), request.password(), request.roleCodes()));
+    public ResponseEntity<ApiResponseDto<ManagedUser>> createUser(@Valid @RequestBody CreateUserRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        ManagedUser user = useCases.create(new CreateUserCommand(currentUserId(jwt), request.username(), request.displayName(), request.password(), request.roleCodes()));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "IDENTITY_USER_CREATED", "Usuario creado correctamente", user, servletRequest.getRequestURI()));
     }
 
@@ -91,8 +91,8 @@ public class UserManagementController {
     @PutMapping("/users/{userId}")
     @Operation(summary = "Actualizar usuario")
     @PreAuthorize("hasAuthority('IDENTITY_USER_UPDATE')")
-    public ResponseEntity<ApiResponseDto<ManagedUser>> updateUser(@PathVariable UUID userId, @Valid @RequestBody UpdateUserRequest request, HttpServletRequest servletRequest) {
-        ManagedUser user = useCases.update(new UpdateUserCommand(userId, request.username(), request.displayName()));
+    public ResponseEntity<ApiResponseDto<ManagedUser>> updateUser(@PathVariable UUID userId, @Valid @RequestBody UpdateUserRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        ManagedUser user = useCases.update(new UpdateUserCommand(currentUserId(jwt), userId, request.username(), request.displayName()));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_USER_UPDATED", "Usuario actualizado correctamente", user, servletRequest.getRequestURI()));
     }
 
@@ -112,24 +112,24 @@ public class UserManagementController {
     @PostMapping("/users/{userId}/password")
     @Operation(summary = "Cambiar contraseña de usuario")
     @PreAuthorize("hasAuthority('IDENTITY_USER_PASSWORD_CHANGE')")
-    public ResponseEntity<ApiResponseDto<ManagedUser>> changeUserPassword(@PathVariable UUID userId, @Valid @RequestBody ChangeUserPasswordRequest request, HttpServletRequest servletRequest) {
-        ManagedUser user = useCases.changePassword(new ChangeUserPasswordCommand(userId, request.password()));
+    public ResponseEntity<ApiResponseDto<ManagedUser>> changeUserPassword(@PathVariable UUID userId, @Valid @RequestBody ChangeUserPasswordRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        ManagedUser user = useCases.changePassword(new ChangeUserPasswordCommand(currentUserId(jwt), userId, request.password()));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_USER_PASSWORD_CHANGED", "Contraseña actualizada correctamente", user, servletRequest.getRequestURI()));
     }
 
     @PutMapping("/users/{userId}/roles")
     @Operation(summary = "Asignar roles a usuario")
     @PreAuthorize("hasAuthority('IDENTITY_USER_ROLE_ASSIGN')")
-    public ResponseEntity<ApiResponseDto<ManagedUser>> assignUserRoles(@PathVariable UUID userId, @Valid @RequestBody AssignUserRolesRequest request, HttpServletRequest servletRequest) {
-        ManagedUser user = useCases.assignRoles(new AssignUserRolesCommand(userId, request.roleCodes()));
+    public ResponseEntity<ApiResponseDto<ManagedUser>> assignUserRoles(@PathVariable UUID userId, @Valid @RequestBody AssignUserRolesRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        ManagedUser user = useCases.assignRoles(new AssignUserRolesCommand(currentUserId(jwt), userId, request.roleCodes()));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_USER_ROLES_UPDATED", "Roles de usuario actualizados correctamente", user, servletRequest.getRequestURI()));
     }
 
     @PutMapping("/users/{userId}/branches")
     @Operation(summary = "Asignar sucursales a usuario")
     @PreAuthorize("hasAuthority('IDENTITY_USER_BRANCH_ASSIGN')")
-    public ResponseEntity<ApiResponseDto<ManagedUser>> assignUserBranches(@PathVariable UUID userId, @Valid @RequestBody AssignUserBranchesRequest request, HttpServletRequest servletRequest) {
-        ManagedUser user = useCases.assignBranches(new AssignUserBranchesCommand(userId, request.branchIds()));
+    public ResponseEntity<ApiResponseDto<ManagedUser>> assignUserBranches(@PathVariable UUID userId, @Valid @RequestBody AssignUserBranchesRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        ManagedUser user = useCases.assignBranches(new AssignUserBranchesCommand(currentUserId(jwt), userId, request.branchIds()));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_USER_BRANCHES_UPDATED", "Sucursales de usuario actualizadas correctamente", user, servletRequest.getRequestURI()));
     }
 
@@ -167,8 +167,8 @@ public class UserManagementController {
     @PutMapping("/roles/{roleId}/permissions")
     @Operation(summary = "Asignar permisos a rol")
     @PreAuthorize("hasAuthority('IDENTITY_ROLE_PERMISSION_ASSIGN')")
-    public ResponseEntity<ApiResponseDto<RoleDetail>> assignRolePermissions(@PathVariable UUID roleId, @Valid @RequestBody AssignRolePermissionsRequest request, HttpServletRequest servletRequest) {
-        RoleDetail role = useCases.assignRolePermissions(new AssignRolePermissionsCommand(roleId, request.permissionCodes()));
+    public ResponseEntity<ApiResponseDto<RoleDetail>> assignRolePermissions(@PathVariable UUID roleId, @Valid @RequestBody AssignRolePermissionsRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
+        RoleDetail role = useCases.assignRolePermissions(new AssignRolePermissionsCommand(currentUserId(jwt), roleId, request.permissionCodes()));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_ROLE_PERMISSIONS_UPDATED", "Permisos de rol actualizados correctamente", role, servletRequest.getRequestURI()));
     }
 

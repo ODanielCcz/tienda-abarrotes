@@ -132,6 +132,20 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
     }
 
     @Override
+    public Set<String> findPermissionCodesForRoles(Set<String> roleCodes) {
+        if (roleCodes == null || roleCodes.isEmpty()) return Set.of();
+        return new LinkedHashSet<>(jdbc.queryForList("""
+            SELECT DISTINCT permission.code
+            FROM iam.roles role
+            JOIN iam.role_permissions role_permission ON role_permission.role_id = role.role_id
+            JOIN iam.permissions permission ON permission.permission_id = role_permission.permission_id
+            WHERE role.status = 'ACTIVE'
+              AND role.code IN (:roleCodes)
+            ORDER BY permission.code
+            """, new MapSqlParameterSource("roleCodes", roleCodes), String.class));
+    }
+
+    @Override
     public void replaceRoles(UUID userId, Set<String> roleCodes) {
         jdbc.update("DELETE FROM iam.user_roles WHERE user_id = :userId", new MapSqlParameterSource("userId", userId));
         if (roleCodes != null && !roleCodes.isEmpty()) {
@@ -150,6 +164,11 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
     }
 
     @Override
+    public void lockSystemAdminMutations() {
+        jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(76190214733001)");
+    }
+
+    @Override
     public long countActiveSystemAdminsExcluding(UUID excludedUserId) {
         Long count = jdbc.queryForObject("""
             SELECT COUNT(DISTINCT user_account.user_id)
@@ -159,6 +178,7 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
             WHERE user_account.status = 'ACTIVE'
               AND role.status = 'ACTIVE'
               AND role.code = 'SYSTEM_ADMIN'
+              AND (user_role.valid_until IS NULL OR user_role.valid_until > clock_timestamp())
               AND user_account.user_id <> :excludedUserId
             """, new MapSqlParameterSource("excludedUserId", excludedUserId), Long.class);
         return count == null ? 0 : count;
@@ -172,6 +192,8 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
             JOIN iam.roles role ON role.role_id = user_role.role_id
             WHERE user_role.user_id = :userId
               AND role.code = 'SYSTEM_ADMIN'
+              AND role.status = 'ACTIVE'
+              AND (user_role.valid_until IS NULL OR user_role.valid_until > clock_timestamp())
             """, new MapSqlParameterSource("userId", userId), Integer.class);
         return count != null && count > 0;
     }
@@ -342,6 +364,7 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
             JOIN iam.roles role ON role.role_id = user_role.role_id
             WHERE user_role.user_id = :userId
               AND role.status = 'ACTIVE'
+              AND (user_role.valid_until IS NULL OR user_role.valid_until > clock_timestamp())
             ORDER BY role.code
             """, new MapSqlParameterSource("userId", userId), String.class));
     }
@@ -355,6 +378,7 @@ public class UserManagementJdbcAdapter implements UserManagementRepositoryPort {
             JOIN iam.permissions permission ON permission.permission_id = role_permission.permission_id
             WHERE user_role.user_id = :userId
               AND role.status = 'ACTIVE'
+              AND (user_role.valid_until IS NULL OR user_role.valid_until > clock_timestamp())
             ORDER BY permission.code
             """, new MapSqlParameterSource("userId", userId), String.class));
     }

@@ -14,6 +14,7 @@ import java.util.UUID;
 
 public interface SyncRepositoryPort {
     Optional<DeviceContext> findDevice(UUID deviceId);
+    boolean userOwnsDevice(UUID userId, UUID deviceId);
     boolean userCanAccessBranch(UUID userId, UUID branchId);
     Optional<SyncOperation> findByIdempotencyKey(UUID idempotencyKey);
     Optional<SyncOperation> findByDeviceSequence(UUID deviceId, long deviceSequence);

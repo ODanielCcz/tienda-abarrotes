@@ -124,6 +124,30 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void shouldRejectTokenAfterAssignedRoleExpires() throws Exception {
+        UUID userId = insertUser(
+            "security_expired_role",
+            "correct-password",
+            "CATALOG_MANAGER"
+        );
+        String token = login("security_expired_role", "correct-password");
+
+        jdbcTemplate.update(
+            """
+                UPDATE iam.user_roles
+                SET valid_until = clock_timestamp() - INTERVAL '1 second'
+                WHERE user_id = ?
+                """,
+            userId
+        );
+
+        mockMvc.perform(get(BRANDS_ENDPOINT).header("Authorization", "Bearer " + token))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("TOKEN_REVOKED"))
+            .andExpect(jsonPath("$.correlationId").isNotEmpty());
+    }
+
+    @Test
     void shouldReturnStructuredUnauthorizedResponseWithoutToken()
         throws Exception {
         mockMvc.perform(

@@ -13,6 +13,7 @@ import com.odcc.tienda.modules.identity.application.port.out.UserManagementRepos
 import com.odcc.tienda.modules.identity.application.usecase.LoginService;
 import com.odcc.tienda.modules.identity.application.usecase.UserManagementService;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
+import com.odcc.tienda.shared.application.authorization.BranchAccessPort;
 import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -47,8 +48,9 @@ public class IdentityConfiguration {
         UserManagementRepositoryPort repository,
         PasswordHashingPort passwordHashingPort,
         TransactionRunner transactionRunner,
-        BusinessAuditPort auditPort
+        BusinessAuditPort auditPort,
+        BranchAccessPort branchAccess
     ) {
-        return new UserManagementService(repository, passwordHashingPort, transactionRunner, auditPort);
+        return new UserManagementService(repository, passwordHashingPort, transactionRunner, auditPort, branchAccess);
     }
 }

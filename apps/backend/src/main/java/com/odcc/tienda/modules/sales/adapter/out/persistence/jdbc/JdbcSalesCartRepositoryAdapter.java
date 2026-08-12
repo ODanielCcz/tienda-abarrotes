@@ -42,7 +42,7 @@ public class JdbcSalesCartRepositoryAdapter implements SalesCartRepositoryPort {
     @Override
     public SalesCart upsert(UpsertSalesCartCommand command) {
         try {
-            jdbc.update("""
+            int claimed = jdbc.update("""
                 INSERT INTO sales.carts (
                     cart_id, customer_id, branch_id, device_id, status,
                     currency_code, expires_at
@@ -52,19 +52,23 @@ public class JdbcSalesCartRepositoryAdapter implements SalesCartRepositoryPort {
                 )
                 ON CONFLICT (cart_id) DO UPDATE
                 SET customer_id = EXCLUDED.customer_id,
-                    branch_id = EXCLUDED.branch_id,
-                    device_id = EXCLUDED.device_id,
                     status = 'ACTIVE',
                     currency_code = EXCLUDED.currency_code,
                     expires_at = EXCLUDED.expires_at,
                     updated_at = clock_timestamp()
-                WHERE sales.carts.status IN ('ACTIVE','ABANDONED','EXPIRED')
+                WHERE sales.carts.branch_id = EXCLUDED.branch_id
+                  AND sales.carts.device_id = EXCLUDED.device_id
+                  AND sales.carts.status = 'ACTIVE'
                 """, new MapSqlParameterSource("id", command.cartId())
                 .addValue("customerId", command.customerId())
                 .addValue("branchId", command.branchId())
                 .addValue("deviceId", command.deviceId())
                 .addValue("currencyCode", command.currencyCode())
                 .addValue("expiresAt", timestamp(command.expiresAt())));
+
+            if (claimed != 1) {
+                throw new SalesException("El carrito no pertenece al dispositivo, sucursal o estado editable");
+            }
 
             jdbc.update("DELETE FROM sales.cart_items WHERE cart_id = :id", new MapSqlParameterSource("id", command.cartId()));
             for (UpsertSalesCartCommand.Item item : command.items()) {

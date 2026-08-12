@@ -15,8 +15,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -149,6 +149,149 @@ class TransactionalConcurrencyIntegrationTest {
     }
 
     @Test
+    void shouldCancelAConcurrentSalesOrderOnlyOnce() throws Exception {
+        Fixture fixture = createFixture();
+        String token = login(fixture.username(), "correct-password");
+        ReturnFixture orderFixture = createReturnFixture(fixture);
+
+        List<Integer> cancelStatuses = runConcurrently(
+            cancelSalesOrderRequest(token, orderFixture.salesOrderId()),
+            cancelSalesOrderRequest(token, orderFixture.salesOrderId())
+        );
+
+        assertEquals(List.of(200, 409), cancelStatuses);
+        Integer cancellationMovements = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM inventory.stock_movements WHERE source_id = ? AND movement_type = 'SALE_RETURN'",
+            Integer.class,
+            orderFixture.salesOrderId()
+        );
+        BigDecimal finalStock = jdbcTemplate.queryForObject(
+            "SELECT on_hand_quantity FROM inventory.stock_balances WHERE warehouse_id = ? AND product_presentation_id = ?",
+            BigDecimal.class,
+            fixture.warehouseId(),
+            orderFixture.presentationId()
+        );
+        assertEquals(1, cancellationMovements);
+        assertEquals(0, new BigDecimal("5.000").compareTo(finalStock));
+    }
+
+    @Test
+    void shouldRejectSalesOrderCancellationWhenANonCancelledReturnExists() throws Exception {
+        Fixture fixture = createFixture();
+        String token = login(fixture.username(), "correct-password");
+        ReturnFixture orderFixture = createReturnFixture(fixture);
+        UUID returnId = createReturnDraft(token, orderFixture);
+
+        MvcResult result = cancelSalesOrderRequest(token, orderFixture.salesOrderId()).call();
+
+        assertEquals(409, result.getResponse().getStatus());
+        assertEquals("CONFIRMED", jdbcTemplate.queryForObject(
+            "SELECT status FROM sales.sales_orders WHERE sales_order_id = ?",
+            String.class,
+            orderFixture.salesOrderId()
+        ));
+        assertEquals("DRAFT", jdbcTemplate.queryForObject(
+            "SELECT status FROM sales.returns WHERE return_id = ?",
+            String.class,
+            returnId
+        ));
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM inventory.stock_movements WHERE source_id = ? AND source_type = 'SALES_ORDER_CANCEL'",
+            Integer.class,
+            orderFixture.salesOrderId()
+        ));
+    }
+
+    @Test
+    void shouldRejectReturnConfirmationAfterSalesOrderCancellation() throws Exception {
+        Fixture fixture = createFixture();
+        String token = login(fixture.username(), "correct-password");
+        ReturnFixture orderFixture = createReturnFixture(fixture);
+        UUID returnId = createReturnDraft(token, orderFixture);
+        jdbcTemplate.update("UPDATE sales.returns SET status = 'CANCELLED' WHERE return_id = ?", returnId);
+        assertEquals(200, cancelSalesOrderRequest(token, orderFixture.salesOrderId()).call().getResponse().getStatus());
+        jdbcTemplate.update("UPDATE sales.returns SET status = 'DRAFT' WHERE return_id = ?", returnId);
+
+        MvcResult result = confirmReturnRequest(token, returnId).call();
+
+        assertEquals(409, result.getResponse().getStatus());
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM inventory.stock_movements WHERE movement_type = 'SALE_RETURN' AND (source_id = ? OR source_id = ?)",
+            Integer.class,
+            orderFixture.salesOrderId(),
+            returnId
+        ));
+        BigDecimal finalStock = jdbcTemplate.queryForObject(
+            "SELECT on_hand_quantity FROM inventory.stock_balances WHERE warehouse_id = ? AND product_presentation_id = ?",
+            BigDecimal.class,
+            fixture.warehouseId(),
+            orderFixture.presentationId()
+        );
+        assertEquals(0, new BigDecimal("5.000").compareTo(finalStock));
+    }
+
+    @Test
+    void shouldRejectSalesOrderCancellationWhenCapturedPaymentExists() throws Exception {
+        Fixture fixture = createFixture();
+        String token = login(fixture.username(), "correct-password");
+        MvcResult payment = paymentRequest(token, fixture.salesOrderId(), UUID.randomUUID(), UUID.randomUUID()).call();
+        assertEquals(201, payment.getResponse().getStatus());
+
+        MvcResult result = cancelSalesOrderRequest(token, fixture.salesOrderId()).call();
+
+        assertEquals(409, result.getResponse().getStatus());
+        assertEquals("CONFIRMED", jdbcTemplate.queryForObject(
+            "SELECT status FROM sales.sales_orders WHERE sales_order_id = ?",
+            String.class,
+            fixture.salesOrderId()
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sales.payments WHERE sales_order_id = ? AND status = 'CAPTURED'",
+            Integer.class,
+            fixture.salesOrderId()
+        ));
+    }
+
+    @Test
+    void shouldCreateOnePurchaseForConcurrentCanonicalIdempotentRequestsAndRejectChangedReplay() throws Exception {
+        Fixture fixture = createFixture();
+        String token = login(fixture.username(), "correct-password");
+        ReturnFixture productFixture = createReturnFixture(fixture);
+        UUID supplierId = createSupplier();
+        UUID idempotencyKey = UUID.randomUUID();
+
+        List<MvcResult> results = runConcurrentlyResults(
+            purchaseRequest(token, fixture.warehouseId(), supplierId, productFixture.presentationId(), idempotencyKey, "10.00"),
+            purchaseRequest(token, fixture.warehouseId(), supplierId, productFixture.presentationId(), idempotencyKey, "10.0000")
+        );
+
+        assertEquals(List.of(201, 201), results.stream().map(result -> result.getResponse().getStatus()).sorted().toList());
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM purchasing.purchases WHERE idempotency_key = ?",
+            Integer.class,
+            idempotencyKey
+        ));
+        List<String> purchaseIds = results.stream()
+            .map(result -> (String) JsonPath.read(
+                new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8),
+                "$.data.purchaseId"
+            ))
+            .distinct()
+            .toList();
+        assertEquals(1, purchaseIds.size());
+
+        MvcResult changedReplay = purchaseRequest(
+            token,
+            fixture.warehouseId(),
+            supplierId,
+            productFixture.presentationId(),
+            idempotencyKey,
+            "11.00"
+        ).call();
+        assertEquals(409, changedReplay.getResponse().getStatus());
+    }
+
+    @Test
     void shouldApplyAConcurrentInventoryReceiptIdempotencyKeyOnlyOnce() throws Exception {
         Fixture fixture = createFixture();
         String token = login(fixture.username(), "correct-password");
@@ -228,6 +371,13 @@ class TransactionalConcurrencyIntegrationTest {
         ).andReturn();
     }
 
+    private Callable<MvcResult> cancelSalesOrderRequest(String token, UUID salesOrderId) {
+        return () -> mockMvc.perform(
+            post("/api/v1/sales/orders/{salesOrderId}/cancel", salesOrderId)
+                .header("Authorization", "Bearer " + token)
+        ).andReturn();
+    }
+
     private Callable<MvcResult> receiptRequest(
         String token,
         UUID warehouseId,
@@ -260,8 +410,50 @@ class TransactionalConcurrencyIntegrationTest {
         ).andReturn();
     }
 
+    private Callable<MvcResult> purchaseRequest(
+        String token,
+        UUID warehouseId,
+        UUID supplierId,
+        UUID presentationId,
+        UUID idempotencyKey,
+        String unitCost
+    ) {
+        return () -> mockMvc.perform(
+            post("/api/v1/purchasing/purchases")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "warehouseId": "%s",
+                      "supplierId": "%s",
+                      "supplierDocument": "CONCURRENT-PURCHASE",
+                      "currencyCode": "MXN",
+                      "idempotencyKey": "%s",
+                      "items": [
+                        {
+                          "productPresentationId": "%s",
+                          "quantity": 2,
+                          "unitCost": %s,
+                          "discountAmount": 0,
+                          "taxAmount": 0
+                        }
+                      ]
+                    }
+                    """.formatted(warehouseId, supplierId, idempotencyKey, presentationId, unitCost))
+        ).andReturn();
+    }
+
     @SafeVarargs
     private final List<Integer> runConcurrently(Callable<MvcResult>... requests) throws Exception {
+        List<Integer> statuses = runConcurrentlyResults(requests).stream()
+            .map(result -> result.getResponse().getStatus())
+            .sorted()
+            .toList();
+        return statuses;
+    }
+
+    @SafeVarargs
+    private final List<MvcResult> runConcurrentlyResults(Callable<MvcResult>... requests) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(requests.length);
         CountDownLatch ready = new CountDownLatch(requests.length);
         CountDownLatch start = new CountDownLatch(1);
@@ -276,12 +468,11 @@ class TransactionalConcurrencyIntegrationTest {
             }
             ready.await(10, TimeUnit.SECONDS);
             start.countDown();
-            List<Integer> statuses = new ArrayList<>();
+            List<MvcResult> results = new ArrayList<>();
             for (Future<MvcResult> future : futures) {
-                statuses.add(future.get(30, TimeUnit.SECONDS).getResponse().getStatus());
+                results.add(future.get(30, TimeUnit.SECONDS));
             }
-            Collections.sort(statuses);
-            return statuses;
+            return results;
         } finally {
             executor.shutdownNow();
         }
@@ -416,6 +607,40 @@ class TransactionalConcurrencyIntegrationTest {
             salesOrderItemId, salesOrderId, presentationId, "CSKU" + suffix
         );
         return new ReturnFixture(salesOrderId, salesOrderItemId, presentationId);
+    }
+
+    private UUID createReturnDraft(String token, ReturnFixture fixture) throws Exception {
+        MvcResult createResult = mockMvc.perform(
+                post("/api/v1/sales/orders/{salesOrderId}/returns", fixture.salesOrderId())
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "reason": "Regresion de cancelacion",
+                          "items": [
+                            {
+                              "salesOrderItemId": "%s",
+                              "quantity": 2
+                            }
+                          ]
+                        }
+                        """.formatted(fixture.salesOrderItemId()))
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+        return UUID.fromString(JsonPath.read(createResult.getResponse().getContentAsString(), "$.data.returnId"));
+    }
+
+    private UUID createSupplier() {
+        UUID supplierId = UUID.randomUUID();
+        String suffix = supplierId.toString().substring(0, 8).toUpperCase();
+        jdbcTemplate.update(
+            "INSERT INTO purchasing.suppliers (supplier_id, supplier_code, legal_name, status) VALUES (?, ?, ?, 'ACTIVE')",
+            supplierId,
+            "CON-S-" + suffix,
+            "Concurrent Supplier"
+        );
+        return supplierId;
     }
 
     private record Fixture(

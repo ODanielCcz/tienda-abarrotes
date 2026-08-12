@@ -55,6 +55,19 @@ public class JdbcSyncRepositoryAdapter implements SyncRepositoryPort {
     }
 
     @Override
+    public boolean userOwnsDevice(UUID userId, UUID deviceId) {
+        Boolean owned = jdbc.queryForObject("""
+            SELECT EXISTS(
+                SELECT 1
+                FROM sync.device_user_bindings binding
+                WHERE binding.user_id = :userId
+                  AND binding.device_id = :deviceId
+            )
+            """, new MapSqlParameterSource("userId", userId).addValue("deviceId", deviceId), Boolean.class);
+        return Boolean.TRUE.equals(owned);
+    }
+
+    @Override
     public boolean userCanAccessBranch(UUID userId, UUID branchId) {
         Boolean allowed = jdbc.queryForObject("""
             SELECT EXISTS(
@@ -69,12 +82,14 @@ public class JdbcSyncRepositoryAdapter implements SyncRepositoryPort {
                         WHERE ur.user_id = user_account.user_id
                           AND role.code = 'SYSTEM_ADMIN'
                           AND role.status = 'ACTIVE'
+                          AND (ur.valid_until IS NULL OR ur.valid_until > clock_timestamp())
                     )
                     OR EXISTS (
                         SELECT 1 FROM iam.user_branch_access access
                         JOIN organization.branches branch ON branch.branch_id = access.branch_id
                         WHERE access.user_id = user_account.user_id
                           AND access.branch_id = :branchId
+                          AND access.status = 'ACTIVE'
                           AND branch.status = 'ACTIVE'
                     )
                   )

@@ -9,12 +9,14 @@ import com.odcc.tienda.modules.sales.application.exception.CustomerCodeAlreadyEx
 import com.odcc.tienda.modules.sales.application.exception.CustomerNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderIdempotencyConflictException;
+import com.odcc.tienda.modules.sales.application.exception.SalesOrderCancellationConflictException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentIdempotencyConflictException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentOverpaidException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPaymentNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnAlreadyProcessedException;
+import com.odcc.tienda.modules.sales.application.exception.SalesReturnOrderConflictException;
 import com.odcc.tienda.modules.sales.application.exception.StockInsufficientException;
 import com.odcc.tienda.modules.sales.application.exception.PriceNotConfiguredException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPriceChangedException;
@@ -48,6 +50,11 @@ public class SalesExceptionHandler {
         return error(HttpStatus.CONFLICT, "SALES_ORDER_IDEMPOTENCY_CONFLICT", exception.getMessage(), request);
     }
 
+    @ExceptionHandler(SalesOrderCancellationConflictException.class)
+    public ResponseEntity<ApiResponseDto<Void>> cancellationConflict(SalesOrderCancellationConflictException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "SALES_ORDER_CANCELLATION_CONFLICT", exception.getMessage(), request);
+    }
+
     @ExceptionHandler(StockInsufficientException.class)
     public ResponseEntity<ApiResponseDto<Void>> stockInsufficient(StockInsufficientException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "STOCK_INSUFFICIENT", exception.getMessage(), request);
@@ -71,6 +78,11 @@ public class SalesExceptionHandler {
     @ExceptionHandler(SalesReturnAlreadyProcessedException.class)
     public ResponseEntity<ApiResponseDto<Void>> salesReturnAlreadyProcessed(SalesReturnAlreadyProcessedException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "SALES_RETURN_ALREADY_PROCESSED", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(SalesReturnOrderConflictException.class)
+    public ResponseEntity<ApiResponseDto<Void>> salesReturnOrderConflict(SalesReturnOrderConflictException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "SALES_RETURN_ORDER_CONFLICT", exception.getMessage(), request);
     }
 
     @ExceptionHandler(SalesPaymentNotFoundException.class)

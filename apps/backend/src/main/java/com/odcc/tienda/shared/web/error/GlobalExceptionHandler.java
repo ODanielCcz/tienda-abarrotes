@@ -90,6 +90,15 @@ public class GlobalExceptionHandler {
         HttpMessageNotReadableException exception,
         HttpServletRequest request
     ) {
+        if (hasCause(exception, SyncPayloadTooLargeIOException.class)) {
+            return error(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "SYNC_PAYLOAD_TOO_LARGE",
+                "El payload Sync supera 256 KiB",
+                null,
+                request
+            );
+        }
         return error(
             HttpStatus.BAD_REQUEST,
             "MALFORMED_JSON",
@@ -160,15 +169,6 @@ public class GlobalExceptionHandler {
         BranchAccessDeniedException exception,
         HttpServletRequest request
     ) {
-        if (hasCause(exception, SyncPayloadTooLargeIOException.class)) {
-            return error(
-                HttpStatus.PAYLOAD_TOO_LARGE,
-                "SYNC_PAYLOAD_TOO_LARGE",
-                "El payload Sync supera 256 KiB",
-                null,
-                request
-            );
-        }
         return error(
             HttpStatus.FORBIDDEN,
             "BRANCH_ACCESS_DENIED",
