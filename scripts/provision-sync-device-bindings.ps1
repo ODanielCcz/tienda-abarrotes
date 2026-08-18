@@ -42,6 +42,17 @@ function Invoke-DatabaseQuery {
     Invoke-Compose -ComposeArguments $arguments
 }
 
+function ConvertTo-SqlUuidLiteral {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    # ConvertTo-RequiredUuid ya garantiza que el valor es un UUID; al insertar
+    # únicamente ese formato validado, no se permite inyección en estas consultas.
+    return "'$Value'::uuid"
+}
+
 $rows = @(Import-Csv -LiteralPath $MappingPath)
 if ($rows.Count -eq 0) {
     throw 'El CSV no contiene asignaciones. Usa las columnas device_id,user_id.'
@@ -119,8 +130,10 @@ RETURNING device_id;
 '@
 
 foreach ($mapping in $validatedRows) {
-    $variables = @{ device_id = $mapping.DeviceId; user_id = $mapping.UserId }
-    $status = (Invoke-DatabaseQuery -Query $validationQuery -Variables $variables | Select-Object -Last 1).Trim()
+    $deviceLiteral = ConvertTo-SqlUuidLiteral -Value $mapping.DeviceId
+    $userLiteral = ConvertTo-SqlUuidLiteral -Value $mapping.UserId
+    $renderedValidationQuery = $validationQuery.Replace(":'device_id'::uuid", $deviceLiteral).Replace(":'user_id'::uuid", $userLiteral)
+    $status = (Invoke-DatabaseQuery -Query $renderedValidationQuery -Variables @{} | Select-Object -Last 1).Trim()
     if ($status -ne 'OK') {
         throw "Fila $($mapping.RowNumber): no se puede vincular $($mapping.DeviceId) con $($mapping.UserId): $status."
     }
@@ -130,7 +143,8 @@ foreach ($mapping in $validatedRows) {
         continue
     }
 
-    $createdDeviceId = (Invoke-DatabaseQuery -Query $insertQuery -Variables $variables | Select-Object -Last 1).Trim()
+    $renderedInsertQuery = $insertQuery.Replace(":'device_id'::uuid", $deviceLiteral).Replace(":'user_id'::uuid", $userLiteral)
+    $createdDeviceId = (Invoke-DatabaseQuery -Query $renderedInsertQuery -Variables @{} | Select-Object -Last 1).Trim()
     if ($createdDeviceId) {
         Write-Host "Vínculo creado: $target"
     } else {
