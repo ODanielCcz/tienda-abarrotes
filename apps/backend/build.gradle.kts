@@ -20,7 +20,7 @@ repositories {
 
 val mapstructVersion = "1.6.3"
 val lombokMapstructBindingVersion = "0.2.0"
-val springdocVersion = "3.0.0"
+val springdocVersion = "3.1.0"
 val archUnitVersion = "1.4.2"
 
 extra["jackson-2-bom.version"] = "2.21.5"
