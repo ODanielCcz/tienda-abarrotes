@@ -83,10 +83,13 @@ No guardes el resultado en Git. Para crear el primer administrador únicamente e
 - Login público: `POST /api/v1/auth/login`.
 - Swagger UI público: `http://localhost:8080/swagger-ui.html`.
 - Contrato OpenAPI: `http://localhost:8080/v3/api-docs`.
+- `ApiResponseDto` incluye `reason` HTTP y `correlationId` en respuestas exitosas y de error.
 - Las operaciones de marcas requieren `Authorization: Bearer <token>` y el permiso correspondiente.
 - Salud e información son públicas; métricas Prometheus requieren autenticación.
 
 La guía completa de consumo está en [`docs/api/backend-api-v1.md`](../../docs/api/backend-api-v1.md).
+
+Para validar un candidato con una base nueva sin tocar la de desarrollo, sigue [`docs/operations/rc1-validation.md`](../../docs/operations/rc1-validation.md). Para Sync v1, un dispositivo `MOBILE_EMPLOYEE` debe estar vinculado al usuario autenticado; consulta [`docs/operations/sync-device-provisioning.md`](../../docs/operations/sync-device-provisioning.md).
 
 ## Observabilidad
 

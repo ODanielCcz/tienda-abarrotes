@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "6b47631d-a9dc-4b75-9f97-29d75f80b001",
     "name": "Tienda de Abarrotes - Backend MVP",
-    "description": "Flujos base de autenticación, facturación interna y sincronización offline v1.",
+    "description": "Flujos base de autenticación, facturación interna y sincronización offline v1. Para Sync, device_id debe pertenecer al usuario autenticado y estar vinculado por el procedimiento operativo.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {

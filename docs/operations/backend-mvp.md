@@ -38,6 +38,14 @@ Set-Location .\apps\backend
 .\gradlew.bat bootJar --no-daemon
 ```
 
+Para validar un candidato contra una base vacía y aislada, usa la guía [rc1-validation.md](rc1-validation.md). No ejecutes `Flyway clean` ni elimines los volúmenes de desarrollo para este fin.
+
+## Sync Offline V1
+
+Antes de probar Inbox, Outbox, checkpoints o conflictos, cada dispositivo `MOBILE_EMPLOYEE` debe tener un propietario explícito en `sync.device_user_bindings`. Sigue [sync-device-provisioning.md](sync-device-provisioning.md); un usuario distinto al propietario no puede sincronizar usando el UUID de ese dispositivo.
+
+Los requests Sync tienen límites de 256 KiB, profundidad 20, 1,000 nodos y 300 operaciones por minuto por dispositivo. Los rechazos usan el contrato estándar y pueden devolver `413`, `400` o `429`.
+
 ## Recuperación Ante Errores
 
 | Falla | Acción |

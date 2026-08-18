@@ -24,7 +24,7 @@ El candidato incluye autenticación, identidad, organización, catálogo, invent
 
 ## Evidencia De Validación
 
-- Migraciones Flyway V001-V031 aplicadas en PostgreSQL/Testcontainers.
+- Migraciones Flyway V001-V034 aplicadas en PostgreSQL/Testcontainers y validadas desde una base aislada.
 - Suite Gradle completa y ArchUnit en verde.
 - `bootJar` generado correctamente.
 - PostgreSQL y backend Docker en estado healthy.
@@ -40,6 +40,17 @@ El candidato incluye autenticación, identidad, organización, catálogo, invent
 - Sin claves o contraseñas reales en archivos versionados.
 - Permisos específicos por endpoint.
 - Respuestas con `reason` y `correlationId`.
+- Autorización por sucursal centralizada; `SYSTEM_ADMIN` conserva acceso global.
+- Precio de venta resuelto por el servidor y validación de precio esperado.
+- Vínculo obligatorio y único entre dispositivo Sync y usuario responsable.
+- Límites de payload y tasa para operaciones Sync.
+
+## Criterios Para Etiquetar
+
+- La suite Gradle, `bootJar`, Flyway aislado, Docker health y Trivy deben estar en verde.
+- El workflow remoto `Backend CI` debe terminar correctamente en el commit candidato.
+- Los dispositivos Sync que vayan a usarse deben estar vinculados mediante el procedimiento operativo versionado.
+- La etiqueta anotada será `backend-v1.0.0-rc1`; no se crea antes de cumplir estos criterios.
 
 ## Backlog V2
 

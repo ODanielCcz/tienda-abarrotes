@@ -32,7 +32,8 @@ Sistema modular para administrar una tienda de abarrotes. El repositorio está p
   - inbox idempotente;
   - outbox por sucursal;
   - checkpoints y conflictos;
-  - conteos físicos y carritos offline.
+  - conteos físicos y carritos offline;
+  - vínculo obligatorio entre dispositivo y usuario responsable.
 
 ## Componentes disponibles
 
@@ -118,6 +119,7 @@ http://localhost:8080/actuator/health
 - Las transacciones de escritura pertenecen al caso de uso mediante `TransactionRunner`.
 - Los documentos fiscales congelan snapshots y son inmutables después de `READY`.
 - Sync v1 solo admite carritos y conteos; ventas, pagos y ajustes offline quedan fuera del MVP.
+- Antes de utilizar Sync v1, un administrador debe provisionar el vínculo usuario-dispositivo siguiendo [`docs/operations/sync-device-provisioning.md`](docs/operations/sync-device-provisioning.md).
 - No se versionan secretos ni datos productivos. Usa `.env.example` como plantilla local.
 
-Estado objetivo actual: candidato `backend-v1.0.0-rc1`.
+Estado objetivo actual: cierre operativo del candidato `backend-v1.0.0-rc1`. La validación repetible está en [`docs/operations/rc1-validation.md`](docs/operations/rc1-validation.md) y la automatización en [`docs/operations/ci-cd.md`](docs/operations/ci-cd.md).

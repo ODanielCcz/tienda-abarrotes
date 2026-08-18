@@ -7,7 +7,7 @@
 | Versión | v1.0 |
 | Estado | En revisión |
 | Responsable | Por definir |
-| Fecha | 2026-07-25 |
+| Fecha | 2026-08-18 |
 | Clasificación | Interno |
 
 ## Control De Versiones
@@ -15,6 +15,7 @@
 | Versión | Fecha | Autor | Cambio | Estado |
 |---|---|---|---|---|
 | v1.0 | 2026-07-25 | Equipo del proyecto | Contrato inicial de autenticación y marcas | En revisión |
+| v1.1 | 2026-08-18 | Equipo del proyecto | Contrato RC1: respuestas, módulos y Sync seguro | En revisión |
 
 ## Resumen Del Servicio
 
@@ -25,6 +26,8 @@ API REST del backend Spring Boot para clientes web y móvil. El contrato ejecuta
 ```text
 http://localhost:8080
 ```
+
+El contrato ejecutable y completo se publica en `GET /v3/api-docs`; Swagger UI está disponible en `GET /swagger-ui/index.html`. Esta guía documenta convenciones, flujos y rutas principales; OpenAPI prevalece ante cualquier diferencia.
 
 ## Autenticación
 
@@ -51,12 +54,31 @@ El token es de acceso, no de refresco. Su duración predeterminada es 30 minutos
   "timestamp": "2026-07-25T20:00:00Z",
   "status": 200,
   "code": "BRAND_FOUND",
+  "reason": "OK",
   "message": "Marca encontrada correctamente",
   "data": {},
   "errors": null,
-  "path": "/api/v1/catalog/brands/00000000-0000-0000-0000-000000000000"
+  "path": "/api/v1/catalog/brands/00000000-0000-0000-0000-000000000000",
+  "correlationId": "7a76edb7-e233-4c79-b450-45cad3859e32"
 }
 ```
+
+`code` es el código estable de negocio; `reason` es la frase HTTP. Envía opcionalmente `X-Correlation-ID` y la API devolverá el mismo valor en el header y cuerpo de la respuesta.
+
+### Módulos Implementados
+
+| Módulo | Prefijo principal | Operación relevante |
+|---|---|---|
+| Identidad | `/api/v1/auth`, `/api/v1/identity` | Login, usuarios, roles, permisos y sucursales |
+| Organización | `/api/v1/organization` | Sucursales, almacenes, cajas y dispositivos |
+| Catálogo | `/api/v1/catalog` | Marcas, categorías, productos, presentaciones, unidades y precios |
+| Inventario | `/api/v1/inventory` | Recepciones, lotes, stock, movimientos, ajustes, traspasos, reservas y conteos |
+| Compras | `/api/v1/purchasing` | Proveedores, órdenes y recepción de compras |
+| Ventas | `/api/v1/sales` | Órdenes, pagos, clientes, devoluciones y carritos |
+| Caja | `/api/v1/cash` | Sesiones y movimientos de caja |
+| Reportes | `/api/v1/reports` | Ventas, margen, inventario, caducidad y devoluciones |
+| Facturación interna | `/api/v1/billing` | Perfiles y documentos fiscales internos |
+| Sync v1 | `/api/v1/sync` | Inbox, outbox, checkpoints y conflictos |
 
 ## Endpoints
 
@@ -278,6 +300,9 @@ Respuesta: `200 CATEGORY_STATUS_UPDATED`. Si no existe: `404 CATEGORY_NOT_FOUND`
 | 403 | `FORBIDDEN` | Falta el permiso requerido | Solicitar asignación de rol |
 | 404 | `RESOURCE_NOT_FOUND` | Ruta inexistente | Verificar método y URL |
 | 405 | `METHOD_NOT_ALLOWED` | Método HTTP no soportado | Usar el método documentado |
+| 409 | Código de conflicto | Estado, idempotencia, precio o concurrencia incompatibles | Consultar recurso y reintentar solo cuando aplique |
+| 413 | `SYNC_PAYLOAD_TOO_LARGE` | Payload Sync mayor a 256 KiB | Reducir el payload |
+| 429 | `LOGIN_RATE_LIMITED` o `SYNC_RATE_LIMITED` | Límite de intentos excedido | Respetar `Retry-After` y reintentar después |
 | 500 | `INTERNAL_ERROR` | Error no controlado | Reportar el `X-Correlation-ID` |
 
 ## Endpoints Operativos
@@ -295,12 +320,12 @@ Respuesta: `200 CATEGORY_STATUS_UPDATED`. Si no existe: `404 CATEGORY_NOT_FOUND`
 
 ```powershell
 # Desde apps/backend
-.\gradlew.bat clean test --no-daemon
+.\gradlew.bat test --no-daemon
 ```
 
 La suite cubre dominio, casos de uso, persistencia PostgreSQL, REST, transacciones, auditoría, autenticación, autorización, OpenAPI, CORS, métricas, trazas y reglas arquitectónicas.
 
 ## Pendientes
 
-- Definir refresh tokens y revocación cuando se diseñen sesiones de usuario.
 - Definir el colector OTLP y la política de retención antes de habilitar exportación en un entorno compartido.
+- Añadir timbrado CFDI/PAC y ventas/pagos offline únicamente como trabajo v2 explícito.

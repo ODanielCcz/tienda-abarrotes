@@ -8,7 +8,7 @@
 | Tipo | Fullstack con cliente web y móvil |
 | Sensibilidad | Interno |
 | Fecha de inicio | 2026-07-12 |
-| Última revisión | 2026-07-29 |
+| Última revisión | 2026-08-18 |
 
 ## Objetivo Actual
 
@@ -37,11 +37,13 @@ Cerrar y validar el backend modular de la tienda: identidad, catálogo, organiza
 - Proteger la API mediante JWT y permisos por caso de uso.
 - Mantener correlación, métricas Prometheus, trazas OpenTelemetry y logs estructurados.
 - Mantener secretos reales únicamente en archivos locales ignorados.
+- Exigir autorización por sucursal, precios resueltos por servidor e idempotencia atómica en operaciones sensibles.
+- Exigir vínculo explícito usuario-dispositivo para Sync v1.
 
 ## Próximas Acciones
 
-1. Ejecutar validación completa desde migración V001 hasta V031.
-2. Aprobar y etiquetar el candidato `backend-v1.0.0-rc1`.
-3. Definir CI/CD y un entorno compartido.
-4. Definir retención de auditoría, outbox, logs y trazas.
-5. Priorizar backlog v2: PAC/CFDI, ventas offline, crédito, exportaciones y clientes web/móvil.
+1. Ejecutar validación aislada completa desde migración V001 hasta V034.
+2. Provisionar y revisar los vínculos locales usuario-dispositivo de Sync antes de usar endpoints offline.
+3. Activar el workflow remoto Backend CI y verificar una ejecución verde sobre `main`.
+4. Aprobar y etiquetar el candidato `backend-v1.0.0-rc1`.
+5. Definir retención de auditoría, outbox, logs y trazas; después priorizar el backlog v2.
