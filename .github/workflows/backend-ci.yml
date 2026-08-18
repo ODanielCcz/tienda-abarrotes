@@ -37,11 +37,11 @@ jobs:
 
       - name: Run backend test suite
         working-directory: apps/backend
-        run: ./gradlew test --no-daemon
+        run: bash ./gradlew test --no-daemon
 
       - name: Build backend jar
         working-directory: apps/backend
-        run: ./gradlew bootJar --no-daemon
+        run: bash ./gradlew bootJar --no-daemon
 
       - name: Create isolated Compose environment
         shell: bash
