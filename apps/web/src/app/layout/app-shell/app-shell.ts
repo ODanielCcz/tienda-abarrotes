@@ -56,10 +56,16 @@ export class AppShell {
         permissions: [],
       },
       {
-        label: 'Catalogo',
-        icon: 'inventory_2',
+        label: 'Marcas',
+        icon: 'sell',
         route: '/catalog/brands',
-        permissions: ['CATALOG_BRAND_READ', 'CATALOG_CATEGORY_READ', 'CATALOG_PRODUCT_READ'],
+        permissions: ['CATALOG_BRAND_READ'],
+      },
+      {
+        label: 'Categorías',
+        icon: 'category',
+        route: '/catalog/categories',
+        permissions: ['CATALOG_CATEGORY_READ'],
       },
       {
         label: 'Inventario',

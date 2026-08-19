@@ -39,6 +39,17 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'catalog/categories',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: ['CATALOG_CATEGORY_READ'],
+        },
+        loadComponent: () =>
+          import(
+            './features/catalog/categories/pages/category-list/category-list'
+          ).then((module) => module.CategoryList),
+      },
+      {
         path: 'inventory',
         canActivate: [permissionGuard],
         data: {

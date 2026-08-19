@@ -1,0 +1,81 @@
+<section class="category-list">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Catálogo</p>
+      <h1>Categorías</h1>
+      <p>Consulta las categorías registradas en la tienda.</p>
+    </div>
+
+    <button mat-stroked-button type="button" (click)="refresh()">
+      <mat-icon>refresh</mat-icon>
+      Actualizar
+    </button>
+  </header>
+
+  <div class="filters">
+    <label>
+      <span>Buscar</span>
+      <input type="search" [formControl]="searchControl" placeholder="Código o nombre" />
+    </label>
+
+    <mat-button-toggle-group [formControl]="statusControl" aria-label="Estado de categoría">
+      <mat-button-toggle value="ALL">Todas</mat-button-toggle>
+      <mat-button-toggle value="ACTIVE">Activas</mat-button-toggle>
+      <mat-button-toggle value="INACTIVE">Inactivas</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <mat-spinner diameter="32" />
+      <span>Consultando categorías...</span>
+    </div>
+  } @else if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  } @else {
+    <div class="table-shell">
+      <table mat-table [dataSource]="categories()">
+        <ng-container matColumnDef="code">
+          <th mat-header-cell *matHeaderCellDef>Código</th>
+          <td mat-cell *matCellDef="let category">{{ category.code }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Nombre</th>
+          <td mat-cell *matCellDef="let category">{{ category.name }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="parent">
+          <th mat-header-cell *matHeaderCellDef>Padre</th>
+          <td mat-cell *matCellDef="let category">
+            {{ category.parentCategoryId || 'Categoría raíz' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let category">
+            <span
+              class="status-pill"
+              [class.status-pill-inactive]="category.status === 'INACTIVE'"
+            >
+              {{ category.status === 'ACTIVE' ? 'Activa' : 'Inactiva' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="createdAt">
+          <th mat-header-cell *matHeaderCellDef>Creada</th>
+          <td mat-cell *matCellDef="let category">{{ category.createdAt | date: 'short' }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+
+        <tr class="empty-row" *matNoDataRow>
+          <td [attr.colspan]="displayedColumns.length">No hay categorías para mostrar.</td>
+        </tr>
+      </table>
+    </div>
+  }
+</section>
