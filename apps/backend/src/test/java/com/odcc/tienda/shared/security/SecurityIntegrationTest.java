@@ -340,6 +340,17 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void shouldExposeReadinessAndLivenessWithoutToken() throws Exception {
+        mockMvc.perform(get("/actuator/health/readiness"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP"));
+
+        mockMvc.perform(get("/actuator/health/liveness"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void shouldCreateOpenTelemetryTraceContext() {
         Span span = tracer.nextSpan().name("observability-integration-test").start();
 
