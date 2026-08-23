@@ -115,7 +115,7 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
 
         SalesReturn confirmedReturn = findById(salesReturn.returnId()).orElseThrow();
         updateSalesOrderReturnStatus(order.salesOrderId());
-        maybeInsertCashRefund(order, confirmedReturn, command.cashSessionId(), command.confirmedBy());
+        allocateRefunds(order, confirmedReturn, command.cashSessionId(), command.confirmedBy());
         return confirmedReturn;
     }
 
@@ -220,44 +220,93 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
         return value == null ? BigDecimal.ZERO : scale3(value);
     }
 
-    private void maybeInsertCashRefund(OrderRow order, SalesReturn salesReturn, UUID cashSessionId, UUID createdBy) {
-        CashPaymentRow cashPayment = findCapturedCashPayment(order.salesOrderId());
-        if (cashPayment == null) return;
-        if (cashSessionId == null) throw new SalesException("Las devoluciones de ventas pagadas en efectivo requieren una sesion de caja abierta");
-        ensureOpenCashSession(cashSessionId, order.branchId());
+    private void allocateRefunds(OrderRow order, SalesReturn salesReturn, UUID cashSessionId, UUID createdBy) {
+        BigDecimal remaining = money(salesReturn.total());
+        boolean cashSessionValidated = false;
+        for (PaymentRow payment : findCapturedPaymentsForUpdate(order.salesOrderId())) {
+            if (remaining.signum() <= 0) break;
+            BigDecimal available = money(payment.amount()).subtract(refundedAmount(payment.paymentId())).max(ZERO);
+            if (available.signum() <= 0) continue;
+            BigDecimal allocationAmount = remaining.min(available);
+            UUID allocationId = UUID.randomUUID();
+            insertRefundAllocation(allocationId, salesReturn.returnId(), payment.paymentId(), allocationAmount);
+            if ("CASH".equals(payment.paymentMethod())) {
+                if (cashSessionId == null) {
+                    throw new SalesException("Las devoluciones con importe reembolsable en efectivo requieren una sesion de caja abierta");
+                }
+                if (!cashSessionValidated) {
+                    ensureOpenCashSession(cashSessionId, order.branchId());
+                    cashSessionValidated = true;
+                }
+                insertCashRefund(cashSessionId, salesReturn, payment.paymentId(), allocationId, allocationAmount, createdBy);
+            }
+            remaining = remaining.subtract(allocationAmount);
+        }
+        if (isFullReturn(order.salesOrderId())) {
+            jdbc.update("UPDATE sales.sales_orders SET payment_status = 'REFUNDED' WHERE sales_order_id = :salesOrderId", new MapSqlParameterSource("salesOrderId", order.salesOrderId()));
+        }
+    }
+
+    private void insertRefundAllocation(UUID allocationId, UUID returnId, UUID paymentId, BigDecimal amount) {
+        jdbc.update("""
+            INSERT INTO sales.refund_allocations (refund_allocation_id, return_id, payment_id, amount)
+            VALUES (:allocationId, :returnId, :paymentId, :amount)
+            """, new MapSqlParameterSource()
+            .addValue("allocationId", allocationId)
+            .addValue("returnId", returnId)
+            .addValue("paymentId", paymentId)
+            .addValue("amount", money(amount)));
+    }
+
+    private void insertCashRefund(
+        UUID cashSessionId,
+        SalesReturn salesReturn,
+        UUID paymentId,
+        UUID allocationId,
+        BigDecimal amount,
+        UUID createdBy
+    ) {
         jdbc.update("""
             INSERT INTO cash.cash_movements (
                 cash_movement_id, cash_session_id, movement_type, direction, amount,
                 payment_id, reference, reason, created_by, source_type, source_id
             ) VALUES (
                 :id, :cashSessionId, 'REFUND', 'OUT', :amount,
-                :paymentId, :reference, :reason, :createdBy, 'SALES_RETURN', :sourceId
+                :paymentId, :reference, :reason, :createdBy, 'SALES_REFUND_ALLOCATION', :sourceId
             )
             """, new MapSqlParameterSource()
             .addValue("id", UUID.randomUUID())
             .addValue("cashSessionId", cashSessionId)
-            .addValue("amount", money(salesReturn.total()))
-            .addValue("paymentId", cashPayment.paymentId())
+            .addValue("amount", money(amount))
+            .addValue("paymentId", paymentId)
             .addValue("reference", "Devolucion " + salesReturn.returnId())
             .addValue("reason", salesReturn.reason())
             .addValue("createdBy", createdBy)
-            .addValue("sourceId", salesReturn.returnId()));
-        if (isFullReturn(order.salesOrderId())) {
-            jdbc.update("UPDATE sales.sales_orders SET payment_status = 'REFUNDED' WHERE sales_order_id = :salesOrderId", new MapSqlParameterSource("salesOrderId", order.salesOrderId()));
-        }
+            .addValue("sourceId", allocationId));
     }
 
-    private CashPaymentRow findCapturedCashPayment(UUID salesOrderId) {
-        List<CashPaymentRow> rows = jdbc.query("""
-            SELECT payment_id, amount
+    private List<PaymentRow> findCapturedPaymentsForUpdate(UUID salesOrderId) {
+        return jdbc.query("""
+            SELECT payment_id, payment_method, amount
             FROM sales.payments
             WHERE sales_order_id = :salesOrderId
-              AND payment_method = 'CASH'
               AND status = 'CAPTURED'
-            ORDER BY created_at
-            LIMIT 1
-            """, new MapSqlParameterSource("salesOrderId", salesOrderId), (rs, rowNum) -> new CashPaymentRow(rs.getObject("payment_id", UUID.class), rs.getBigDecimal("amount")));
-        return rows.isEmpty() ? null : rows.getFirst();
+            ORDER BY created_at, payment_id
+            FOR UPDATE
+            """, new MapSqlParameterSource("salesOrderId", salesOrderId), (rs, rowNum) -> new PaymentRow(
+            rs.getObject("payment_id", UUID.class),
+            rs.getString("payment_method"),
+            rs.getBigDecimal("amount")
+        ));
+    }
+
+    private BigDecimal refundedAmount(UUID paymentId) {
+        BigDecimal refunded = jdbc.queryForObject("""
+            SELECT COALESCE(SUM(amount), 0)
+            FROM sales.refund_allocations
+            WHERE payment_id = :paymentId
+            """, new MapSqlParameterSource("paymentId", paymentId), BigDecimal.class);
+        return money(refunded);
     }
 
     private void ensureOpenCashSession(UUID cashSessionId, UUID branchId) {
@@ -416,5 +465,5 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
 
     private record OrderRow(UUID salesOrderId, String orderNumber, UUID branchId, UUID warehouseId, String status, String paymentStatus, BigDecimal total) {}
     private record OrderItemRow(UUID salesOrderItemId, UUID salesOrderId, UUID productPresentationId, UUID lotId, String productNameSnapshot, String skuSnapshot, BigDecimal quantity, BigDecimal unitCost, BigDecimal lineTotal) {}
-    private record CashPaymentRow(UUID paymentId, BigDecimal amount) {}
+    private record PaymentRow(UUID paymentId, String paymentMethod, BigDecimal amount) {}
 }

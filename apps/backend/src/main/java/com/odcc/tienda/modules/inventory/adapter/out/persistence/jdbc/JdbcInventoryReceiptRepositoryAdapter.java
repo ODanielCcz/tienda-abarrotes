@@ -6,6 +6,7 @@ import com.odcc.tienda.modules.inventory.application.command.InventoryReceiptPal
 import com.odcc.tienda.modules.inventory.application.exception.InventoryReceiptException;
 import com.odcc.tienda.modules.inventory.application.exception.InventoryReceiptAlreadyExistsException;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
+import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptExecution;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptItem;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptPallet;
 import com.odcc.tienda.modules.inventory.application.port.out.InventoryReceiptRepositoryPort;
@@ -82,6 +83,11 @@ public class JdbcInventoryReceiptRepositoryAdapter implements InventoryReceiptRe
 
     @Override
     public InventoryReceipt create(CreateInventoryReceiptCommand command, String fingerprint) {
+        return createWithOutcome(command, fingerprint).receipt();
+    }
+
+    @Override
+    public InventoryReceiptExecution createWithOutcome(CreateInventoryReceiptCommand command, String fingerprint) {
         WarehouseRow warehouse = findWarehouse(command.warehouseId());
         UUID movementId = UUID.randomUUID();
         UUID idempotencyKey = command.idempotencyKey();
@@ -109,7 +115,7 @@ public class JdbcInventoryReceiptRepositoryAdapter implements InventoryReceiptRe
 
         if (claimedMovementIds.isEmpty()) {
             Optional<InventoryReceipt> existing = findByIdempotencyKey(idempotencyKey, fingerprint);
-            if (existing.isPresent()) return existing.get();
+            if (existing.isPresent()) return InventoryReceiptExecution.replayed(existing.get());
             throw new InventoryReceiptAlreadyExistsException(idempotencyKey);
         }
 
@@ -128,7 +134,15 @@ public class JdbcInventoryReceiptRepositoryAdapter implements InventoryReceiptRe
             }
         }
 
-        return new InventoryReceipt(movementId, command.warehouseId(), command.supplierId(), "CONFIRMED", receivedAt, simpleItems, pallets);
+        return InventoryReceiptExecution.created(new InventoryReceipt(
+            movementId,
+            command.warehouseId(),
+            command.supplierId(),
+            "CONFIRMED",
+            receivedAt,
+            simpleItems,
+            pallets
+        ));
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.odcc.tienda.modules.inventory.application.command.InventoryReceiptPal
 import com.odcc.tienda.modules.inventory.application.exception.InventoryReceiptAlreadyExistsException;
 import com.odcc.tienda.modules.inventory.application.exception.InventoryReceiptException;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
+import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptExecution;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptPallet;
 import com.odcc.tienda.modules.inventory.application.port.in.CreateInventoryReceiptUseCase;
 import com.odcc.tienda.modules.inventory.application.port.out.InventoryReceiptFingerprintPort;
@@ -33,34 +34,46 @@ public class CreateInventoryReceiptService implements CreateInventoryReceiptUseC
 
     @Override
     public InventoryReceipt execute(CreateInventoryReceiptCommand command) {
-        return executeInternal(command);
+        return executeWithOutcome(command).receipt();
     }
 
     @Override
     public InventoryReceipt execute(CreateInventoryReceiptCommand command, UUID actorUserId) {
+        return executeWithOutcome(command, actorUserId).receipt();
+    }
+
+    @Override
+    public InventoryReceiptExecution executeWithOutcome(CreateInventoryReceiptCommand command) {
+        return executeInternal(command);
+    }
+
+    @Override
+    public InventoryReceiptExecution executeWithOutcome(CreateInventoryReceiptCommand command, UUID actorUserId) {
         validate(command);
         branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(command.warehouseId()));
         return executeInternal(command);
     }
 
-    private InventoryReceipt executeInternal(CreateInventoryReceiptCommand command) {
+    private InventoryReceiptExecution executeInternal(CreateInventoryReceiptCommand command) {
         validate(command);
         String fingerprint = fingerprint(command);
         return transactionRunner.required(() -> create(command, fingerprint));
     }
 
-    private InventoryReceipt create(CreateInventoryReceiptCommand command, String fingerprint) {
+    private InventoryReceiptExecution create(CreateInventoryReceiptCommand command, String fingerprint) {
         if (command.idempotencyKey() != null) {
             if (repository.existsByIdempotencyKeyWithDifferentFingerprint(command.idempotencyKey(), fingerprint)) {
                 throw new InventoryReceiptAlreadyExistsException(command.idempotencyKey());
             }
             var existing = repository.findByIdempotencyKey(command.idempotencyKey(), fingerprint);
             if (existing.isPresent()) {
-                return existing.get();
+                return InventoryReceiptExecution.replayed(existing.get());
             }
         }
 
-        InventoryReceipt receipt = repository.create(command, fingerprint);
+        InventoryReceiptExecution execution = repository.createWithOutcome(command, fingerprint);
+        if (!execution.wasCreated()) return execution;
+        InventoryReceipt receipt = execution.receipt();
         auditPort.record(new BusinessAuditEvent(
             "INVENTORY_RECEIPT_CREATED",
             "INVENTORY_RECEIPT",
@@ -83,7 +96,7 @@ public class CreateInventoryReceiptService implements CreateInventoryReceiptUseC
                 Map.of("receiptId", receipt.receiptId())
             ));
         }
-        return receipt;
+        return execution;
     }
 
     private void validate(CreateInventoryReceiptCommand command) {

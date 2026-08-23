@@ -9,6 +9,7 @@ import com.odcc.tienda.modules.purchasing.application.model.Purchase;
 import com.odcc.tienda.modules.purchasing.application.model.PurchaseItem;
 import com.odcc.tienda.modules.purchasing.application.port.out.PurchaseRepositoryPort;
 import com.odcc.tienda.modules.purchasing.application.query.ListPurchasesQuery;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -121,18 +122,33 @@ public class JdbcPurchaseRepositoryAdapter implements PurchaseRepositoryPort {
 
     @Override
     public List<Purchase> findAll(ListPurchasesQuery query) {
+        return findAll(query, BranchScope.global());
+    }
+
+    @Override
+    public List<Purchase> findAll(
+        ListPurchasesQuery query,
+        BranchScope scope
+    ) {
+        BranchScope effectiveScope = scope == null ? BranchScope.restricted(java.util.Set.of()) : scope;
+        if (!effectiveScope.globalAccess() && effectiveScope.branchIds().isEmpty()) return List.of();
         List<Purchase> headers = jdbc.query("""
             SELECT *
             FROM purchasing.purchases
             WHERE (:supplierId IS NULL OR supplier_id = :supplierId)
               AND (:warehouseId IS NULL OR warehouse_id = :warehouseId)
               AND (:status IS NULL OR status = :status)
+              AND (CAST(:globalAccess AS boolean) OR branch_id IN (:authorizedBranchIds))
             ORDER BY purchased_at DESC
             LIMIT 200
             """, new MapSqlParameterSource()
             .addValue("supplierId", query == null ? null : query.supplierId())
             .addValue("warehouseId", query == null ? null : query.warehouseId())
-            .addValue("status", normalize(query == null ? null : query.status())), this::mapPurchaseWithoutItems);
+            .addValue("status", normalize(query == null ? null : query.status()))
+            .addValue("globalAccess", effectiveScope.globalAccess())
+            .addValue("authorizedBranchIds", effectiveScope.globalAccess()
+                ? List.of(new UUID(0L, 0L))
+                : List.copyOf(effectiveScope.branchIds())), this::mapPurchaseWithoutItems);
         return headers.stream().map(this::withItems).toList();
     }
 

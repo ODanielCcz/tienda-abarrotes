@@ -8,6 +8,7 @@ import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundExc
 import com.odcc.tienda.modules.sales.application.exception.PriceNotConfiguredException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPriceChangedException;
 import com.odcc.tienda.modules.sales.application.model.SalesOrder;
+import com.odcc.tienda.modules.sales.application.model.SalesOrderExecution;
 import com.odcc.tienda.modules.sales.application.port.in.SalesOrderUseCases;
 import com.odcc.tienda.modules.sales.application.port.out.SalesOrderRepositoryPort;
 import com.odcc.tienda.modules.sales.application.query.ListSalesOrdersQuery;
@@ -50,7 +51,12 @@ public class SalesOrderService implements SalesOrderUseCases {
             if (command.customerId() != null && !repository.customerIsActive(command.customerId())) {
                 throw new SalesException("El cliente no existe o no esta activo");
             }
-            SalesOrder order = repository.createConfirmed(resolveServerPrices(command), fingerprint);
+            SalesOrderExecution execution = repository.createConfirmedWithOutcome(
+                resolveServerPrices(command),
+                fingerprint
+            );
+            SalesOrder order = execution.salesOrder();
+            if (!execution.wasCreated()) return order;
             Map<String, Object> after = new LinkedHashMap<>();
             after.put("orderNumber", order.orderNumber());
             after.put("total", order.total());
@@ -73,7 +79,7 @@ public class SalesOrderService implements SalesOrderUseCases {
         if (query != null && query.warehouseId() != null) {
             branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(query.warehouseId()));
         }
-        return repository.findAll(query).stream().filter(order -> scope.allows(order.branchId())).toList();
+        return repository.findAll(query, scope);
     }
 
     @Override

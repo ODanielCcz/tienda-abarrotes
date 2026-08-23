@@ -2,6 +2,7 @@ package com.odcc.tienda.modules.purchasing.application.usecase;
 
 import com.odcc.tienda.modules.inventory.application.command.CreateInventoryReceiptCommand;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
+import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptExecution;
 import com.odcc.tienda.modules.inventory.application.port.in.CreateInventoryReceiptUseCase;
 import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseCommand;
 import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseItemCommand;
@@ -23,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -57,6 +60,45 @@ class PurchaseServiceTest {
 
         Purchase updated = service.getById(purchase.purchaseId());
         assertEquals("RECEIVED", updated.status());
+        assertEquals(BigDecimal.ONE, updated.items().getFirst().receivedQuantity());
+    }
+
+    @Test
+    void shouldNotApplyReceivedQuantityWhenInventoryReceiptIsReplayed() {
+        Purchase draft = service.create(new CreatePurchaseCommand(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "FAC-REPLAY",
+            "MXN",
+            UUID.randomUUID(),
+            List.of(new CreatePurchaseItemCommand(
+                UUID.randomUUID(),
+                new BigDecimal("2.000"),
+                new BigDecimal("10.0000"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
+            ))
+        ));
+        Purchase purchase = service.confirm(draft.purchaseId());
+        UUID idempotencyKey = UUID.randomUUID();
+        ReceivePurchaseCommand command = new ReceivePurchaseCommand(
+            purchase.purchaseId(),
+            idempotencyKey,
+            List.of(new ReceivePurchaseItemCommand(
+                purchase.items().getFirst().purchaseItemId(),
+                null,
+                null,
+                null,
+                BigDecimal.ONE
+            )),
+            List.of()
+        );
+
+        service.receive(command);
+        service.receive(command);
+
+        Purchase updated = service.getById(purchase.purchaseId());
+        assertEquals("PARTIALLY_RECEIVED", updated.status());
         assertEquals(BigDecimal.ONE, updated.items().getFirst().receivedQuantity());
     }
 
@@ -200,9 +242,20 @@ class PurchaseServiceTest {
     }
 
     private static class FakeInventoryReceiptUseCase implements CreateInventoryReceiptUseCase {
+        private final Map<UUID, InventoryReceipt> receipts = new HashMap<>();
+
         @Override
         public InventoryReceipt execute(CreateInventoryReceiptCommand command) {
-            return new InventoryReceipt(UUID.randomUUID(), command.warehouseId(), command.supplierId(), "CONFIRMED", Instant.now(), List.of(), List.of());
+            return executeWithOutcome(command).receipt();
+        }
+
+        @Override
+        public InventoryReceiptExecution executeWithOutcome(CreateInventoryReceiptCommand command) {
+            InventoryReceipt existing = receipts.get(command.idempotencyKey());
+            if (existing != null) return InventoryReceiptExecution.replayed(existing);
+            InventoryReceipt created = new InventoryReceipt(UUID.randomUUID(), command.warehouseId(), command.supplierId(), "CONFIRMED", Instant.now(), List.of(), List.of());
+            receipts.put(command.idempotencyKey(), created);
+            return InventoryReceiptExecution.created(created);
         }
     }
 }

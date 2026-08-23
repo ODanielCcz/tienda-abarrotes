@@ -169,6 +169,73 @@ class SalesReturnApiIntegrationTest {
     }
 
     @Test
+    void shouldRefundOnlyTheCashPortionOfAMixedPaymentSale() throws Exception {
+        UUID userId = insertUser("mixed_return_admin", "correct-password", "SYSTEM_ADMIN");
+        String token = login("mixed_return_admin", "correct-password");
+        TestContext context = createContext("MIXED-RETURN");
+        UUID presentationId = insertProductPresentation("MIXED-RETURN");
+        UUID lotId = insertLot(presentationId, "LOT-MIXED-RETURN");
+        insertStock(context.warehouseId(), presentationId, lotId, new BigDecimal("1.000"));
+        SaleFixture sale = insertSale(context, presentationId, lotId, BigDecimal.ONE, new BigDecimal("100.0000"), "PAID");
+        UUID cashPaymentId = insertCapturedPayment(sale.salesOrderId(), "CASH", new BigDecimal("10.0000"));
+        UUID cardPaymentId = insertCapturedPayment(sale.salesOrderId(), "CARD", new BigDecimal("90.0000"));
+        UUID cashSessionId = insertOpenCashSession(context.cashRegisterId(), userId, new BigDecimal("500.0000"));
+
+        MvcResult created = mockMvc.perform(
+                post("/api/v1/sales/orders/{salesOrderId}/returns", sale.salesOrderId())
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "reason": "Devolucion de venta con pago mixto",
+                          "items": [
+                            {
+                              "salesOrderItemId": "%s",
+                              "quantity": 1
+                            }
+                          ]
+                        }
+                        """.formatted(sale.salesOrderItemId()))
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        String returnId = JsonPath.read(created.getResponse().getContentAsString(), "$.data.returnId");
+
+        mockMvc.perform(
+                post("/api/v1/sales/returns/{returnId}/confirm", returnId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "cashSessionId": "%s"
+                        }
+                        """.formatted(cashSessionId))
+            )
+            .andExpect(status().isOk());
+
+        BigDecimal cashRefund = jdbcTemplate.queryForObject(
+            """
+                SELECT COALESCE(SUM(amount), 0)
+                FROM cash.cash_movements
+                WHERE payment_id = ?
+                  AND movement_type = 'REFUND'
+                  AND direction = 'OUT'
+                """,
+            BigDecimal.class,
+            cashPaymentId
+        );
+        Integer cardCashMovements = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM cash.cash_movements WHERE payment_id = ? AND movement_type = 'REFUND'",
+            Integer.class,
+            cardPaymentId
+        );
+
+        assertEquals(new BigDecimal("10.0000"), cashRefund);
+        assertEquals(0, cardCashMovements);
+    }
+
+    @Test
     void shouldRejectReturnQuantityGreaterThanSoldAndProtectEndpoints() throws Exception {
         TestContext context = createContext("RETURN-SECURITY");
         UUID presentationId = insertProductPresentation("RETURN-SECURITY");
@@ -483,14 +550,19 @@ class SalesReturnApiIntegrationTest {
     }
 
     private UUID insertCapturedCashPayment(UUID salesOrderId, BigDecimal amount) {
+        return insertCapturedPayment(salesOrderId, "CASH", amount);
+    }
+
+    private UUID insertCapturedPayment(UUID salesOrderId, String paymentMethod, BigDecimal amount) {
         UUID paymentId = UUID.randomUUID();
         jdbcTemplate.update(
             """
                 INSERT INTO sales.payments (payment_id, sales_order_id, payment_method, status, amount, idempotency_key, paid_at)
-                VALUES (?, ?, 'CASH', 'CAPTURED', ?, ?, clock_timestamp())
+                VALUES (?, ?, ?, 'CAPTURED', ?, ?, clock_timestamp())
                 """,
             paymentId,
             salesOrderId,
+            paymentMethod,
             amount,
             UUID.randomUUID()
         );

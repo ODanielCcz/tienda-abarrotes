@@ -4,11 +4,14 @@ import com.odcc.tienda.modules.sales.application.command.CreateSalesOrderCommand
 import com.odcc.tienda.modules.sales.application.command.CreateSalesOrderItemCommand;
 import com.odcc.tienda.modules.sales.application.exception.SalesException;
 import com.odcc.tienda.modules.sales.application.exception.SalesOrderCancellationConflictException;
+import com.odcc.tienda.modules.sales.application.exception.SalesOrderIdempotencyConflictException;
 import com.odcc.tienda.modules.sales.application.exception.StockInsufficientException;
 import com.odcc.tienda.modules.sales.application.model.SalesOrder;
+import com.odcc.tienda.modules.sales.application.model.SalesOrderExecution;
 import com.odcc.tienda.modules.sales.application.model.SalesOrderItem;
 import com.odcc.tienda.modules.sales.application.port.out.SalesOrderRepositoryPort;
 import com.odcc.tienda.modules.sales.application.query.ListSalesOrdersQuery;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -112,6 +115,14 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
 
     @Override
     public SalesOrder createConfirmed(CreateSalesOrderCommand command, String fingerprint) {
+        return createConfirmedWithOutcome(command, fingerprint).salesOrder();
+    }
+
+    @Override
+    public SalesOrderExecution createConfirmedWithOutcome(
+        CreateSalesOrderCommand command,
+        String fingerprint
+    ) {
         WarehouseRow warehouse = findWarehouse(command.warehouseId());
         UUID orderId = UUID.randomUUID();
         UUID stockMovementId = UUID.randomUUID();
@@ -121,7 +132,7 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
         Totals totals = estimateTotals(command.items());
         Instant now = Instant.now();
 
-        jdbc.update("""
+        List<UUID> claimedOrderIds = jdbc.query("""
             INSERT INTO sales.sales_orders (
                 sales_order_id, order_number, branch_id, warehouse_id, customer_id, device_id,
                 channel, status, payment_status, currency_code, subtotal, discount_total, tax_total,
@@ -131,6 +142,8 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
                 :channel, 'CONFIRMED', 'PENDING', :currencyCode, :subtotal, :discountTotal, :taxTotal,
                 :total, :idempotencyKey, :fingerprint, :createdAt, :confirmedAt
             )
+            ON CONFLICT (idempotency_key) DO NOTHING
+            RETURNING sales_order_id
             """, new MapSqlParameterSource()
             .addValue("orderId", orderId)
             .addValue("orderNumber", orderNumber)
@@ -147,7 +160,14 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
             .addValue("idempotencyKey", command.idempotencyKey())
             .addValue("fingerprint", fingerprint)
             .addValue("createdAt", Timestamp.from(now))
-            .addValue("confirmedAt", Timestamp.from(now)));
+            .addValue("confirmedAt", Timestamp.from(now)),
+            (rs, rowNum) -> rs.getObject("sales_order_id", UUID.class));
+
+        if (claimedOrderIds.isEmpty()) {
+            SalesOrder replayed = findByIdempotencyKey(command.idempotencyKey(), fingerprint)
+                .orElseThrow(() -> new SalesOrderIdempotencyConflictException(command.idempotencyKey()));
+            return SalesOrderExecution.replayed(replayed);
+        }
 
         boolean movementCreated = false;
         for (CreateSalesOrderItemCommand item : command.items()) {
@@ -167,7 +187,7 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
             }
         }
         recalculateOrderTotals(orderId);
-        return findById(orderId).orElseThrow();
+        return SalesOrderExecution.created(findById(orderId).orElseThrow());
     }
 
     @Override
@@ -182,17 +202,32 @@ public class JdbcSalesOrderRepositoryAdapter implements SalesOrderRepositoryPort
 
     @Override
     public List<SalesOrder> findAll(ListSalesOrdersQuery query) {
+        return findAll(query, BranchScope.global());
+    }
+
+    @Override
+    public List<SalesOrder> findAll(
+        ListSalesOrdersQuery query,
+        BranchScope scope
+    ) {
+        BranchScope effectiveScope = scope == null ? BranchScope.restricted(java.util.Set.of()) : scope;
+        if (!effectiveScope.globalAccess() && effectiveScope.branchIds().isEmpty()) return List.of();
         List<SalesOrder> orders = jdbc.query("""
             SELECT * FROM sales.sales_orders
             WHERE (CAST(:warehouseId AS uuid) IS NULL OR warehouse_id = CAST(:warehouseId AS uuid))
               AND (CAST(:customerId AS uuid) IS NULL OR customer_id = CAST(:customerId AS uuid))
               AND (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
+              AND (CAST(:globalAccess AS boolean) OR branch_id IN (:authorizedBranchIds))
             ORDER BY created_at DESC
             LIMIT 200
             """, new MapSqlParameterSource()
             .addValue("warehouseId", query == null ? null : query.warehouseId())
             .addValue("customerId", query == null ? null : query.customerId())
-            .addValue("status", query == null ? null : normalize(query.status(), null)), this::mapOrderWithoutItems);
+            .addValue("status", query == null ? null : normalize(query.status(), null))
+            .addValue("globalAccess", effectiveScope.globalAccess())
+            .addValue("authorizedBranchIds", effectiveScope.globalAccess()
+                ? List.of(new UUID(0L, 0L))
+                : List.copyOf(effectiveScope.branchIds())), this::mapOrderWithoutItems);
         return orders.stream().map(this::withItems).toList();
     }
 

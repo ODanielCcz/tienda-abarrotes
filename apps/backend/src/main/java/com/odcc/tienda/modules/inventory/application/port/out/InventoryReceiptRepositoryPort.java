@@ -2,6 +2,7 @@ package com.odcc.tienda.modules.inventory.application.port.out;
 
 import com.odcc.tienda.modules.inventory.application.command.CreateInventoryReceiptCommand;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
+import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptExecution;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,10 @@ public interface InventoryReceiptRepositoryPort {
     boolean existsByIdempotencyKeyWithDifferentFingerprint(UUID idempotencyKey, String fingerprint);
 
     InventoryReceipt create(CreateInventoryReceiptCommand command, String fingerprint);
+
+    default InventoryReceiptExecution createWithOutcome(CreateInventoryReceiptCommand command, String fingerprint) {
+        return InventoryReceiptExecution.created(create(command, fingerprint));
+    }
 
     Optional<InventoryReceipt> findById(UUID receiptId);
 

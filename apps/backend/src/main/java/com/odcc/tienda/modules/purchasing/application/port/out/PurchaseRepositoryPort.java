@@ -4,6 +4,7 @@ import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseComm
 import com.odcc.tienda.modules.purchasing.application.model.Purchase;
 import com.odcc.tienda.modules.purchasing.application.model.PurchaseItem;
 import com.odcc.tienda.modules.purchasing.application.query.ListPurchasesQuery;
+import com.odcc.tienda.shared.application.authorization.BranchScope;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -23,6 +24,15 @@ public interface PurchaseRepositoryPort {
     Optional<Purchase> findById(UUID purchaseId);
 
     List<Purchase> findAll(ListPurchasesQuery query);
+
+    default List<Purchase> findAll(
+        ListPurchasesQuery query,
+        BranchScope scope
+    ) {
+        List<Purchase> purchases = findAll(query);
+        if (scope == null || scope.globalAccess()) return purchases;
+        return purchases.stream().filter(purchase -> scope.allows(purchase.branchId())).toList();
+    }
 
     Purchase confirm(UUID purchaseId);
 
