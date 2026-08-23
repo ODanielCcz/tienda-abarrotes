@@ -6,6 +6,7 @@ import com.odcc.tienda.modules.identity.application.port.in.UserManagementUseCas
 import com.odcc.tienda.modules.identity.application.port.out.AccessTokenPort;
 import com.odcc.tienda.modules.identity.application.port.out.AuthenticationAuditPort;
 import com.odcc.tienda.modules.identity.application.port.out.PasswordHashingPort;
+import com.odcc.tienda.modules.identity.application.port.out.PasswordPolicyPort;
 import com.odcc.tienda.modules.identity.application.port.out.PasswordVerificationPort;
 import com.odcc.tienda.modules.identity.application.port.out.UserAccountPort;
 import com.odcc.tienda.modules.identity.application.port.out.LoginRateLimitPort;
@@ -49,8 +50,16 @@ public class IdentityConfiguration {
         PasswordHashingPort passwordHashingPort,
         TransactionRunner transactionRunner,
         BusinessAuditPort auditPort,
-        BranchAccessPort branchAccess
+        BranchAccessPort branchAccess,
+        PasswordPolicyPort passwordPolicyPort
     ) {
-        return new UserManagementService(repository, passwordHashingPort, transactionRunner, auditPort, branchAccess);
+        return new UserManagementService(
+            repository,
+            passwordHashingPort,
+            transactionRunner,
+            auditPort,
+            branchAccess,
+            passwordPolicyPort
+        );
     }
 }

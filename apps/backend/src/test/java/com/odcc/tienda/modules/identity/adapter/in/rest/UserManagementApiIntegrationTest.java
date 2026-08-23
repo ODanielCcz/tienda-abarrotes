@@ -363,7 +363,7 @@ class UserManagementApiIntegrationTest {
                         {
                           "username": "created_privileged_%s",
                           "displayName": "Created Privileged",
-                          "password": "Temporary123!",
+                          "password": "Luna-Cobre-Rio-2026!",
                           "roleCodes": ["%s"]
                         }
                         """.formatted(suffix.toLowerCase(), privilegedRole))
@@ -388,7 +388,7 @@ class UserManagementApiIntegrationTest {
                         {
                           "username": "created_equivalent_%s",
                           "displayName": "Created Equivalent",
-                          "password": "Temporary123!",
+                          "password": "Luna-Cobre-Rio-2026!",
                           "roleCodes": ["%s"]
                         }
                         """.formatted(suffix.toLowerCase(), delegatedRole))

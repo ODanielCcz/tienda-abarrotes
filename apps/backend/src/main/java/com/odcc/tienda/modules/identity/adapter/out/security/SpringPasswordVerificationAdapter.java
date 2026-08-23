@@ -10,11 +10,22 @@ import org.springframework.stereotype.Component;
 public class SpringPasswordVerificationAdapter
     implements PasswordVerificationPort {
 
+    private static final String DUMMY_BCRYPT_HASH =
+        "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     private final PasswordEncoder passwordEncoder;
 
     @Override
     public boolean matches(String rawPassword, String encodedPassword) {
         return rawPassword != null
             && passwordEncoder.matches(rawPassword, encodedPassword);
+    }
+
+    @Override
+    public boolean matchesDummy(String rawPassword) {
+        return passwordEncoder.matches(
+            rawPassword == null ? "" : rawPassword,
+            DUMMY_BCRYPT_HASH
+        );
     }
 }

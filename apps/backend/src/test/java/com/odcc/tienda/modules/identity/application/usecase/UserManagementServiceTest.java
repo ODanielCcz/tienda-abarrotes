@@ -57,7 +57,8 @@ class UserManagementServiceTest {
             rawPassword -> "hashed-password",
             transactionRunner,
             event -> { },
-            branchAccess
+            branchAccess,
+            (username, password) -> { }
         );
     }
 

@@ -37,14 +37,14 @@ class LoginServiceTest {
     private FakeAuthenticationAuditPort auditPort;
     private LoginService service;
     private Clock clock;
+    private TrackingPasswordVerificationPort passwordPort;
 
     @BeforeEach
     void setUp() {
         userAccountPort = new FakeUserAccountPort(activeUser());
         clock = Clock.fixed(Instant.parse("2026-08-09T18:00:00Z"), ZoneOffset.UTC);
         auditPort = new FakeAuthenticationAuditPort();
-        PasswordVerificationPort passwordPort = (raw, encoded) ->
-            "correct-password".equals(raw) && "stored-hash".equals(encoded);
+        passwordPort = new TrackingPasswordVerificationPort();
         AccessTokenPort tokenPort = user -> new IssuedAccessToken(
             "signed.jwt.token",
             Instant.parse("2026-07-24T08:30:00Z")
@@ -87,6 +87,8 @@ class LoginServiceTest {
         );
 
         assertEquals(List.of("FAILURE:admin:INVALID_PASSWORD"), auditPort.events);
+        assertEquals(1, passwordPort.realMatches);
+        assertEquals(0, passwordPort.dummyMatches);
     }
 
     @Test
@@ -104,6 +106,8 @@ class LoginServiceTest {
             "Las credenciales proporcionadas no son válidas",
             exception.getMessage()
         );
+        assertEquals(0, passwordPort.realMatches);
+        assertEquals(1, passwordPort.dummyMatches);
         assertEquals(List.of("FAILURE:unknown:USER_NOT_FOUND"), auditPort.events);
     }
 
@@ -130,7 +134,7 @@ class LoginServiceTest {
     }
 
     @Test
-    void shouldLockAccountForFifteenMinutesAfterFiveInvalidPasswords() {
+    void shouldNotPersistentlyLockAccountAfterFiveInvalidPasswords() {
         for (int attempt = 0; attempt < 5; attempt++) {
             assertThrows(
                 InvalidCredentialsException.class,
@@ -139,11 +143,10 @@ class LoginServiceTest {
         }
 
         assertEquals(5, userAccountPort.user.failedLoginAttempts());
-        assertEquals(Instant.parse("2026-08-09T18:15:00Z"), userAccountPort.user.lockedUntil());
-        assertThrows(
-            UserTemporarilyLockedException.class,
-            () -> service.execute(new LoginCommand("admin", "correct-password"))
-        );
+        assertEquals(null, userAccountPort.user.lockedUntil());
+
+        service.execute(new LoginCommand("admin", "correct-password"));
+        assertEquals(0, userAccountPort.user.failedLoginAttempts());
     }
 
     @Test
@@ -170,6 +173,26 @@ class LoginServiceTest {
             Set.of("CATALOG_BRAND_READ")
         );
     }
+    private static final class TrackingPasswordVerificationPort
+        implements PasswordVerificationPort {
+
+        private int realMatches;
+        private int dummyMatches;
+
+        @Override
+        public boolean matches(String rawPassword, String encodedPassword) {
+            realMatches++;
+            return "correct-password".equals(rawPassword)
+                && "stored-hash".equals(encodedPassword);
+        }
+
+        @Override
+        public boolean matchesDummy(String rawPassword) {
+            dummyMatches++;
+            return false;
+        }
+    }
+
 
     private static final class FakeUserAccountPort implements UserAccountPort {
 
@@ -186,9 +209,9 @@ class LoginServiceTest {
         }
 
         @Override
-        public void recordFailedLogin(UUID userId, Instant lockedUntil) {
+        public void recordFailedLogin(UUID userId, Instant failedAt) {
             int attempts = user.failedLoginAttempts() + 1;
-            user = user.withAuthenticationState(attempts, attempts >= 5 ? lockedUntil : user.lockedUntil());
+            user = user.withAuthenticationState(attempts, null);
         }
 
         @Override
