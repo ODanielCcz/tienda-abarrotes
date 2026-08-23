@@ -7,17 +7,23 @@ El workflow [Backend CI](../../.github/workflows/backend-ci.yml) se ejecuta en c
 1. Ejecuta la suite Gradle con PostgreSQL/Testcontainers.
 2. Genera el `bootJar`.
 3. Levanta PostgreSQL aislado mediante Docker Compose.
-4. Aplica y valida Flyway hasta `V034`.
-5. Construye el contenedor del backend y comprueba `/actuator/health`.
+4. Aplica Flyway y valida automáticamente la última migración versionada disponible.
+5. Construye el contenedor del backend y comprueba `/actuator/health/readiness`.
 6. Analiza la imagen con Trivy y bloquea vulnerabilidades `HIGH` o `CRITICAL` corregibles.
 7. Conserva los reportes de Gradle durante catorce días.
 
 ## Seguridad De La Cadena De Suministro
 
+- Gitleaks revisa el historial completo y solo admite dos fingerprints de prueba documentados en `.gitleaksignore`.
+- Dependency Review bloquea dependencias nuevas con severidad `HIGH` o `CRITICAL`.
+- Dependency Submission genera el grafo Gradle para Dependabot sin ejecutar código de un pull request con permisos de escritura.
+- Trivy revisa filesystem, configuración e imagen del backend.
 - Las acciones de GitHub se fijan por SHA y Dependabot propone sus actualizaciones.
 - La imagen Java del backend se fija por digest y conserva su etiqueta legible.
 - `apk upgrade` actualiza paquetes de Alpine en cada build; por ello, el digest fija la imagen base pero no convierte el build en un artefacto bit-a-bit reproducible. El escaneo semanal es obligatorio para detectar CVE aparecidos después de una compilación.
-- El `GITHUB_TOKEN` tiene únicamente `contents: read`. No se publica imagen ni se requiere un secreto de registro en esta etapa.
+- Cada job declara los permisos mínimos requeridos. No se publica imagen ni se requiere un secreto de registro en esta etapa.
+
+Los checks que deben proteger `main` son `Secret scan`, `Filesystem security scan`, `Dependency graph`, `Dependency review` y los jobs de `Backend CI`.
 
 ## Regla Para RC1
 

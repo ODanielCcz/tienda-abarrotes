@@ -8,7 +8,7 @@
 | Tipo | Fullstack con cliente web y móvil |
 | Sensibilidad | Interno |
 | Fecha de inicio | 2026-07-12 |
-| Última revisión | 2026-08-18 |
+| Última revisión | 2026-08-23 |
 
 ## Objetivo Actual
 
@@ -24,6 +24,7 @@ Cerrar y validar el backend modular de la tienda: identidad, catálogo, organiza
 - Java 21.
 - Spring Boot 4.1.0.
 - Gradle Kotlin DSL con Gradle Wrapper.
+- Redis 8.8.1 para protección distribuida del login en producción.
 
 ## Decisiones Vigentes
 
@@ -39,11 +40,13 @@ Cerrar y validar el backend modular de la tienda: identidad, catálogo, organiza
 - Mantener secretos reales únicamente en archivos locales ignorados.
 - Exigir autorización por sucursal, precios resueltos por servidor e idempotencia atómica en operaciones sensibles.
 - Exigir vínculo explícito usuario-dispositivo para Sync v1.
+- Exigir rate limiting Redis compartido y fail-closed en producción; conservar memoria únicamente para local/test.
+- Derivar claves de rate limiting mediante HMAC con un secreto independiente del JWT.
 
 ## Próximas Acciones
 
-1. Ejecutar validación aislada completa desde migración V001 hasta V034.
-2. Provisionar y revisar los vínculos locales usuario-dispositivo de Sync antes de usar endpoints offline.
-3. Activar el workflow remoto Backend CI y verificar una ejecución verde sobre `main`.
-4. Aprobar y etiquetar el candidato `backend-v1.0.0-rc1`.
-5. Definir retención de auditoría, outbox, logs y trazas; después priorizar el backlog v2.
+1. Ejecutar la suite completa y la validación Docker en modos memoria y Redis distribuido.
+2. Comprobar la caída controlada: readiness `DOWN`, liveness `UP` y login `503`.
+3. Activar Gitleaks, Dependency Review, Dependency Graph, Dependabot alerts, Secret Scanning y Push Protection en GitHub.
+4. Provisionar y revisar los vínculos locales usuario-dispositivo de Sync antes de usar endpoints offline.
+5. Aprobar y etiquetar el candidato `backend-v1.0.0-rc1` cuando los checks remotos estén verdes.
