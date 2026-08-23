@@ -2,8 +2,6 @@ package com.odcc.tienda.modules.identity.adapter.out.security;
 
 import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitedException;
 import com.odcc.tienda.modules.identity.application.port.out.LoginRateLimitPort;
-import org.springframework.stereotype.Component;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -13,40 +11,45 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-@Component
 public final class InMemoryLoginRateLimiter implements LoginRateLimitPort {
 
     private static final int MAX_KEYS = 10_000;
-    private static final Duration WINDOW = Duration.ofMinutes(1);
-    private static final int PAIR_MAX_FAILURES = 5;
-    private static final int ACCOUNT_MAX_FAILURES = 10;
 
     private final Clock clock;
-    private final int maxAttempts;
+    private final int ipMaxFailures;
+    private final int pairMaxFailures;
+    private final int accountMaxFailures;
+    private final Duration windowDuration;
     private final Map<String, Window> windows = new HashMap<>();
 
     public InMemoryLoginRateLimiter(
         Clock clock,
-        @Value("${app.security.login-rate-limit.max-attempts:20}") int maxAttempts
+        int ipMaxFailures,
+        int pairMaxFailures,
+        int accountMaxFailures,
+        Duration windowDuration
     ) {
         this.clock = clock;
-        this.maxAttempts = Math.max(1, maxAttempts);
+        this.ipMaxFailures = Math.max(1, ipMaxFailures);
+        this.pairMaxFailures = Math.max(1, pairMaxFailures);
+        this.accountMaxFailures = Math.max(1, accountMaxFailures);
+        this.windowDuration = windowDuration;
     }
 
     @Override
     public synchronized void check(String clientAddress) {
         Instant now = clock.instant();
         String key = ipKey(clientAddress);
-        ensureAllowed(key, maxAttempts, now);
+        ensureAllowed(key, ipMaxFailures, now);
         record(key, now);
     }
 
     @Override
     public synchronized void check(String clientAddress, String username) {
         Instant now = clock.instant();
-        ensureAllowed(ipKey(clientAddress), maxAttempts, now);
-        ensureAllowed(pairKey(clientAddress, username), PAIR_MAX_FAILURES, now);
-        ensureAllowed(accountKey(username), ACCOUNT_MAX_FAILURES, now);
+        ensureAllowed(ipKey(clientAddress), ipMaxFailures, now);
+        ensureAllowed(pairKey(clientAddress, username), pairMaxFailures, now);
+        ensureAllowed(accountKey(username), accountMaxFailures, now);
     }
 
     @Override
@@ -65,10 +68,16 @@ public final class InMemoryLoginRateLimiter implements LoginRateLimitPort {
 
     private void ensureAllowed(String key, int limit, Instant now) {
         Window current = activeWindow(key, now);
-        if (current == null || current.attempts() < limit) return;
+        if (current == null || current.attempts() < limit) {
+            return;
+        }
+
         long retryAfter = Math.max(
             1,
-            Duration.between(now, current.startedAt().plus(WINDOW)).toSeconds()
+            Duration.between(
+                now,
+                current.startedAt().plus(windowDuration)
+            ).toSeconds()
         );
         throw new LoginRateLimitedException(retryAfter);
     }
@@ -85,7 +94,10 @@ public final class InMemoryLoginRateLimiter implements LoginRateLimitPort {
 
     private Window activeWindow(String key, Instant now) {
         Window current = windows.get(key);
-        if (current != null && now.isBefore(current.startedAt().plus(WINDOW))) {
+        if (
+            current != null
+                && now.isBefore(current.startedAt().plus(windowDuration))
+        ) {
             return current;
         }
         windows.remove(key);
@@ -93,7 +105,9 @@ public final class InMemoryLoginRateLimiter implements LoginRateLimitPort {
     }
 
     private void ensureCapacity() {
-        if (windows.size() < MAX_KEYS) return;
+        if (windows.size() < MAX_KEYS) {
+            return;
+        }
         windows.entrySet().stream()
             .min(Comparator.comparing(entry -> entry.getValue().startedAt()))
             .map(Map.Entry::getKey)
@@ -105,7 +119,8 @@ public final class InMemoryLoginRateLimiter implements LoginRateLimitPort {
     }
 
     private static String pairKey(String clientAddress, String username) {
-        return "pair:" + normalize(clientAddress, "unknown") + ':' + normalize(username, "unknown");
+        return "pair:" + normalize(clientAddress, "unknown") + ':'
+            + normalize(username, "unknown");
     }
 
     private static String accountKey(String username) {
@@ -118,5 +133,6 @@ public final class InMemoryLoginRateLimiter implements LoginRateLimitPort {
             : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private record Window(Instant startedAt, int attempts) {}
+    private record Window(Instant startedAt, int attempts) {
+    }
 }
