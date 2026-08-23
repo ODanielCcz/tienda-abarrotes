@@ -9,6 +9,6 @@ import java.util.List;
 
 public record CreateSalesReturnRequest(
     @NotBlank @Size(max = 1000) String reason,
-    @NotEmpty List<@Valid CreateSalesReturnItemRequest> items
+    @NotEmpty @Size(max = 200) List<@Valid CreateSalesReturnItemRequest> items
 ) {
 }
