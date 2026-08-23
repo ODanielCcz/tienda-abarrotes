@@ -2,6 +2,8 @@ package com.odcc.tienda.modules.identity.adapter.config;
 
 import com.odcc.tienda.modules.identity.adapter.out.security.InMemoryLoginRateLimiter;
 import com.odcc.tienda.modules.identity.application.port.out.LoginRateLimitPort;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -81,6 +83,11 @@ class LoginRateLimitConfigurationTest {
         @Bean
         Clock clock() {
             return Clock.systemUTC();
+        }
+
+        @Bean
+        MeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
         }
     }
 }
