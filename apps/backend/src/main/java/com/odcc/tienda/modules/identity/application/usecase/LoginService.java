@@ -67,9 +67,9 @@ public final class LoginService implements LoginUseCase {
             throw new UserNotActiveException();
         }
 
+        loginRateLimitPort.onSuccess(command.clientAddress(), username);
         IssuedAccessToken token = accessTokenPort.issue(user);
         userAccountPort.clearLoginFailures(user.id(), now);
-        loginRateLimitPort.onSuccess(command.clientAddress(), username);
         authenticationAuditPort.loginSucceeded(user.id(), username);
 
         return new LoginResult(

@@ -2,6 +2,7 @@ package com.odcc.tienda.modules.identity.application.usecase;
 
 import com.odcc.tienda.modules.identity.application.command.LoginCommand;
 import com.odcc.tienda.modules.identity.application.exception.InvalidCredentialsException;
+import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitUnavailableException;
 import com.odcc.tienda.modules.identity.application.exception.UserNotActiveException;
 import com.odcc.tienda.modules.identity.application.exception.UserTemporarilyLockedException;
 import com.odcc.tienda.modules.identity.application.model.IssuedAccessToken;
@@ -9,6 +10,7 @@ import com.odcc.tienda.modules.identity.application.model.LoginResult;
 import com.odcc.tienda.modules.identity.application.port.out.AccessTokenPort;
 import com.odcc.tienda.modules.identity.application.port.out.AuthenticationAuditPort;
 import com.odcc.tienda.modules.identity.application.port.out.PasswordVerificationPort;
+import com.odcc.tienda.modules.identity.application.port.out.LoginRateLimitPort;
 import com.odcc.tienda.modules.identity.application.port.out.UserAccountPort;
 import com.odcc.tienda.modules.identity.domain.model.UserAccount;
 import com.odcc.tienda.modules.identity.domain.model.UserAccountStatus;
@@ -38,6 +40,7 @@ class LoginServiceTest {
     private LoginService service;
     private Clock clock;
     private TrackingPasswordVerificationPort passwordPort;
+    private TrackingAccessTokenPort tokenPort;
 
     @BeforeEach
     void setUp() {
@@ -45,10 +48,7 @@ class LoginServiceTest {
         clock = Clock.fixed(Instant.parse("2026-08-09T18:00:00Z"), ZoneOffset.UTC);
         auditPort = new FakeAuthenticationAuditPort();
         passwordPort = new TrackingPasswordVerificationPort();
-        AccessTokenPort tokenPort = user -> new IssuedAccessToken(
-            "signed.jwt.token",
-            Instant.parse("2026-07-24T08:30:00Z")
-        );
+        tokenPort = new TrackingAccessTokenPort();
 
         service = new LoginService(
             userAccountPort,
@@ -162,6 +162,38 @@ class LoginServiceTest {
         assertEquals(null, userAccountPort.user.lockedUntil());
     }
 
+    @Test
+    void shouldNotIssueTokenWhenRateLimitCleanupIsUnavailable() {
+        LoginRateLimitPort unavailableOnSuccess = new LoginRateLimitPort() {
+            @Override
+            public void check(String clientAddress) {
+            }
+
+            @Override
+            public void onSuccess(String clientAddress, String username) {
+                throw new LoginRateLimitUnavailableException(5);
+            }
+        };
+        service = new LoginService(
+            userAccountPort,
+            passwordPort,
+            tokenPort,
+            auditPort,
+            clock,
+            unavailableOnSuccess
+        );
+
+        assertThrows(
+            LoginRateLimitUnavailableException.class,
+            () -> service.execute(
+                new LoginCommand("admin", "correct-password", "192.0.2.10")
+            )
+        );
+
+        assertEquals(0, tokenPort.issueCalls);
+        assertEquals(List.of(), auditPort.events);
+    }
+
     private static UserAccount activeUser() {
         return new UserAccount(
             USER_ID,
@@ -190,6 +222,21 @@ class LoginServiceTest {
         public boolean matchesDummy(String rawPassword) {
             dummyMatches++;
             return false;
+        }
+    }
+
+    private static final class TrackingAccessTokenPort
+        implements AccessTokenPort {
+
+        private int issueCalls;
+
+        @Override
+        public IssuedAccessToken issue(UserAccount user) {
+            issueCalls++;
+            return new IssuedAccessToken(
+                "signed.jwt.token",
+                Instant.parse("2026-07-24T08:30:00Z")
+            );
         }
     }
 

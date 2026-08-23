@@ -7,6 +7,7 @@ import com.odcc.tienda.modules.identity.application.model.LoginResult;
 import com.odcc.tienda.modules.identity.application.command.LoginCommand;
 import com.odcc.tienda.modules.identity.application.port.in.LoginUseCase;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
+import com.odcc.tienda.shared.web.correlation.CorrelationIdFilter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -37,7 +38,12 @@ public class AuthenticationController {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Autenticación correcta"),
         @ApiResponse(responseCode = "400", description = "Solicitud inválida"),
-        @ApiResponse(responseCode = "401", description = "Credenciales inválidas")
+        @ApiResponse(responseCode = "401", description = "Credenciales inválidas"),
+        @ApiResponse(responseCode = "429", description = "Demasiados intentos"),
+        @ApiResponse(
+            responseCode = "503",
+            description = "Protección de inicio de sesión no disponible"
+        )
     })
     public ResponseEntity<ApiResponseDto<LoginResponse>> login(
         @Valid @RequestBody LoginRequest request,
@@ -56,7 +62,8 @@ public class AuthenticationController {
                 "LOGIN_SUCCEEDED",
                 "Inicio de sesión correcto",
                 mapper.toResponse(result),
-                servletRequest.getRequestURI()
+                servletRequest.getRequestURI(),
+                CorrelationIdFilter.from(servletRequest)
             )
         );
     }
