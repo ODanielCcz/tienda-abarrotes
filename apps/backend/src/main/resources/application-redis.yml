@@ -1,0 +1,19 @@
+app:
+  security:
+    login-rate-limit:
+      provider: redis
+      key-secret-base64: ${RATE_LIMIT_KEY_SECRET_BASE64:}
+
+management:
+  health:
+    redis:
+      enabled: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db,redis
