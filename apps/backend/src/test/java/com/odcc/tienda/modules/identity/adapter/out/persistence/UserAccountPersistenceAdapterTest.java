@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -55,6 +56,23 @@ class UserAccountPersistenceAdapterTest {
         Optional<UserAccount> user = userAccountPort.findByUsername("unknown");
 
         assertTrue(user.isEmpty());
+    }
+
+    @Test
+    void shouldPersistFifteenMinuteLockAtFifthFailure() {
+        UUID userId = UUID.randomUUID();
+        insertUser(userId, "locked_identity_test");
+        Instant lockedUntil = Instant.parse("2026-08-23T18:15:00Z");
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            userAccountPort.recordFailedLogin(userId, lockedUntil);
+        }
+
+        UserAccount user = userAccountPort
+            .findByUsername("locked_identity_test")
+            .orElseThrow();
+        assertEquals(5, user.failedLoginAttempts());
+        assertEquals(lockedUntil, user.lockedUntil());
     }
 
     private void insertUser(UUID userId, String username) {

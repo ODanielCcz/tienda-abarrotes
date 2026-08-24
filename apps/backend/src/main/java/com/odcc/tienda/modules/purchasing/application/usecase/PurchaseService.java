@@ -62,11 +62,7 @@ public class PurchaseService implements PurchaseUseCases {
             branchAccessPort.requireAccess(actorUserId, repository.findBranchIdByWarehouseId(query.warehouseId()));
         }
         BranchScope scope = branchAccessPort.resolveScope(actorUserId);
-        List<Purchase> purchases = list(query);
-        if (scope.globalAccess()) return purchases;
-        return purchases.stream()
-            .filter(purchase -> scope.branchIds().contains(repository.findBranchIdByWarehouseId(purchase.warehouseId())))
-            .toList();
+        return repository.findAll(query, scope);
     }
 
     @Override
@@ -147,7 +143,6 @@ public class PurchaseService implements PurchaseUseCases {
                 throw new PurchasingException("Solo se pueden recibir compras CONFIRMED o PARTIALLY_RECEIVED");
             }
             validateReceive(command);
-            boolean alreadyApplied = command.idempotencyKey() != null && repository.inventoryReceiptExists(command.idempotencyKey());
             List<InventoryReceiptItemCommand> items = command.items() == null ? List.of() : command.items().stream().map(item -> toInventoryItem(command.purchaseId(), item)).toList();
             List<InventoryReceiptPalletCommand> pallets = command.pallets() == null ? List.of() : command.pallets().stream().map(pallet -> toInventoryPallet(command.purchaseId(), pallet)).toList();
             CreateInventoryReceiptCommand receiptCommand = new CreateInventoryReceiptCommand(
@@ -158,10 +153,11 @@ public class PurchaseService implements PurchaseUseCases {
                 items,
                 pallets
             );
-            InventoryReceipt receipt = actorUserId == null
-                ? inventoryReceiptUseCase.execute(receiptCommand)
-                : inventoryReceiptUseCase.execute(receiptCommand, actorUserId);
-            if (!alreadyApplied) {
+            var execution = actorUserId == null
+                ? inventoryReceiptUseCase.executeWithOutcome(receiptCommand)
+                : inventoryReceiptUseCase.executeWithOutcome(receiptCommand, actorUserId);
+            InventoryReceipt receipt = execution.receipt();
+            if (execution.wasCreated()) {
                 applyReceivedQuantities(command);
                 Purchase updated = repository.refreshStatusAfterReceive(purchase.purchaseId());
                 auditPort.record(new BusinessAuditEvent("PURCHASE_RECEIVED", "PURCHASE", updated.purchaseId(), Map.of("status", purchase.status()), Map.of("status", updated.status()), Map.of("inventoryReceiptId", receipt.receiptId())));

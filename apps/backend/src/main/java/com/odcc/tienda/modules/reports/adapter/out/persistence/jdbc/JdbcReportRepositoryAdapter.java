@@ -50,9 +50,12 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                    COALESCE(SUM(total), 0) AS total,
                    COALESCE(AVG(total), 0) AS average_ticket
             FROM sales.sales_orders so
+            JOIN organization.branches b ON b.branch_id = so.branch_id
             WHERE so.status IN ('CONFIRMED', 'PARTIALLY_RETURNED', 'RETURNED')
-              AND so.created_at >= CAST(:from AS date)
-              AND so.created_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (so.created_at AT TIME ZONE
+                   CASE WHEN CAST(:branchId AS uuid) IS NULL
+                        THEN :defaultTimezone ELSE b.timezone END)::date
+                  BETWEEN CAST(:from AS date) AND CAST(:to AS date)
               AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
@@ -77,9 +80,12 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                    COALESCE(SUM(soi.line_total), 0) AS gross_amount
             FROM sales.sales_order_items soi
             JOIN sales.sales_orders so ON so.sales_order_id = soi.sales_order_id
+            JOIN organization.branches b ON b.branch_id = so.branch_id
             WHERE so.status IN ('CONFIRMED', 'PARTIALLY_RETURNED', 'RETURNED')
-              AND so.created_at >= CAST(:from AS date)
-              AND so.created_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (so.created_at AT TIME ZONE
+                   CASE WHEN CAST(:branchId AS uuid) IS NULL
+                        THEN :defaultTimezone ELSE b.timezone END)::date
+                  BETWEEN CAST(:from AS date) AND CAST(:to AS date)
               AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
@@ -106,10 +112,13 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                    COALESCE(SUM(so.total), 0) AS total
             FROM sales.sales_orders so
             LEFT JOIN sales.customers c ON c.customer_id = so.customer_id
+            JOIN organization.branches b ON b.branch_id = so.branch_id
             WHERE so.status IN ('CONFIRMED', 'PARTIALLY_RETURNED', 'RETURNED')
               AND so.customer_id IS NOT NULL
-              AND so.created_at >= CAST(:from AS date)
-              AND so.created_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (so.created_at AT TIME ZONE
+                   CASE WHEN CAST(:branchId AS uuid) IS NULL
+                        THEN :defaultTimezone ELSE b.timezone END)::date
+                  BETWEEN CAST(:from AS date) AND CAST(:to AS date)
               AND (CAST(:globalAccess AS boolean) OR so.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR so.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR so.warehouse_id = CAST(:warehouseId AS uuid))
@@ -167,10 +176,13 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                    COALESCE(SUM(smi.quantity), 0) AS total_quantity
             FROM inventory.stock_movements sm
             JOIN organization.warehouses w ON w.warehouse_id = sm.warehouse_id
+            JOIN organization.branches b ON b.branch_id = sm.branch_id
             LEFT JOIN inventory.stock_movement_items smi ON smi.stock_movement_id = sm.stock_movement_id
             WHERE sm.status = 'CONFIRMED'
-              AND sm.created_at >= CAST(:from AS date)
-              AND sm.created_at < CAST(:to AS date) + INTERVAL '1 day'
+              AND (sm.created_at AT TIME ZONE
+                   CASE WHEN CAST(:branchId AS uuid) IS NULL
+                        THEN :defaultTimezone ELSE b.timezone END)::date
+                  BETWEEN CAST(:from AS date) AND CAST(:to AS date)
               AND (CAST(:globalAccess AS boolean) OR sm.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR sm.branch_id = CAST(:branchId AS uuid))
               AND (CAST(:warehouseId AS uuid) IS NULL OR sm.warehouse_id = CAST(:warehouseId AS uuid))
@@ -203,9 +215,12 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
                    cs.closed_at
             FROM cash.cash_sessions cs
             JOIN organization.cash_registers cr ON cr.cash_register_id = cs.cash_register_id
+            JOIN organization.branches b ON b.branch_id = cr.branch_id
             LEFT JOIN cash.cash_movements cm ON cm.cash_session_id = cs.cash_session_id
-            WHERE cs.opened_at >= CAST(:from AS date)
-              AND cs.opened_at < CAST(:to AS date) + INTERVAL '1 day'
+            WHERE (cs.opened_at AT TIME ZONE
+                   CASE WHEN CAST(:branchId AS uuid) IS NULL
+                        THEN :defaultTimezone ELSE b.timezone END)::date
+                  BETWEEN CAST(:from AS date) AND CAST(:to AS date)
               AND (CAST(:globalAccess AS boolean) OR cr.branch_id IN (:branchIds))
               AND (CAST(:branchId AS uuid) IS NULL OR cr.branch_id = CAST(:branchId AS uuid))
             GROUP BY cs.cash_session_id, cs.cash_register_id, cr.code, cs.status,
@@ -690,6 +705,7 @@ public class JdbcReportRepositoryAdapter implements ReportRepositoryPort {
             .addValue("warehouseId", filter.warehouseId())
             .addValue("customerId", filter.customerId())
             .addValue("limit", filter.limit())
+            .addValue("defaultTimezone", DEFAULT_TIMEZONE)
             .addValue("globalAccess", scope.globalAccess())
             .addValue("branchIds", branchIds(scope));
     }

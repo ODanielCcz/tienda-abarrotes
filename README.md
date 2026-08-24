@@ -10,6 +10,7 @@ Sistema modular para administrar una tienda de abarrotes. El repositorio está p
 - PostgreSQL
 - Flyway
 - Docker Compose
+- Redis 8.8 para rate limiting distribuido de login en producción
 - JWT
 - Arquitectura hexagonal
 - Clean Architecture
@@ -47,6 +48,7 @@ Sistema modular para administrar una tienda de abarrotes. El repositorio está p
 - OpenAPI/Swagger con modo oscuro.
 - CORS configurable.
 - Actuator, Prometheus y OpenTelemetry.
+- Rate limiting de login seleccionable: memoria local o Redis distribuido con claves HMAC opacas.
 
 ## Inicio rápido
 
@@ -92,7 +94,19 @@ Health:
 
 ```text
 http://localhost:8080/actuator/health
+http://localhost:8080/actuator/health/readiness
+http://localhost:8080/actuator/health/liveness
 ```
+
+Protección distribuida del login:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = 'local,redis'
+$env:LOGIN_RATE_LIMIT_PROVIDER = 'redis'
+docker compose --profile distributed-security up -d database redis backend
+```
+
+Redis es obligatorio para el login en producción, pero no para catálogo, inventario, ventas ni el desarrollo local con provider `memory`. Consulta [`docs/operations/distributed-login-rate-limit.md`](docs/operations/distributed-login-rate-limit.md).
 
 ## Rutas principales
 
@@ -120,6 +134,7 @@ http://localhost:8080/actuator/health
 - Los documentos fiscales congelan snapshots y son inmutables después de `READY`.
 - Sync v1 solo admite carritos y conteos; ventas, pagos y ajustes offline quedan fuera del MVP.
 - Antes de utilizar Sync v1, un administrador debe provisionar el vínculo usuario-dispositivo siguiendo [`docs/operations/sync-device-provisioning.md`](docs/operations/sync-device-provisioning.md).
+- Los límites de login se comparten entre instancias mediante Redis, Lua y claves HMAC; producción falla cerrado si la protección no está disponible.
 - No se versionan secretos ni datos productivos. Usa `.env.example` como plantilla local.
 
 Estado objetivo actual: cierre operativo del candidato `backend-v1.0.0-rc1`. La validación repetible está en [`docs/operations/rc1-validation.md`](docs/operations/rc1-validation.md) y la automatización en [`docs/operations/ci-cd.md`](docs/operations/ci-cd.md).

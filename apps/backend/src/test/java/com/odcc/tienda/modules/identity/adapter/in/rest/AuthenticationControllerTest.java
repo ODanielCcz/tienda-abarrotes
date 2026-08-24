@@ -4,9 +4,13 @@ import com.odcc.tienda.modules.identity.adapter.in.rest.error.AuthenticationExce
 import com.odcc.tienda.modules.identity.adapter.in.rest.mapper.AuthenticationRestMapperImpl;
 import com.odcc.tienda.modules.identity.application.command.LoginCommand;
 import com.odcc.tienda.modules.identity.application.exception.InvalidCredentialsException;
+import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitUnavailableException;
+import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitedException;
+import com.odcc.tienda.modules.identity.application.model.LoginRateLimitDimension;
 import com.odcc.tienda.modules.identity.application.model.AuthenticatedUser;
 import com.odcc.tienda.modules.identity.application.model.LoginResult;
 import com.odcc.tienda.modules.identity.application.port.in.LoginUseCase;
+import com.odcc.tienda.shared.web.correlation.CorrelationIdFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -15,6 +19,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.Instant;
 import java.util.Set;
@@ -25,6 +30,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthenticationController.class)
@@ -116,6 +122,53 @@ class AuthenticationControllerTest {
             .andExpect(jsonPath("$.errors.password").exists());
 
         verifyNoInteractions(loginUseCase);
+    }
+
+    @Test
+    void shouldReturn429WithRetryAfterAndCorrelationId() throws Exception {
+        given(loginUseCase.execute(any(LoginCommand.class)))
+            .willThrow(new LoginRateLimitedException(
+                37,
+                LoginRateLimitDimension.PAIR
+            ));
+
+        mockMvc.perform(loginRequest("correlation-rate-limited-123"))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("Retry-After", "37"))
+            .andExpect(jsonPath("$.code").value("LOGIN_RATE_LIMITED"))
+            .andExpect(jsonPath("$.reason").value("Too Many Requests"))
+            .andExpect(jsonPath("$.correlationId")
+                .value("correlation-rate-limited-123"));
+    }
+
+    @Test
+    void shouldReturn503WhenRateLimitBackendIsUnavailable() throws Exception {
+        given(loginUseCase.execute(any(LoginCommand.class)))
+            .willThrow(new LoginRateLimitUnavailableException(5));
+
+        mockMvc.perform(loginRequest("correlation-redis-unavailable-123"))
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(header().string("Retry-After", "5"))
+            .andExpect(jsonPath("$.code")
+                .value("LOGIN_RATE_LIMIT_UNAVAILABLE"))
+            .andExpect(jsonPath("$.reason").value("Service Unavailable"))
+            .andExpect(jsonPath("$.correlationId")
+                .value("correlation-redis-unavailable-123"));
+    }
+
+    private static MockHttpServletRequestBuilder loginRequest(
+        String correlationId
+    ) {
+        return post(ENDPOINT)
+            .requestAttr(CorrelationIdFilter.ATTRIBUTE_NAME, correlationId)
+            .header(CorrelationIdFilter.HEADER_NAME, correlationId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "username": "admin",
+                  "password": "correct-password"
+                }
+                """);
     }
 }
 

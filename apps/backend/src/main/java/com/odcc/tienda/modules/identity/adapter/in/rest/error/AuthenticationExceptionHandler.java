@@ -5,6 +5,8 @@ import com.odcc.tienda.modules.identity.application.exception.InvalidCredentials
 import com.odcc.tienda.modules.identity.application.exception.UserNotActiveException;
 import com.odcc.tienda.modules.identity.application.exception.UserTemporarilyLockedException;
 import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitedException;
+import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitUnavailableException;
+import com.odcc.tienda.shared.web.correlation.CorrelationIdFilter;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -62,7 +64,28 @@ public class AuthenticationExceptionHandler {
                 "LOGIN_RATE_LIMITED",
                 exception.getMessage(),
                 null,
-                request.getRequestURI()
+                request.getRequestURI(),
+                CorrelationIdFilter.from(request)
+            ));
+    }
+
+    @ExceptionHandler(LoginRateLimitUnavailableException.class)
+    public ResponseEntity<ApiResponseDto<Void>> handleRateLimitUnavailable(
+        LoginRateLimitUnavailableException exception,
+        HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .header(
+                HttpHeaders.RETRY_AFTER,
+                Long.toString(exception.retryAfterSeconds())
+            )
+            .body(ApiResponseDto.error(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "LOGIN_RATE_LIMIT_UNAVAILABLE",
+                exception.getMessage(),
+                null,
+                request.getRequestURI(),
+                CorrelationIdFilter.from(request)
             ));
     }
 
@@ -78,7 +101,8 @@ public class AuthenticationExceptionHandler {
                 code,
                 message,
                 null,
-                request.getRequestURI()
+                request.getRequestURI(),
+                CorrelationIdFilter.from(request)
             )
         );
     }

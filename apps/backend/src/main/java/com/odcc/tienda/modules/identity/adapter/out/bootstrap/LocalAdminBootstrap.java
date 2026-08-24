@@ -1,5 +1,6 @@
 package com.odcc.tienda.modules.identity.adapter.out.bootstrap;
 
+import com.odcc.tienda.modules.identity.application.port.out.PasswordPolicyPort;
 import com.odcc.tienda.shared.application.audit.BusinessAuditEvent;
 import com.odcc.tienda.shared.application.audit.BusinessAuditPort;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class LocalAdminBootstrap implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final TransactionTemplate transactionTemplate;
     private final BusinessAuditPort auditPort;
+    private final PasswordPolicyPort passwordPolicyPort;
 
     @Override
     public void run(ApplicationArguments arguments) {
@@ -54,6 +56,8 @@ public class LocalAdminBootstrap implements ApplicationRunner {
             log.info("El usuario administrador local ya existe: {}", username);
             return;
         }
+
+        passwordPolicyPort.validate(username, properties.password());
 
         UUID userId = UUID.randomUUID();
 
@@ -120,12 +124,6 @@ public class LocalAdminBootstrap implements ApplicationRunner {
         if (properties.password() == null || properties.password().isBlank()) {
             throw new IllegalStateException(
                 "BOOTSTRAP_ADMIN_PASSWORD es obligatorio cuando el bootstrap está habilitado"
-            );
-        }
-
-        if (properties.password().length() < 12) {
-            throw new IllegalStateException(
-                "BOOTSTRAP_ADMIN_PASSWORD debe contener al menos 12 caracteres"
             );
         }
 

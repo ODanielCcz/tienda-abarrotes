@@ -43,6 +43,7 @@ jobs:
           POSTGRES_DB=tienda_ci
           POSTGRES_USER=tienda_owner
           POSTGRES_PASSWORD=$(openssl rand -hex 32)
+          REDIS_PASSWORD=$(openssl rand -hex 32)
           POSTGRES_PORT=55433
           BACKEND_PORT=58080
           JWT_SECRET_BASE64=$(openssl rand -base64 48 | tr -d '\n')
@@ -68,10 +69,12 @@ jobs:
           docker compose --env-file "$COMPOSE_ENV_FILE" up -d database
           docker compose --env-file "$COMPOSE_ENV_FILE" --profile migrate run --rm flyway migrate
           docker compose --env-file "$COMPOSE_ENV_FILE" --profile migrate run --rm flyway validate
-          version=$(docker compose --env-file "$COMPOSE_ENV_FILE" exec -T database \
+          expected=$(find database/migrations -maxdepth 1 -type f -name 'V*__*.sql' -printf '%f\n' \
+            | sed -E 's/^V([0-9]+)__.*/\1/' | sort -n | tail -1)
+          actual=$(docker compose --env-file "$COMPOSE_ENV_FILE" exec -T database \
             psql -U tienda_owner -d tienda_ci -Atc \
             "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1;")
-          test "$version" = '034'
+          test "$((10#$actual))" -eq "$((10#$expected))"
 
       - name: Build and smoke-test backend image
         shell: bash

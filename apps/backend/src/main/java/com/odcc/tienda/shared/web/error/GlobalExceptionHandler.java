@@ -2,6 +2,7 @@ package com.odcc.tienda.shared.web.error;
 
 import com.odcc.tienda.shared.application.authorization.BranchAccessDeniedException;
 import com.odcc.tienda.modules.sync.adapter.in.rest.filter.SyncPayloadTooLargeIOException;
+import com.odcc.tienda.shared.web.filter.ApiPayloadTooLargeIOException;
 import com.odcc.tienda.shared.web.correlation.CorrelationIdFilter;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
@@ -90,6 +91,15 @@ public class GlobalExceptionHandler {
         HttpMessageNotReadableException exception,
         HttpServletRequest request
     ) {
+        if (hasCause(exception, ApiPayloadTooLargeIOException.class)) {
+            return error(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "REQUEST_PAYLOAD_TOO_LARGE",
+                "El payload supera el limite configurado",
+                null,
+                request
+            );
+        }
         if (hasCause(exception, SyncPayloadTooLargeIOException.class)) {
             return error(
                 HttpStatus.PAYLOAD_TOO_LARGE,

@@ -58,6 +58,24 @@ services:
     restart: unless-stopped
     networks: [tienda_data]
 
+  redis:
+    image: redis:8.8.1-alpine
+    profiles: [distributed-security]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Define REDIS_PASSWORD in .env}
+    command:
+      - sh
+      - -c
+      - exec redis-server --save '' --appendonly no --requirepass "$${REDIS_PASSWORD}"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+    networks: [tienda_data]
+
 
   backend:
     build:
@@ -65,13 +83,24 @@ services:
       dockerfile: deploy/backend/Dockerfile
     image: tienda-backend:local
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       POSTGRES_HOST: database
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-tienda_abarrotes}
       POSTGRES_USER: ${POSTGRES_USER:-tienda_owner}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env}
       JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?Define JWT_SECRET_BASE64 in .env}
+      LOGIN_RATE_LIMIT_PROVIDER: ${LOGIN_RATE_LIMIT_PROVIDER:-memory}
+      LOGIN_RATE_LIMIT_WINDOW: ${LOGIN_RATE_LIMIT_WINDOW:-PT1M}
+      LOGIN_RATE_LIMIT_IP_MAX_FAILURES: ${LOGIN_RATE_LIMIT_IP_MAX_FAILURES:-20}
+      LOGIN_RATE_LIMIT_PAIR_MAX_FAILURES: ${LOGIN_RATE_LIMIT_PAIR_MAX_FAILURES:-5}
+      LOGIN_RATE_LIMIT_ACCOUNT_MAX_FAILURES: ${LOGIN_RATE_LIMIT_ACCOUNT_MAX_FAILURES:-10}
+      RATE_LIMIT_KEY_SECRET_BASE64: ${RATE_LIMIT_KEY_SECRET_BASE64:-}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_CONNECT_TIMEOUT: ${REDIS_CONNECT_TIMEOUT:-PT2S}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-PT1S}
       BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-false}
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
@@ -81,8 +110,11 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+        required: false
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
       interval: 10s
       timeout: 5s
       retries: 12

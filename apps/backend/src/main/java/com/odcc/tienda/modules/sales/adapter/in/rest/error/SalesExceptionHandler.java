@@ -17,6 +17,7 @@ import com.odcc.tienda.modules.sales.application.exception.SalesPaymentNotFoundE
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnAlreadyProcessedException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnOrderConflictException;
+import com.odcc.tienda.modules.sales.application.exception.SalesReturnRefundUnfundedException;
 import com.odcc.tienda.modules.sales.application.exception.StockInsufficientException;
 import com.odcc.tienda.modules.sales.application.exception.PriceNotConfiguredException;
 import com.odcc.tienda.modules.sales.application.exception.SalesPriceChangedException;
@@ -83,6 +84,19 @@ public class SalesExceptionHandler {
     @ExceptionHandler(SalesReturnOrderConflictException.class)
     public ResponseEntity<ApiResponseDto<Void>> salesReturnOrderConflict(SalesReturnOrderConflictException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "SALES_RETURN_ORDER_CONFLICT", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(SalesReturnRefundUnfundedException.class)
+    public ResponseEntity<ApiResponseDto<Void>> salesReturnRefundUnfunded(
+        SalesReturnRefundUnfundedException exception,
+        HttpServletRequest request
+    ) {
+        return error(
+            HttpStatus.CONFLICT,
+            "SALES_RETURN_REFUND_UNFUNDED",
+            exception.getMessage(),
+            request
+        );
     }
 
     @ExceptionHandler(SalesPaymentNotFoundException.class)

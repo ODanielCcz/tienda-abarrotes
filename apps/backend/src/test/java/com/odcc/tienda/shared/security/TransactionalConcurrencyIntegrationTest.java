@@ -104,6 +104,10 @@ class TransactionalConcurrencyIntegrationTest {
         Fixture fixture = createFixture();
         String token = login(fixture.username(), "correct-password");
         ReturnFixture returnFixture = createReturnFixture(fixture);
+        insertCapturedCardPayment(
+            returnFixture.salesOrderId(),
+            new BigDecimal("40.0000")
+        );
 
         MvcResult createResult = mockMvc.perform(
                 post("/api/v1/sales/orders/{salesOrderId}/returns", returnFixture.salesOrderId())
@@ -325,6 +329,75 @@ class TransactionalConcurrencyIntegrationTest {
         assertEquals(64, fingerprintLength);
     }
 
+    @Test
+    void shouldReturnTheSameSalesOrderForConcurrentIdempotentRequests() throws Exception {
+        Fixture fixture = createFixture();
+        ReturnFixture productFixture = createReturnFixture(fixture);
+        String token = login(fixture.username(), "correct-password");
+        UUID idempotencyKey = UUID.randomUUID();
+        UUID priceListId = UUID.randomUUID();
+        jdbcTemplate.update(
+            """
+                INSERT INTO catalog.price_lists (price_list_id, code, name, currency_code, status)
+                VALUES (?, 'GENERAL', 'General', 'MXN', 'ACTIVE')
+                ON CONFLICT (code) DO UPDATE SET status = 'ACTIVE'
+                """,
+            priceListId
+        );
+        UUID activePriceListId = jdbcTemplate.queryForObject(
+            "SELECT price_list_id FROM catalog.price_lists WHERE code = 'GENERAL'",
+            UUID.class
+        );
+        jdbcTemplate.update(
+            """
+                INSERT INTO catalog.prices (price_id, price_list_id, branch_id, product_presentation_id, amount)
+                VALUES (?, ?, ?, ?, 20.0000)
+                """,
+            UUID.randomUUID(),
+            activePriceListId,
+            fixture.branchId(),
+            productFixture.presentationId()
+        );
+        jdbcTemplate.execute("""
+            CREATE OR REPLACE FUNCTION sales.delay_sales_order_insert_for_test()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+            BEGIN
+                PERFORM pg_sleep(0.75);
+                RETURN NEW;
+            END;
+            $$
+            """);
+        jdbcTemplate.execute("""
+            CREATE TRIGGER delay_sales_order_insert_for_test
+            AFTER INSERT ON sales.sales_orders
+            FOR EACH ROW
+            EXECUTE FUNCTION sales.delay_sales_order_insert_for_test()
+            """);
+
+        List<MvcResult> results = runConcurrentlyResults(
+            salesOrderRequest(token, fixture.warehouseId(), productFixture.presentationId(), idempotencyKey),
+            salesOrderRequest(token, fixture.warehouseId(), productFixture.presentationId(), idempotencyKey)
+        );
+
+        assertEquals(List.of(201, 201), results.stream().map(result -> result.getResponse().getStatus()).sorted().toList());
+        String firstOrderId = JsonPath.read(results.get(0).getResponse().getContentAsString(), "$.data.salesOrderId");
+        String secondOrderId = JsonPath.read(results.get(1).getResponse().getContentAsString(), "$.data.salesOrderId");
+        assertEquals(firstOrderId, secondOrderId);
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sales.sales_orders WHERE idempotency_key = ?",
+            Integer.class,
+            idempotencyKey
+        ));
+        assertEquals(new BigDecimal("2.000"), jdbcTemplate.queryForObject(
+            "SELECT on_hand_quantity FROM inventory.stock_balances WHERE warehouse_id = ? AND product_presentation_id = ?",
+            BigDecimal.class,
+            fixture.warehouseId(),
+            productFixture.presentationId()
+        ));
+    }
+
     private Callable<MvcResult> paymentRequest(
         String token,
         UUID salesOrderId,
@@ -441,6 +514,54 @@ class TransactionalConcurrencyIntegrationTest {
                     }
                     """.formatted(warehouseId, supplierId, idempotencyKey, presentationId, unitCost))
         ).andReturn();
+    }
+
+    private void insertCapturedCardPayment(
+        UUID salesOrderId,
+        BigDecimal amount
+    ) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO sales.payments (
+                    payment_id, sales_order_id, payment_method, status,
+                    amount, idempotency_key, paid_at
+                ) VALUES (?, ?, 'CARD', 'CAPTURED', ?, ?, clock_timestamp())
+                """,
+            UUID.randomUUID(),
+            salesOrderId,
+            amount,
+            UUID.randomUUID()
+        );
+    }
+
+    private Callable<MvcResult> salesOrderRequest(
+        String token,
+        UUID warehouseId,
+        UUID presentationId,
+        UUID idempotencyKey
+    ) {
+        return () -> mockMvc.perform(
+                post("/api/v1/sales/orders")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "warehouseId": "%s",
+                          "channel": "POS",
+                          "currencyCode": "MXN",
+                          "idempotencyKey": "%s",
+                          "items": [
+                            {
+                              "productPresentationId": "%s",
+                              "quantity": 1,
+                              "unitPrice": 20.00,
+                              "discountAmount": 0
+                            }
+                          ]
+                        }
+                        """.formatted(warehouseId, idempotencyKey, presentationId))
+            )
+            .andReturn();
     }
 
     @SafeVarargs

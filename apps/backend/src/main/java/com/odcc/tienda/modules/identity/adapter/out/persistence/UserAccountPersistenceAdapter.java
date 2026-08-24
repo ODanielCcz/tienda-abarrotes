@@ -78,7 +78,10 @@ public class UserAccountPersistenceAdapter implements UserAccountPort {
                 WHERE user_id = :userId
                 """,
             new MapSqlParameterSource("userId", userId)
-                .addValue("lockedUntil", Timestamp.from(lockedUntilAtThreshold))
+                .addValue(
+                    "lockedUntil",
+                    Timestamp.from(lockedUntilAtThreshold)
+                )
         );
     }
 

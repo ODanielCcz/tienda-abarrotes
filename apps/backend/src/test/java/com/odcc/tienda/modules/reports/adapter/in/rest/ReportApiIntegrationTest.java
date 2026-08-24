@@ -44,6 +44,7 @@ class ReportApiIntegrationTest {
 
     @Test
     void shouldReturnOperationalReportsFromConfirmedDataOnly() throws Exception {
+        jdbcTemplate.execute("SET LOCAL TIME ZONE 'UTC'");
         insertUser("report_admin", "correct-password", "SYSTEM_ADMIN");
         String token = login("report_admin", "correct-password");
         TestData data = createOperationalData();

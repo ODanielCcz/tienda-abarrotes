@@ -2,6 +2,7 @@ package com.odcc.tienda.modules.identity.application.usecase;
 
 import com.odcc.tienda.modules.identity.application.command.LoginCommand;
 import com.odcc.tienda.modules.identity.application.exception.InvalidCredentialsException;
+import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitUnavailableException;
 import com.odcc.tienda.modules.identity.application.exception.UserNotActiveException;
 import com.odcc.tienda.modules.identity.application.exception.UserTemporarilyLockedException;
 import com.odcc.tienda.modules.identity.application.model.IssuedAccessToken;
@@ -9,6 +10,7 @@ import com.odcc.tienda.modules.identity.application.model.LoginResult;
 import com.odcc.tienda.modules.identity.application.port.out.AccessTokenPort;
 import com.odcc.tienda.modules.identity.application.port.out.AuthenticationAuditPort;
 import com.odcc.tienda.modules.identity.application.port.out.PasswordVerificationPort;
+import com.odcc.tienda.modules.identity.application.port.out.LoginRateLimitPort;
 import com.odcc.tienda.modules.identity.application.port.out.UserAccountPort;
 import com.odcc.tienda.modules.identity.domain.model.UserAccount;
 import com.odcc.tienda.modules.identity.domain.model.UserAccountStatus;
@@ -37,18 +39,16 @@ class LoginServiceTest {
     private FakeAuthenticationAuditPort auditPort;
     private LoginService service;
     private Clock clock;
+    private TrackingPasswordVerificationPort passwordPort;
+    private TrackingAccessTokenPort tokenPort;
 
     @BeforeEach
     void setUp() {
         userAccountPort = new FakeUserAccountPort(activeUser());
         clock = Clock.fixed(Instant.parse("2026-08-09T18:00:00Z"), ZoneOffset.UTC);
         auditPort = new FakeAuthenticationAuditPort();
-        PasswordVerificationPort passwordPort = (raw, encoded) ->
-            "correct-password".equals(raw) && "stored-hash".equals(encoded);
-        AccessTokenPort tokenPort = user -> new IssuedAccessToken(
-            "signed.jwt.token",
-            Instant.parse("2026-07-24T08:30:00Z")
-        );
+        passwordPort = new TrackingPasswordVerificationPort();
+        tokenPort = new TrackingAccessTokenPort();
 
         service = new LoginService(
             userAccountPort,
@@ -56,7 +56,7 @@ class LoginServiceTest {
             tokenPort,
             auditPort,
             clock,
-            clientAddress -> { }
+            (clientAddress, username) -> { }
         );
     }
 
@@ -87,6 +87,8 @@ class LoginServiceTest {
         );
 
         assertEquals(List.of("FAILURE:admin:INVALID_PASSWORD"), auditPort.events);
+        assertEquals(1, passwordPort.realMatches);
+        assertEquals(0, passwordPort.dummyMatches);
     }
 
     @Test
@@ -104,6 +106,8 @@ class LoginServiceTest {
             "Las credenciales proporcionadas no son válidas",
             exception.getMessage()
         );
+        assertEquals(0, passwordPort.realMatches);
+        assertEquals(1, passwordPort.dummyMatches);
         assertEquals(List.of("FAILURE:unknown:USER_NOT_FOUND"), auditPort.events);
     }
 
@@ -139,7 +143,10 @@ class LoginServiceTest {
         }
 
         assertEquals(5, userAccountPort.user.failedLoginAttempts());
-        assertEquals(Instant.parse("2026-08-09T18:15:00Z"), userAccountPort.user.lockedUntil());
+        assertEquals(
+            Instant.parse("2026-08-09T18:15:00Z"),
+            userAccountPort.user.lockedUntil()
+        );
         assertThrows(
             UserTemporarilyLockedException.class,
             () -> service.execute(new LoginCommand("admin", "correct-password"))
@@ -159,6 +166,38 @@ class LoginServiceTest {
         assertEquals(null, userAccountPort.user.lockedUntil());
     }
 
+    @Test
+    void shouldNotIssueTokenWhenRateLimitCleanupIsUnavailable() {
+        LoginRateLimitPort unavailableOnSuccess = new LoginRateLimitPort() {
+            @Override
+            public void check(String clientAddress, String username) {
+            }
+
+            @Override
+            public void onSuccess(String clientAddress, String username) {
+                throw new LoginRateLimitUnavailableException(5);
+            }
+        };
+        service = new LoginService(
+            userAccountPort,
+            passwordPort,
+            tokenPort,
+            auditPort,
+            clock,
+            unavailableOnSuccess
+        );
+
+        assertThrows(
+            LoginRateLimitUnavailableException.class,
+            () -> service.execute(
+                new LoginCommand("admin", "correct-password", "192.0.2.10")
+            )
+        );
+
+        assertEquals(0, tokenPort.issueCalls);
+        assertEquals(List.of(), auditPort.events);
+    }
+
     private static UserAccount activeUser() {
         return new UserAccount(
             USER_ID,
@@ -170,6 +209,41 @@ class LoginServiceTest {
             Set.of("CATALOG_BRAND_READ")
         );
     }
+    private static final class TrackingPasswordVerificationPort
+        implements PasswordVerificationPort {
+
+        private int realMatches;
+        private int dummyMatches;
+
+        @Override
+        public boolean matches(String rawPassword, String encodedPassword) {
+            realMatches++;
+            return "correct-password".equals(rawPassword)
+                && "stored-hash".equals(encodedPassword);
+        }
+
+        @Override
+        public boolean matchesDummy(String rawPassword) {
+            dummyMatches++;
+            return false;
+        }
+    }
+
+    private static final class TrackingAccessTokenPort
+        implements AccessTokenPort {
+
+        private int issueCalls;
+
+        @Override
+        public IssuedAccessToken issue(UserAccount user) {
+            issueCalls++;
+            return new IssuedAccessToken(
+                "signed.jwt.token",
+                Instant.parse("2026-07-24T08:30:00Z")
+            );
+        }
+    }
+
 
     private static final class FakeUserAccountPort implements UserAccountPort {
 
@@ -188,7 +262,10 @@ class LoginServiceTest {
         @Override
         public void recordFailedLogin(UUID userId, Instant lockedUntil) {
             int attempts = user.failedLoginAttempts() + 1;
-            user = user.withAuthenticationState(attempts, attempts >= 5 ? lockedUntil : user.lockedUntil());
+            user = user.withAuthenticationState(
+                attempts,
+                attempts >= 5 ? lockedUntil : user.lockedUntil()
+            );
         }
 
         @Override

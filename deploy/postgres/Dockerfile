@@ -15,3 +15,5 @@ RUN apt-get update \
     && rm -rf /tmp/pgaudit /var/lib/apt/lists/* \
     && mkdir -p /var/log/postgresql \
     && chown -R postgres:postgres /var/log/postgresql
+
+USER postgres

@@ -14,6 +14,6 @@ public record CreatePurchaseRequest(
     @Size(max = 100) String supplierDocument,
     @Size(min = 3, max = 3) String currencyCode,
     UUID idempotencyKey,
-    @Valid @NotEmpty List<CreatePurchaseItemRequest> items
+    @Valid @NotEmpty @Size(max = 500) List<CreatePurchaseItemRequest> items
 ) {
 }

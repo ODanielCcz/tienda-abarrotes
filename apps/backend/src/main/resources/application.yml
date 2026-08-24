@@ -11,11 +11,21 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:PT2S}
+      timeout: ${REDIS_TIMEOUT:PT1S}
 
 server:
   shutdown: graceful
 
 management:
+  health:
+    redis:
+      enabled: false
   tracing:
     sampling:
       probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
@@ -38,6 +48,13 @@ management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
 
 logging:
   include-application-name: false
@@ -56,7 +73,17 @@ app:
       issuer: ${JWT_ISSUER:tienda-abarrotes-api}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:PT30M}
       secret-base64: ${JWT_SECRET_BASE64:}
+    login-rate-limit:
+      provider: ${LOGIN_RATE_LIMIT_PROVIDER:memory}
+      window: ${LOGIN_RATE_LIMIT_WINDOW:PT1M}
+      ip-max-failures: ${LOGIN_RATE_LIMIT_IP_MAX_FAILURES:20}
+      pair-max-failures: ${LOGIN_RATE_LIMIT_PAIR_MAX_FAILURES:5}
+      account-max-failures: ${LOGIN_RATE_LIMIT_ACCOUNT_MAX_FAILURES:10}
+      namespace: ${LOGIN_RATE_LIMIT_NAMESPACE:tienda:auth:rate-limit:v1}
+      key-secret-base64: ${RATE_LIMIT_KEY_SECRET_BASE64:}
+      unavailable-retry-after: ${LOGIN_RATE_LIMIT_UNAVAILABLE_RETRY_AFTER:PT5S}
   web:
+    max-json-payload-bytes: ${API_MAX_JSON_PAYLOAD_BYTES:1048576}
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:8100}
       allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS

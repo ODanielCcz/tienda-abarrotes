@@ -23,7 +23,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +45,8 @@ class UserManagementServiceTest {
     private BranchAccessPort branchAccess;
 
     private UserManagementService service;
+    private AtomicReference<String> passwordPassedToHasher;
+    private AtomicReference<String> passwordPassedToPolicy;
 
     @BeforeEach
     void setUp() {
@@ -52,12 +56,18 @@ class UserManagementServiceTest {
                 return operation.get();
             }
         };
+        passwordPassedToHasher = new AtomicReference<>();
+        passwordPassedToPolicy = new AtomicReference<>();
         service = new UserManagementService(
             repository,
-            rawPassword -> "hashed-password",
+            rawPassword -> {
+                passwordPassedToHasher.set(rawPassword);
+                return "hashed-password";
+            },
             transactionRunner,
             event -> { },
-            branchAccess
+            branchAccess,
+            (username, password) -> passwordPassedToPolicy.set(password)
         );
     }
 
@@ -162,6 +172,27 @@ class UserManagementServiceTest {
                 new ChangeUserPasswordCommand(ACTOR_ID, TARGET_ID, "Replacement123!")
             )
         );
+    }
+
+    @Test
+    void passwordChangesShouldPreserveLeadingAndTrailingWhitespace() {
+        ManagedUser target = managedUser(
+            TARGET_ID,
+            Set.of("CASHIER"),
+            Set.of(BRANCH_ID)
+        );
+        when(repository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+        when(branchAccess.resolveScope(ACTOR_ID)).thenReturn(BranchScope.global());
+        when(repository.updatePassword(TARGET_ID, "hashed-password"))
+            .thenReturn(target);
+        String rawPassword = "  Replacement123!  ";
+
+        service.changePassword(
+            new ChangeUserPasswordCommand(ACTOR_ID, TARGET_ID, rawPassword)
+        );
+
+        assertEquals(rawPassword, passwordPassedToPolicy.get());
+        assertEquals(rawPassword, passwordPassedToHasher.get());
     }
 
     private static ManagedUser managedUser(UUID userId, Set<String> roles, Set<UUID> branchIds) {
