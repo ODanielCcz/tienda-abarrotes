@@ -53,8 +53,8 @@
 - Crear `apps/backend/src/main/java/com/odcc/tienda/modules/identity/adapter/out/security/LoginRateLimitMetrics.java`: métricas Micrometer.
 - Crear `apps/backend/src/main/java/com/odcc/tienda/modules/identity/adapter/out/security/RedisLoginRateLimiter.java`: adaptador distribuido.
 - Modificar `apps/backend/src/main/java/com/odcc/tienda/modules/identity/adapter/out/security/InMemoryLoginRateLimiter.java`: quitar autodetección y usar propiedades/métricas compartidas.
-- Crear `apps/backend/src/main/resources/redis/check-rate-limit.lua`: decisión atómica.
-- Crear `apps/backend/src/main/resources/redis/record-login-failure.lua`: incremento y TTL atómicos.
+- Crear `apps/backend/src/main/resources/redis/check-rate-limit.lua`: decisión y reserva atómica de capacidad.
+- Crear `apps/backend/src/main/resources/redis/clear-successful-login-reservation.lua`: liberar la reserva de la solicitud exitosa sin borrar fallos IP anteriores.
 - Modificar `apps/backend/src/main/java/com/odcc/tienda/modules/identity/application/exception/LoginRateLimitedException.java`: incluir dimensión.
 - Modificar `apps/backend/src/main/java/com/odcc/tienda/modules/identity/application/usecase/LoginService.java`: limpiar Redis antes de emitir el JWT.
 - Modificar `apps/backend/src/main/java/com/odcc/tienda/modules/identity/adapter/in/rest/error/AuthenticationExceptionHandler.java`: respuesta `503` y `correlationId`.
@@ -468,7 +468,7 @@ git commit -m "feat(identity): derive opaque login rate limit keys"
 
 **Files:**
 - Create: `apps/backend/src/main/resources/redis/check-rate-limit.lua`
-- Create: `apps/backend/src/main/resources/redis/record-login-failure.lua`
+- Create: `apps/backend/src/main/resources/redis/clear-successful-login-reservation.lua`
 - Create: `apps/backend/src/main/java/com/odcc/tienda/modules/identity/application/model/LoginRateLimitDimension.java`
 - Modify: `apps/backend/src/main/java/com/odcc/tienda/modules/identity/application/exception/LoginRateLimitedException.java`
 - Create: `apps/backend/src/main/java/com/odcc/tienda/modules/identity/application/exception/LoginRateLimitUnavailableException.java`
@@ -507,7 +507,7 @@ Expected: FAIL por clases y scripts inexistentes.
 
 `check-rate-limit.lua` debe leer `KEYS[1..3]`, comparar con `ARGV[1..3]`, consultar `PTTL`, elegir el mayor TTL bloqueado y devolver `allowed:retryAfterSeconds:dimensionIndex`. Si una clave bloqueada carece de TTL, usar `ARGV[4]` como ventana defensiva.
 
-`record-login-failure.lua` debe ejecutar para las tres claves:
+Cuando la decisión sea permitida, `check-rate-limit.lua` debe ejecutar para las tres claves dentro del mismo script:
 
 ```lua
 local value = redis.call('INCR', KEYS[index])
@@ -1069,5 +1069,5 @@ Expected: worktree limpio, commits lógicos y ninguna migración PostgreSQL. El 
 
 - Restaurar la versión anterior del backend; Redis puede permanecer temporalmente sin consumidores.
 - No eliminar datos PostgreSQL ni ejecutar Flyway porque esta entrega no contiene migraciones.
-- `provider=memory` en producción solo es mitigación temporal documentada y únicamente cuando existe una instancia.
+- `provider=memory` no está permitido en producción; una incidencia Redis debe conservar el rechazo cerrado de nuevos logins.
 - Un check CI solo se deshabilita mediante commit revisado; no usar `continue-on-error`.

@@ -93,7 +93,7 @@ class RedisLoginRateLimiterUnavailableIntegrationTest {
                 String.class
             ),
             RedisScript.of(
-                new ClassPathResource("redis/record-login-failure.lua"),
+                new ClassPathResource("redis/clear-successful-login-reservation.lua"),
                 Long.class
             ),
             new RateLimitKeyEncoder(

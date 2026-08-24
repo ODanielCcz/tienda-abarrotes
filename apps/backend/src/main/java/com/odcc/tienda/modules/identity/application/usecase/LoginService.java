@@ -3,6 +3,7 @@ package com.odcc.tienda.modules.identity.application.usecase;
 import com.odcc.tienda.modules.identity.application.command.LoginCommand;
 import com.odcc.tienda.modules.identity.application.exception.InvalidCredentialsException;
 import com.odcc.tienda.modules.identity.application.exception.UserNotActiveException;
+import com.odcc.tienda.modules.identity.application.exception.UserTemporarilyLockedException;
 import com.odcc.tienda.modules.identity.application.model.AuthenticatedUser;
 import com.odcc.tienda.modules.identity.application.model.IssuedAccessToken;
 import com.odcc.tienda.modules.identity.application.model.LoginResult;
@@ -19,10 +20,13 @@ import lombok.RequiredArgsConstructor;
 import java.util.Locale;
 import java.util.Objects;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 
 @RequiredArgsConstructor
 public final class LoginService implements LoginUseCase {
+
+    private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
 
     private final UserAccountPort userAccountPort;
     private final PasswordVerificationPort passwordVerificationPort;
@@ -41,14 +45,23 @@ public final class LoginService implements LoginUseCase {
         UserAccount user = userAccountPort.findByUsername(username).orElse(null);
         if (user == null) {
             passwordVerificationPort.matchesDummy(password);
-            loginRateLimitPort.onFailure(command.clientAddress(), username);
             throw invalidCredentials(username);
         }
 
         Instant now = clock.instant();
+        if (user.lockedUntil() != null && now.isBefore(user.lockedUntil())) {
+            authenticationAuditPort.loginFailed(
+                user.id(),
+                username,
+                "TEMPORARILY_LOCKED"
+            );
+            throw new UserTemporarilyLockedException(user.lockedUntil());
+        }
         if (!passwordVerificationPort.matches(password, user.passwordHash())) {
-            userAccountPort.recordFailedLogin(user.id(), now);
-            loginRateLimitPort.onFailure(command.clientAddress(), username);
+            userAccountPort.recordFailedLogin(
+                user.id(),
+                now.plus(LOCK_DURATION)
+            );
             authenticationAuditPort.loginFailed(
                 user.id(),
                 username,
@@ -58,7 +71,6 @@ public final class LoginService implements LoginUseCase {
         }
 
         if (user.status() != UserAccountStatus.ACTIVE) {
-            loginRateLimitPort.onFailure(command.clientAddress(), username);
             authenticationAuditPort.loginFailed(
                 user.id(),
                 username,

@@ -23,4 +23,11 @@ if blockedDimension > 0 then
     return '0:' .. retrySeconds .. ':' .. blockedDimension
 end
 
+for index = 1, 3 do
+    local attempts = redis.call('INCR', KEYS[index])
+    if attempts == 1 then
+        redis.call('PEXPIRE', KEYS[index], fallbackWindowMillis)
+    end
+end
+
 return '1:0:0'

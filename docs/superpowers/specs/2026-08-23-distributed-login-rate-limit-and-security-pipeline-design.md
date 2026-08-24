@@ -65,7 +65,7 @@ LoginRateLimitPort
           │
           ├── RateLimitKeyEncoder (HMAC-SHA-256)
           ├── check-rate-limit.lua
-          └── record-login-failure.lua
+          └── clear-successful-login-reservation.lua
                     │
                     ▼
                   Redis
@@ -110,7 +110,7 @@ El HMAC utilizará `RATE_LIMIT_KEY_SECRET_BASE64`, separado del secreto JWT. Rot
 
 ### Operaciones Atómicas
 
-`check-rate-limit.lua` leerá las tres dimensiones y devolverá si la solicitud está permitida y el mayor tiempo restante de bloqueo. `record-login-failure.lua` incrementará las tres dimensiones y asignará TTL al crear cada contador. La operación completa se ejecutará en Redis de forma atómica.
+`check-rate-limit.lua` comprobará y reservará atómicamente capacidad en las tres dimensiones antes de verificar credenciales. `clear-successful-login-reservation.lua` revertirá únicamente la reserva IP de la solicitud exitosa y limpiará las dimensiones IP+cuenta y cuenta. Así, ningún conjunto de solicitudes concurrentes puede superar el umbral antes de contabilizarse.
 
 No se utilizará una secuencia separada `INCR` seguida de `EXPIRE`, porque un fallo entre ambas operaciones podría dejar una clave sin caducidad. Los scripts se declararán como beans únicos para aprovechar el caché SHA de Spring Data Redis.
 
@@ -254,7 +254,7 @@ Las pruebas usarán Testcontainers con la misma versión mayor de Redis definida
 ## Rollback
 
 - El rollback normal restaura la versión anterior del backend y mantiene Redis sin consumidores hasta retirarlo.
-- Cambiar producción a `provider=memory` solo se permitirá como mitigación temporal documentada cuando exista una única instancia; reduce la garantía de seguridad distribuida.
+- Producción no permite `provider=memory`; una caída de Redis debe mantener el rechazo cerrado de nuevos logins hasta restaurar Redis o la versión estable.
 - No hay rollback de base de datos porque el diseño no crea tablas ni migraciones.
 - Deshabilitar un check de CI requiere un commit revisado; no se usará `continue-on-error` para ocultar fallos.
 

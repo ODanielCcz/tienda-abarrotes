@@ -56,7 +56,7 @@ class LoginServiceTest {
             tokenPort,
             auditPort,
             clock,
-            clientAddress -> { }
+            (clientAddress, username) -> { }
         );
     }
 
@@ -134,7 +134,7 @@ class LoginServiceTest {
     }
 
     @Test
-    void shouldNotPersistentlyLockAccountAfterFiveInvalidPasswords() {
+    void shouldLockAccountForFifteenMinutesAfterFiveInvalidPasswords() {
         for (int attempt = 0; attempt < 5; attempt++) {
             assertThrows(
                 InvalidCredentialsException.class,
@@ -143,10 +143,14 @@ class LoginServiceTest {
         }
 
         assertEquals(5, userAccountPort.user.failedLoginAttempts());
-        assertEquals(null, userAccountPort.user.lockedUntil());
-
-        service.execute(new LoginCommand("admin", "correct-password"));
-        assertEquals(0, userAccountPort.user.failedLoginAttempts());
+        assertEquals(
+            Instant.parse("2026-08-09T18:15:00Z"),
+            userAccountPort.user.lockedUntil()
+        );
+        assertThrows(
+            UserTemporarilyLockedException.class,
+            () -> service.execute(new LoginCommand("admin", "correct-password"))
+        );
     }
 
     @Test
@@ -166,7 +170,7 @@ class LoginServiceTest {
     void shouldNotIssueTokenWhenRateLimitCleanupIsUnavailable() {
         LoginRateLimitPort unavailableOnSuccess = new LoginRateLimitPort() {
             @Override
-            public void check(String clientAddress) {
+            public void check(String clientAddress, String username) {
             }
 
             @Override
@@ -256,9 +260,12 @@ class LoginServiceTest {
         }
 
         @Override
-        public void recordFailedLogin(UUID userId, Instant failedAt) {
+        public void recordFailedLogin(UUID userId, Instant lockedUntil) {
             int attempts = user.failedLoginAttempts() + 1;
-            user = user.withAuthenticationState(attempts, null);
+            user = user.withAuthenticationState(
+                attempts,
+                attempts >= 5 ? lockedUntil : user.lockedUntil()
+            );
         }
 
         @Override

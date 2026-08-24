@@ -72,7 +72,9 @@ public class UserManagementService implements UserManagementUseCases {
         return transactionRunner.required(() -> {
             String username = normalizeUsername(command == null ? null : command.username());
             String displayName = normalizeRequired(command == null ? null : command.displayName(), "El nombre visible es obligatorio", DISPLAY_NAME_MAX_LENGTH);
-            String password = normalizeRequired(command == null ? null : command.password(), "La contraseña es obligatoria", 255);
+            String password = requirePassword(
+                command == null ? null : command.password()
+            );
             passwordPolicyPort.validate(username, password);
             Set<String> roleCodes = normalizeRoleCodes(command == null ? null : command.roleCodes());
             validateRolesExist(roleCodes);
@@ -141,7 +143,7 @@ public class UserManagementService implements UserManagementUseCases {
             if (command == null || command.userId() == null) throw new IdentityException("El usuario es obligatorio");
             ManagedUser current = getById(command.userId());
             requireActorCanMutateTarget(command.actorUserId(), current);
-            String password = normalizeRequired(command.password(), "La contraseña es obligatoria", 255);
+            String password = requirePassword(command.password());
             passwordPolicyPort.validate(current.username(), password);
             ManagedUser updated = repository.updatePassword(command.userId(), passwordHashingPort.hash(password));
             auditPort.record(new BusinessAuditEvent("USER_PASSWORD_CHANGED", "USER", updated.userId(), state(current), state(updated), Map.of()));
@@ -398,6 +400,18 @@ public class UserManagementService implements UserManagementUseCases {
         String normalized = normalize(value);
         if (normalized != null && normalized.length() > maxLength) throw new IdentityException(fieldName + " debe tener maximo " + maxLength + " caracteres");
         return normalized;
+    }
+
+    private static String requirePassword(String password) {
+        if (password == null || password.isBlank()) {
+            throw new IdentityException("La contraseña es obligatoria");
+        }
+        if (password.length() > 255) {
+            throw new IdentityException(
+                "La contraseña es obligatoria, maximo 255 caracteres"
+            );
+        }
+        return password;
     }
 
     private static String normalize(String value) {

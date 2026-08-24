@@ -73,14 +73,14 @@ public class LoginRateLimitConfiguration {
         );
     }
 
-    @Bean("recordLoginFailureScript")
+    @Bean("clearSuccessfulLoginReservationScript")
     @ConditionalOnProperty(
         name = "app.security.login-rate-limit.provider",
         havingValue = "redis"
     )
-    RedisScript<Long> recordLoginFailureScript() {
+    RedisScript<Long> clearSuccessfulLoginReservationScript() {
         return RedisScript.of(
-            new ClassPathResource("redis/record-login-failure.lua"),
+            new ClassPathResource("redis/clear-successful-login-reservation.lua"),
             Long.class
         );
     }
@@ -94,8 +94,8 @@ public class LoginRateLimitConfiguration {
         StringRedisTemplate redis,
         @Qualifier("checkLoginRateLimitScript")
         RedisScript<String> checkScript,
-        @Qualifier("recordLoginFailureScript")
-        RedisScript<Long> failureScript,
+        @Qualifier("clearSuccessfulLoginReservationScript")
+        RedisScript<Long> successScript,
         RateLimitKeyEncoder keyEncoder,
         LoginRateLimitProperties properties,
         LoginRateLimitMetrics metrics
@@ -103,7 +103,7 @@ public class LoginRateLimitConfiguration {
         return new RedisLoginRateLimiter(
             redis,
             checkScript,
-            failureScript,
+            successScript,
             keyEncoder,
             properties,
             metrics

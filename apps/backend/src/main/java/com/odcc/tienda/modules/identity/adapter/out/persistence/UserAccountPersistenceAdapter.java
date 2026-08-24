@@ -65,16 +65,23 @@ public class UserAccountPersistenceAdapter implements UserAccountPort {
     }
 
     @Override
-    public void recordFailedLogin(UUID userId, Instant failedAt) {
+    public void recordFailedLogin(UUID userId, Instant lockedUntilAtThreshold) {
         jdbcTemplate.update(
             """
                 UPDATE iam.users
                 SET failed_login_attempts = failed_login_attempts + 1,
-                    locked_until = NULL,
+                    locked_until = CASE
+                        WHEN failed_login_attempts + 1 >= 5 THEN :lockedUntil
+                        ELSE locked_until
+                    END,
                     updated_at = clock_timestamp()
                 WHERE user_id = :userId
                 """,
             new MapSqlParameterSource("userId", userId)
+                .addValue(
+                    "lockedUntil",
+                    Timestamp.from(lockedUntilAtThreshold)
+                )
         );
     }
 

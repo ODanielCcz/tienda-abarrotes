@@ -29,7 +29,7 @@ class RedisLoginRateLimiterTest {
 
     private StringRedisTemplate redis;
     private RedisScript<String> checkScript;
-    private RedisScript<Long> failureScript;
+    private RedisScript<Long> successScript;
     private RateLimitKeyEncoder keyEncoder;
     private SimpleMeterRegistry meterRegistry;
     private RedisLoginRateLimiter limiter;
@@ -39,7 +39,7 @@ class RedisLoginRateLimiterTest {
     void setUp() {
         redis = mock(StringRedisTemplate.class);
         checkScript = mock(RedisScript.class);
-        failureScript = mock(RedisScript.class);
+        successScript = mock(RedisScript.class);
         keyEncoder = new RateLimitKeyEncoder(
             "tienda:auth:rate-limit:v1",
             new byte[32]
@@ -48,7 +48,7 @@ class RedisLoginRateLimiterTest {
         limiter = new RedisLoginRateLimiter(
             redis,
             checkScript,
-            failureScript,
+            successScript,
             keyEncoder,
             properties(),
             new LoginRateLimitMetrics(meterRegistry)
@@ -89,16 +89,19 @@ class RedisLoginRateLimiterTest {
     }
 
     @Test
-    void shouldRecordAllThreeFailureDimensions() {
+    void shouldAtomicallyReserveAllThreeDimensions() {
         RateLimitKeyEncoder.Keys keys = keyEncoder.encode("192.0.2.10", "alice");
-        given(redis.execute(same(failureScript), anyList(), any(Object[].class)))
-            .willReturn(1L);
+        given(redis.execute(same(checkScript), anyList(), any(Object[].class)))
+            .willReturn("1:0:0");
 
-        limiter.onFailure("192.0.2.10", "alice");
+        limiter.check("192.0.2.10", "alice");
 
         verify(redis).execute(
-            same(failureScript),
+            same(checkScript),
             eq(keys.asList()),
+            eq("20"),
+            eq("5"),
+            eq("10"),
             eq("60000")
         );
     }
@@ -106,10 +109,12 @@ class RedisLoginRateLimiterTest {
     @Test
     void shouldClearOnlyPairAndAccountAfterSuccess() {
         RateLimitKeyEncoder.Keys keys = keyEncoder.encode("192.0.2.10", "alice");
+        given(redis.execute(same(successScript), anyList(), any(Object[].class)))
+            .willReturn(1L);
 
         limiter.onSuccess("192.0.2.10", "alice");
 
-        verify(redis).delete(java.util.List.of(keys.pair(), keys.account()));
+        verify(redis).execute(same(successScript), eq(keys.asList()));
     }
 
     @Test
@@ -126,7 +131,7 @@ class RedisLoginRateLimiterTest {
 
         assertThat(meterRegistry.get("auth.rate.limit.backend.errors")
             .tag("provider", "redis")
-            .tag("operation", "check")
+            .tag("operation", "reserve")
             .counter().count()).isEqualTo(1.0);
     }
 

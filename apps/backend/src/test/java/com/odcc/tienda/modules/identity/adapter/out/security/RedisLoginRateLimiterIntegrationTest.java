@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -101,8 +102,8 @@ class RedisLoginRateLimiterIntegrationTest {
         RedisLoginRateLimiter first = limiter(redisA, 100, 2, 100);
         RedisLoginRateLimiter second = limiter(redisB, 100, 2, 100);
 
-        first.onFailure("192.0.2.10", "alice");
-        second.onFailure("192.0.2.10", "alice");
+        first.check("192.0.2.10", "alice");
+        second.check("192.0.2.10", "alice");
 
         assertThatThrownBy(() -> first.check("192.0.2.10", "alice"))
             .isInstanceOf(LoginRateLimitedException.class)
@@ -128,7 +129,7 @@ class RedisLoginRateLimiterIntegrationTest {
                 futures.add(executor.submit(() -> {
                     ready.countDown();
                     assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
-                    selected.onFailure("192.0.2.20", "user-" + UUID.randomUUID());
+                    selected.check("192.0.2.20", "user-" + UUID.randomUUID());
                     return null;
                 }));
             }
@@ -149,9 +150,53 @@ class RedisLoginRateLimiterIntegrationTest {
     }
 
     @Test
+    void concurrentAttemptsAcrossInstancesShouldNotOverAdmit() throws Exception {
+        RedisLoginRateLimiter first = limiter(redisA, 100, 5, 100);
+        RedisLoginRateLimiter second = limiter(redisB, 100, 5, 100);
+        int workers = 20;
+        CountDownLatch ready = new CountDownLatch(workers);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch checked = new CountDownLatch(workers);
+        AtomicInteger admitted = new AtomicInteger();
+        ExecutorService executor = Executors.newFixedThreadPool(workers);
+        List<Future<?>> futures = new ArrayList<>();
+
+        try {
+            for (int index = 0; index < workers; index++) {
+                RedisLoginRateLimiter selected = index % 2 == 0
+                    ? first
+                    : second;
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
+                    try {
+                        selected.check("192.0.2.21", "alice");
+                        admitted.incrementAndGet();
+                        checked.countDown();
+                        assertThat(checked.await(10, TimeUnit.SECONDS)).isTrue();
+                    } catch (LoginRateLimitedException exception) {
+                        checked.countDown();
+                    }
+                    return null;
+                }));
+            }
+
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            for (Future<?> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(admitted.get()).isEqualTo(5);
+    }
+
+    @Test
     void shouldBlockEachDimensionAtItsOwnThreshold() {
         RedisLoginRateLimiter ipLimiter = limiter(redisA, 1, 100, 100);
-        ipLimiter.onFailure("192.0.2.30", "alice");
+        ipLimiter.check("192.0.2.30", "alice");
         assertBlocked(
             ipLimiter,
             "192.0.2.30",
@@ -160,7 +205,7 @@ class RedisLoginRateLimiterIntegrationTest {
         );
 
         RedisLoginRateLimiter pairLimiter = limiter(redisA, 100, 1, 100);
-        pairLimiter.onFailure("192.0.2.31", "carol");
+        pairLimiter.check("192.0.2.31", "carol");
         assertBlocked(
             pairLimiter,
             "192.0.2.31",
@@ -169,8 +214,8 @@ class RedisLoginRateLimiterIntegrationTest {
         );
 
         RedisLoginRateLimiter accountLimiter = limiter(redisA, 100, 100, 2);
-        accountLimiter.onFailure("192.0.2.32", "dave");
-        accountLimiter.onFailure("192.0.2.33", "dave");
+        accountLimiter.check("192.0.2.32", "dave");
+        accountLimiter.check("192.0.2.33", "dave");
         assertBlocked(
             accountLimiter,
             "192.0.2.34",
@@ -210,7 +255,7 @@ class RedisLoginRateLimiterIntegrationTest {
             100,
             Duration.ofSeconds(1)
         );
-        limiter.onFailure("192.0.2.40", "alice");
+        limiter.check("192.0.2.40", "alice");
         assertBlocked(
             limiter,
             "192.0.2.40",
@@ -237,7 +282,8 @@ class RedisLoginRateLimiterIntegrationTest {
         RedisLoginRateLimiter limiter = limiter(redisA, 100, 100, 100);
         RateLimitKeyEncoder encoder = encoder();
         RateLimitKeyEncoder.Keys keys = encoder.encode("192.0.2.50", "alice");
-        limiter.onFailure("192.0.2.50", "alice");
+        limiter.check("192.0.2.50", "alice");
+        limiter.check("192.0.2.50", "alice");
 
         limiter.onSuccess("192.0.2.50", "alice");
 
@@ -249,7 +295,7 @@ class RedisLoginRateLimiterIntegrationTest {
     @Test
     void storedKeysShouldBeOpaque() {
         RedisLoginRateLimiter limiter = limiter(redisA, 100, 100, 100);
-        limiter.onFailure("192.0.2.60", "admin@example.com");
+        limiter.check("192.0.2.60", "admin@example.com");
 
         Set<String> keys = redisA.keys(NAMESPACE + ":*");
 
@@ -303,7 +349,7 @@ class RedisLoginRateLimiterIntegrationTest {
                 String.class
             ),
             RedisScript.of(
-                new ClassPathResource("redis/record-login-failure.lua"),
+                new ClassPathResource("redis/clear-successful-login-reservation.lua"),
                 Long.class
             ),
             encoder(),

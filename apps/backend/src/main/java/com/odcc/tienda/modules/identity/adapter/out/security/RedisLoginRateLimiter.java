@@ -9,7 +9,6 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 
-import java.util.List;
 import java.util.function.Supplier;
 
 public final class RedisLoginRateLimiter implements LoginRateLimitPort {
@@ -18,7 +17,7 @@ public final class RedisLoginRateLimiter implements LoginRateLimitPort {
 
     private final StringRedisTemplate redis;
     private final RedisScript<String> checkScript;
-    private final RedisScript<Long> failureScript;
+    private final RedisScript<Long> successScript;
     private final RateLimitKeyEncoder keyEncoder;
     private final LoginRateLimitProperties properties;
     private final LoginRateLimitMetrics metrics;
@@ -26,14 +25,14 @@ public final class RedisLoginRateLimiter implements LoginRateLimitPort {
     public RedisLoginRateLimiter(
         StringRedisTemplate redis,
         RedisScript<String> checkScript,
-        RedisScript<Long> failureScript,
+        RedisScript<Long> successScript,
         RateLimitKeyEncoder keyEncoder,
         LoginRateLimitProperties properties,
         LoginRateLimitMetrics metrics
     ) {
         this.redis = redis;
         this.checkScript = checkScript;
-        this.failureScript = failureScript;
+        this.successScript = successScript;
         this.keyEncoder = keyEncoder;
         this.properties = properties;
         this.metrics = metrics;
@@ -51,7 +50,7 @@ public final class RedisLoginRateLimiter implements LoginRateLimitPort {
             username
         );
         String result = execute(
-            "check",
+            "reserve",
             () -> redis.execute(
                 checkScript,
                 keys.asList(),
@@ -76,22 +75,6 @@ public final class RedisLoginRateLimiter implements LoginRateLimitPort {
     }
 
     @Override
-    public void onFailure(String clientAddress, String username) {
-        RateLimitKeyEncoder.Keys keys = keyEncoder.encode(
-            clientAddress,
-            username
-        );
-        execute(
-            "failure",
-            () -> redis.execute(
-                failureScript,
-                keys.asList(),
-                Long.toString(properties.window().toMillis())
-            )
-        );
-    }
-
-    @Override
     public void onSuccess(String clientAddress, String username) {
         RateLimitKeyEncoder.Keys keys = keyEncoder.encode(
             clientAddress,
@@ -99,7 +82,7 @@ public final class RedisLoginRateLimiter implements LoginRateLimitPort {
         );
         execute(
             "success",
-            () -> redis.delete(List.of(keys.pair(), keys.account()))
+            () -> redis.execute(successScript, keys.asList())
         );
     }
 
@@ -114,7 +97,7 @@ public final class RedisLoginRateLimiter implements LoginRateLimitPort {
     private Decision parseDecision(String value) {
         if (value == null) {
             throw unavailable(
-                "check",
+                "reserve",
                 new IllegalStateException("Redis devolvio una decision nula")
             );
         }
@@ -143,7 +126,7 @@ public final class RedisLoginRateLimiter implements LoginRateLimitPort {
             };
             return new Decision(allowed, Math.max(0, retryAfter), dimension);
         } catch (IllegalArgumentException exception) {
-            throw unavailable("check", exception);
+            throw unavailable("reserve", exception);
         }
     }
 

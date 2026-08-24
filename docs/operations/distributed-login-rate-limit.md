@@ -69,6 +69,7 @@ $redisPassword = [Convert]::ToHexString(
 | `REDIS_TIMEOUT` | No | `PT1S` |
 
 Los umbrales predeterminados son 20 por IP, 5 por IP+cuenta y 10 por cuenta en una ventana de un minuto.
+La capacidad se reserva atómicamente antes de verificar credenciales. Un login correcto elimina la reserva de IP correspondiente a esa solicitud y limpia las dimensiones IP+cuenta y cuenta; un fallo conserva la reserva hasta que expire su TTL. PostgreSQL mantiene además el bloqueo de cuenta de 15 minutos después de cinco contraseñas incorrectas.
 
 ## Ejecución Local En Memoria
 
@@ -173,7 +174,7 @@ Alertar cuando aumente `auth_rate_limit_backend_errors_total` o readiness perman
 - Restaurar la versión anterior del backend.
 - Redis puede permanecer activo temporalmente sin consumidores.
 - No eliminar datos PostgreSQL ni ejecutar `Flyway clean`.
-- Usar memoria en producción únicamente como mitigación temporal, documentada y con una sola instancia.
+- No cambiar producción al proveedor en memoria. Si Redis falla, restaurar el servicio Redis o la versión estable del backend y conservar el rechazo cerrado de nuevos logins.
 - No deshabilitar checks de seguridad mediante `continue-on-error`.
 
 ## Solución De Problemas
