@@ -11,8 +11,10 @@ import org.mapstruct.Mapping;
 @Mapper(config = CentralMapperConfig.class)
 public interface AuthenticationRestMapper {
 
-    @Mapping(target = "clientAddress", ignore = true)
-    LoginCommand toCommand(LoginRequest request);
+    @Mapping(target = "username", source = "request.username")
+    @Mapping(target = "password", source = "request.password")
+    @Mapping(target = "clientAddress", source = "clientAddress")
+    LoginCommand toCommand(LoginRequest request, String clientAddress);
 
     LoginResponse toResponse(LoginResult result);
 }

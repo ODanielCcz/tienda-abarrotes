@@ -4,7 +4,6 @@ import com.odcc.tienda.modules.identity.adapter.in.rest.mapper.AuthenticationRes
 import com.odcc.tienda.modules.identity.adapter.in.rest.request.LoginRequest;
 import com.odcc.tienda.modules.identity.adapter.in.rest.response.LoginResponse;
 import com.odcc.tienda.modules.identity.application.model.LoginResult;
-import com.odcc.tienda.modules.identity.application.command.LoginCommand;
 import com.odcc.tienda.modules.identity.application.port.in.LoginUseCase;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import com.odcc.tienda.shared.web.correlation.CorrelationIdFilter;
@@ -49,12 +48,9 @@ public class AuthenticationController {
         @Valid @RequestBody LoginRequest request,
         HttpServletRequest servletRequest
     ) {
-        LoginCommand mapped = mapper.toCommand(request);
-        LoginResult result = loginUseCase.execute(new LoginCommand(
-            mapped.username(),
-            mapped.password(),
-            servletRequest.getRemoteAddr()
-        ));
+        LoginResult result = loginUseCase.execute(
+            mapper.toCommand(request, servletRequest.getRemoteAddr())
+        );
 
         return ResponseEntity.ok(
             ApiResponseDto.success(
