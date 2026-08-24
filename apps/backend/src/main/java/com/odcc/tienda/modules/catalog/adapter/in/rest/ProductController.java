@@ -8,7 +8,6 @@ import com.odcc.tienda.modules.catalog.adapter.in.rest.request.CreateProductRequ
 import com.odcc.tienda.modules.catalog.adapter.in.rest.request.UpdateProductRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.ProductPresentationResponse;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.ProductResponse;
-import com.odcc.tienda.modules.catalog.application.command.ChangeProductStatusCommand;
 import com.odcc.tienda.modules.catalog.application.command.CreateProductCommand;
 import com.odcc.tienda.modules.catalog.application.command.CreateProductPresentationCommand;
 import com.odcc.tienda.modules.catalog.application.command.UpdateProductCommand;
@@ -222,7 +221,9 @@ public class ProductController {
         @Valid @RequestBody ChangeProductStatusRequest request,
         HttpServletRequest servletRequest
     ) {
-        Product updatedProduct = changeProductStatusUseCase.execute(new ChangeProductStatusCommand(productId, request.status()));
+        Product updatedProduct = changeProductStatusUseCase.execute(
+            mapper.toStatusCommand(productId, request)
+        );
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "PRODUCT_STATUS_UPDATED",

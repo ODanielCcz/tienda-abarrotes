@@ -1,17 +1,9 @@
 package com.odcc.tienda.modules.inventory.adapter.in.rest;
 
+import com.odcc.tienda.modules.inventory.adapter.in.rest.mapper.InventoryReceiptRestMapper;
 import com.odcc.tienda.modules.inventory.adapter.in.rest.request.CreateInventoryReceiptRequest;
-import com.odcc.tienda.modules.inventory.adapter.in.rest.request.InventoryReceiptItemRequest;
-import com.odcc.tienda.modules.inventory.adapter.in.rest.request.InventoryReceiptPalletRequest;
-import com.odcc.tienda.modules.inventory.adapter.in.rest.response.InventoryReceiptItemResponse;
-import com.odcc.tienda.modules.inventory.adapter.in.rest.response.InventoryReceiptPalletResponse;
 import com.odcc.tienda.modules.inventory.adapter.in.rest.response.InventoryReceiptResponse;
-import com.odcc.tienda.modules.inventory.application.command.CreateInventoryReceiptCommand;
-import com.odcc.tienda.modules.inventory.application.command.InventoryReceiptItemCommand;
-import com.odcc.tienda.modules.inventory.application.command.InventoryReceiptPalletCommand;
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
-import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptItem;
-import com.odcc.tienda.modules.inventory.application.model.InventoryReceiptPallet;
 import com.odcc.tienda.modules.inventory.application.port.in.CreateInventoryReceiptUseCase;
 import com.odcc.tienda.modules.inventory.application.port.in.GetInventoryReceiptByIdUseCase;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
@@ -32,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -43,6 +34,7 @@ public class InventoryReceiptController {
 
     private final CreateInventoryReceiptUseCase createInventoryReceiptUseCase;
     private final GetInventoryReceiptByIdUseCase getInventoryReceiptByIdUseCase;
+    private final InventoryReceiptRestMapper mapper;
 
     @PostMapping
     @Operation(summary = "Registrar una recepcion de mercancia")
@@ -52,12 +44,15 @@ public class InventoryReceiptController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        InventoryReceipt receipt = createInventoryReceiptUseCase.execute(toCommand(request), currentUserId(jwt));
+        InventoryReceipt receipt = createInventoryReceiptUseCase.execute(
+            mapper.toCommand(request),
+            currentUserId(jwt)
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(
             HttpStatus.CREATED,
             "INVENTORY_RECEIPT_CREATED",
             "Recepcion de inventario registrada correctamente",
-            toResponse(receipt),
+            mapper.toResponse(receipt),
             servletRequest.getRequestURI()
         ));
     }
@@ -80,74 +75,9 @@ public class InventoryReceiptController {
             HttpStatus.OK,
             "INVENTORY_RECEIPT_FOUND",
             "Recepcion de inventario consultada correctamente",
-            toResponse(receipt),
+            mapper.toResponse(receipt),
             servletRequest.getRequestURI()
         ));
     }
 
-    private CreateInventoryReceiptCommand toCommand(CreateInventoryReceiptRequest request) {
-        return new CreateInventoryReceiptCommand(
-            request.warehouseId(),
-            request.supplierId(),
-            request.idempotencyKey(),
-            request.reason(),
-            request.items() == null ? List.of() : request.items().stream().map(this::toItemCommand).toList(),
-            request.pallets() == null ? List.of() : request.pallets().stream().map(this::toPalletCommand).toList()
-        );
-    }
-
-    private InventoryReceiptPalletCommand toPalletCommand(InventoryReceiptPalletRequest request) {
-        return new InventoryReceiptPalletCommand(
-            request.externalPalletCode(),
-            request.items().stream().map(this::toItemCommand).toList()
-        );
-    }
-
-    private InventoryReceiptItemCommand toItemCommand(InventoryReceiptItemRequest request) {
-        return new InventoryReceiptItemCommand(
-            request.productPresentationId(),
-            request.lotNumber(),
-            request.manufacturedAt(),
-            request.expiresAt(),
-            request.quantity(),
-            request.unitCost()
-        );
-    }
-
-    private InventoryReceiptResponse toResponse(InventoryReceipt receipt) {
-        return new InventoryReceiptResponse(
-            receipt.receiptId(),
-            receipt.warehouseId(),
-            receipt.supplierId(),
-            receipt.status(),
-            receipt.receivedAt(),
-            receipt.items().stream().map(this::toItemResponse).toList(),
-            receipt.pallets().stream().map(this::toPalletResponse).toList()
-        );
-    }
-
-    private InventoryReceiptPalletResponse toPalletResponse(InventoryReceiptPallet pallet) {
-        return new InventoryReceiptPalletResponse(
-            pallet.palletId(),
-            pallet.palletCode(),
-            pallet.externalPalletCode(),
-            pallet.status(),
-            pallet.items().stream().map(this::toItemResponse).toList()
-        );
-    }
-
-    private InventoryReceiptItemResponse toItemResponse(InventoryReceiptItem item) {
-        return new InventoryReceiptItemResponse(
-            item.stockMovementItemId(),
-            item.productPresentationId(),
-            item.lotId(),
-            item.lotNumber(),
-            item.quantity(),
-            item.unitCost(),
-            item.quantityBefore(),
-            item.quantityAfter(),
-            item.manufacturedAt(),
-            item.expiresAt()
-        );
-    }
 }

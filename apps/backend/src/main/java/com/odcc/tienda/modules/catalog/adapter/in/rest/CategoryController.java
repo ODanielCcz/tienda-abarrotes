@@ -6,7 +6,6 @@ import com.odcc.tienda.modules.catalog.adapter.in.rest.request.CreateCategoryReq
 import com.odcc.tienda.modules.catalog.adapter.in.rest.request.UpdateCategoryRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.CategoryResponse;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.CategoryTreeResponse;
-import com.odcc.tienda.modules.catalog.application.command.ChangeCategoryStatusCommand;
 import com.odcc.tienda.modules.catalog.application.command.CreateCategoryCommand;
 import com.odcc.tienda.modules.catalog.application.command.UpdateCategoryCommand;
 import com.odcc.tienda.modules.catalog.application.model.CategoryTreeNode;
@@ -263,10 +262,9 @@ public class CategoryController {
         @Valid @RequestBody ChangeCategoryStatusRequest request,
         HttpServletRequest servletRequest
     ) {
-        Category updatedCategory = changeCategoryStatusUseCase.execute(new ChangeCategoryStatusCommand(
-            categoryId,
-            request.status()
-        ));
+        Category updatedCategory = changeCategoryStatusUseCase.execute(
+            mapper.toStatusCommand(categoryId, request)
+        );
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
             "CATEGORY_STATUS_UPDATED",
