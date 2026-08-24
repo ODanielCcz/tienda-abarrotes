@@ -1,11 +1,9 @@
 package com.odcc.tienda.modules.sync.adapter.in.rest;
 
+import com.odcc.tienda.modules.sync.adapter.in.rest.mapper.SyncRestMapper;
 import com.odcc.tienda.modules.sync.adapter.in.rest.request.SyncRequests.AcknowledgeCheckpointRequest;
 import com.odcc.tienda.modules.sync.adapter.in.rest.request.SyncRequests.IngestOperationRequest;
 import com.odcc.tienda.modules.sync.adapter.in.rest.request.SyncRequests.ResolveConflictRequest;
-import com.odcc.tienda.modules.sync.application.command.SyncCommands.AcknowledgeCheckpointCommand;
-import com.odcc.tienda.modules.sync.application.command.SyncCommands.IngestOperationCommand;
-import com.odcc.tienda.modules.sync.application.command.SyncCommands.ResolveConflictCommand;
 import com.odcc.tienda.modules.sync.application.model.SyncModels.DeviceCheckpoint;
 import com.odcc.tienda.modules.sync.application.model.SyncModels.OutboxBatch;
 import com.odcc.tienda.modules.sync.application.model.SyncModels.SyncConflict;
@@ -40,6 +38,7 @@ import java.util.UUID;
 public class SyncController {
 
     private final SyncUseCases useCases;
+    private final SyncRestMapper mapper;
 
     @PostMapping("/inbox")
     @Operation(summary = "Recibir operacion offline idempotente")
@@ -49,10 +48,9 @@ public class SyncController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        SyncOperation operation = useCases.ingest(new IngestOperationCommand(
-            request.operationId(), request.deviceId(), request.deviceSequence(), request.idempotencyKey(),
-            request.operationType(), request.aggregateType(), request.aggregateId(), request.payload(),
-            request.clientCreatedAt(), userId(jwt)));
+        SyncOperation operation = useCases.ingest(
+            mapper.toIngestCommand(request, userId(jwt))
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(
             HttpStatus.CREATED, "SYNC_OPERATION_RECEIVED", "Operacion Sync procesada correctamente",
             operation, servletRequest.getRequestURI()));
@@ -94,7 +92,7 @@ public class SyncController {
         HttpServletRequest servletRequest
     ) {
         return ok("SYNC_CHECKPOINT_ACKNOWLEDGED", "Checkpoint confirmado correctamente",
-            useCases.acknowledge(new AcknowledgeCheckpointCommand(deviceId, request.outboxSequence(), userId(jwt))),
+            useCases.acknowledge(mapper.toAcknowledgeCommand(deviceId, request, userId(jwt))),
             servletRequest);
     }
 
@@ -121,9 +119,7 @@ public class SyncController {
         HttpServletRequest servletRequest
     ) {
         return ok("SYNC_CONFLICT_RESOLVED", "Conflicto resuelto correctamente",
-            useCases.resolveConflict(new ResolveConflictCommand(
-                conflictId, request.resolution(), request.resolutionNotes(),
-                request.mergedPayload(), userId(jwt))), servletRequest);
+            useCases.resolveConflict(mapper.toResolveCommand(conflictId, request, userId(jwt))), servletRequest);
     }
 
     private UUID userId(Jwt jwt) {
