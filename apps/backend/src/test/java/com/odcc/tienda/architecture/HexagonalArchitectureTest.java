@@ -6,6 +6,7 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.core.importer.ImportOption;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 
 @AnalyzeClasses(
     packages = "com.odcc.tienda",
@@ -61,4 +62,20 @@ class HexagonalArchitectureTest {
         .should()
         .dependOnClassesThat()
         .resideInAPackage("..adapter.out.persistence.entity..");
+
+    @ArchTest
+    static final ArchRule domainAndApplicationMustNotUseMapStruct = noClasses()
+        .that()
+        .resideInAnyPackage("..domain..", "..application..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("org.mapstruct..");
+
+    @ArchTest
+    static final ArchRule productionFieldsMustNotUseAutowired = noFields()
+        .that()
+        .areDeclaredInClassesThat()
+        .resideInAPackage("com.odcc.tienda..")
+        .should()
+        .beAnnotatedWith(org.springframework.beans.factory.annotation.Autowired.class);
 }

@@ -1,23 +1,10 @@
 package com.odcc.tienda.modules.inventory.adapter.in.rest;
 
+import com.odcc.tienda.modules.inventory.adapter.in.rest.mapper.AdvancedInventoryRestMapper;
 import com.odcc.tienda.modules.inventory.adapter.in.rest.request.CreateInventoryAdjustmentRequest;
 import com.odcc.tienda.modules.inventory.adapter.in.rest.request.CreateInventoryCountRequest;
 import com.odcc.tienda.modules.inventory.adapter.in.rest.request.CreateInventoryTransferRequest;
 import com.odcc.tienda.modules.inventory.adapter.in.rest.request.CreateReservationRequest;
-import com.odcc.tienda.modules.inventory.adapter.in.rest.request.InventoryAdjustmentItemRequest;
-import com.odcc.tienda.modules.inventory.adapter.in.rest.request.InventoryCountItemRequest;
-import com.odcc.tienda.modules.inventory.adapter.in.rest.request.InventoryTransferItemRequest;
-import com.odcc.tienda.modules.inventory.adapter.in.rest.request.ReservationItemRequest;
-import com.odcc.tienda.modules.inventory.application.command.ConfirmInventoryCountCommand;
-import com.odcc.tienda.modules.inventory.application.command.CreateInventoryAdjustmentCommand;
-import com.odcc.tienda.modules.inventory.application.command.CreateInventoryCountCommand;
-import com.odcc.tienda.modules.inventory.application.command.CreateInventoryTransferCommand;
-import com.odcc.tienda.modules.inventory.application.command.CreateReservationCommand;
-import com.odcc.tienda.modules.inventory.application.command.InventoryAdjustmentItemCommand;
-import com.odcc.tienda.modules.inventory.application.command.InventoryCountItemCommand;
-import com.odcc.tienda.modules.inventory.application.command.InventoryTransferItemCommand;
-import com.odcc.tienda.modules.inventory.application.command.ReleaseReservationCommand;
-import com.odcc.tienda.modules.inventory.application.command.ReservationItemCommand;
 import com.odcc.tienda.modules.inventory.application.model.InventoryCountView;
 import com.odcc.tienda.modules.inventory.application.model.LotView;
 import com.odcc.tienda.modules.inventory.application.model.ReservationView;
@@ -54,6 +41,7 @@ import java.util.UUID;
 public class AdvancedInventoryController {
 
     private final AdvancedInventoryUseCases useCases;
+    private final AdvancedInventoryRestMapper mapper;
 
     @PostMapping("/adjustments")
     @Operation(summary = "Crear ajuste manual de inventario")
@@ -63,9 +51,9 @@ public class AdvancedInventoryController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        StockMovementView movement = useCases.adjust(new CreateInventoryAdjustmentCommand(
-            request.warehouseId(), request.reason(), currentUserId(jwt), request.items().stream().map(this::toAdjustmentItem).toList()
-        ));
+        StockMovementView movement = useCases.adjust(
+            mapper.toAdjustmentCommand(request, currentUserId(jwt))
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "INVENTORY_ADJUSTMENT_CREATED", "Ajuste de inventario creado correctamente", movement, servletRequest.getRequestURI()));
     }
 
@@ -77,9 +65,9 @@ public class AdvancedInventoryController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        List<StockMovementView> movements = useCases.transfer(new CreateInventoryTransferCommand(
-            request.fromWarehouseId(), request.toWarehouseId(), request.reason(), currentUserId(jwt), request.items().stream().map(this::toTransferItem).toList()
-        ));
+        List<StockMovementView> movements = useCases.transfer(
+            mapper.toTransferCommand(request, currentUserId(jwt))
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "INVENTORY_TRANSFER_CREATED", "Traspaso de inventario creado correctamente", movements, servletRequest.getRequestURI()));
     }
 
@@ -91,9 +79,9 @@ public class AdvancedInventoryController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        InventoryCountView count = useCases.createCount(new CreateInventoryCountCommand(
-            request.warehouseId(), currentUserId(jwt), request.items().stream().map(this::toCountItem).toList()
-        ));
+        InventoryCountView count = useCases.createCount(
+            mapper.toCountCommand(request, currentUserId(jwt))
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "INVENTORY_COUNT_CREATED", "Conteo fisico creado correctamente", count, servletRequest.getRequestURI()));
     }
 
@@ -105,7 +93,9 @@ public class AdvancedInventoryController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        InventoryCountView count = useCases.confirmCount(new ConfirmInventoryCountCommand(inventoryCountId, currentUserId(jwt)));
+        InventoryCountView count = useCases.confirmCount(
+            mapper.toConfirmCountCommand(inventoryCountId, currentUserId(jwt))
+        );
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_COUNT_CONFIRMED", "Conteo fisico confirmado correctamente", count, servletRequest.getRequestURI()));
     }
 
@@ -117,9 +107,9 @@ public class AdvancedInventoryController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        ReservationView reservation = useCases.reserve(new CreateReservationCommand(
-            request.customerId(), request.sourceType(), request.sourceId(), request.idempotencyKey(), request.expiresAt(), currentUserId(jwt), request.items().stream().map(this::toReservationItem).toList()
-        ));
+        ReservationView reservation = useCases.reserve(
+            mapper.toReservationCommand(request, currentUserId(jwt))
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "INVENTORY_RESERVATION_CREATED", "Reserva de inventario creada correctamente", reservation, servletRequest.getRequestURI()));
     }
 
@@ -131,7 +121,9 @@ public class AdvancedInventoryController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        ReservationView reservation = useCases.releaseReservation(new ReleaseReservationCommand(reservationId, currentUserId(jwt)));
+        ReservationView reservation = useCases.releaseReservation(
+            mapper.toReleaseReservationCommand(reservationId, currentUserId(jwt))
+        );
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_RESERVATION_RELEASED", "Reserva de inventario liberada correctamente", reservation, servletRequest.getRequestURI()));
     }
 
@@ -145,22 +137,6 @@ public class AdvancedInventoryController {
     ) {
         List<LotView> lots = useCases.findExpiringLots(expiresBefore, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "INVENTORY_EXPIRING_LOTS_FOUND", "Lotes proximos a caducar consultados correctamente", lots, servletRequest.getRequestURI()));
-    }
-
-    private InventoryAdjustmentItemCommand toAdjustmentItem(InventoryAdjustmentItemRequest request) {
-        return new InventoryAdjustmentItemCommand(request.productPresentationId(), request.lotId(), request.direction(), request.quantity(), request.unitCost());
-    }
-
-    private InventoryTransferItemCommand toTransferItem(InventoryTransferItemRequest request) {
-        return new InventoryTransferItemCommand(request.productPresentationId(), request.lotId(), request.quantity(), request.unitCost());
-    }
-
-    private InventoryCountItemCommand toCountItem(InventoryCountItemRequest request) {
-        return new InventoryCountItemCommand(request.productPresentationId(), request.lotId(), request.countedQuantity());
-    }
-
-    private ReservationItemCommand toReservationItem(ReservationItemRequest request) {
-        return new ReservationItemCommand(request.warehouseId(), request.productPresentationId(), request.lotId(), request.quantity());
     }
 
     private UUID currentUserId(Jwt jwt) {
