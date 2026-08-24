@@ -6,18 +6,13 @@ import com.odcc.tienda.modules.catalog.adapter.in.rest.response.BrandResponse;
 import com.odcc.tienda.modules.catalog.application.command.CreateBrandCommand;
 import com.odcc.tienda.modules.catalog.application.command.UpdateBrandCommand;
 import com.odcc.tienda.modules.catalog.domain.model.Brand;
+import com.odcc.tienda.shared.infrastructure.mapping.CentralMapperConfig;
 import org.mapstruct.Mapper;
-import org.mapstruct.ReportingPolicy;
 import org.mapstruct.Mapping;
 
 import java.util.UUID;
 
-import static org.mapstruct.MappingConstants.ComponentModel.SPRING;
-
-@Mapper(
-    componentModel = SPRING,
-    unmappedTargetPolicy = ReportingPolicy.ERROR
-)
+@Mapper(config = CentralMapperConfig.class)
 public interface BrandRestMapper {
 
     CreateBrandCommand toCommand(CreateBrandRequest request);

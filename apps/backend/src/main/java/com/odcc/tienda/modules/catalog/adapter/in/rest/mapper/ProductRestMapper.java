@@ -7,17 +7,12 @@ import com.odcc.tienda.modules.catalog.application.command.CreateProductCommand;
 import com.odcc.tienda.modules.catalog.application.command.UpdateProductCommand;
 import com.odcc.tienda.modules.catalog.domain.model.Product;
 import com.odcc.tienda.modules.catalog.domain.model.ProductType;
+import com.odcc.tienda.shared.infrastructure.mapping.CentralMapperConfig;
 import org.mapstruct.Mapper;
-import org.mapstruct.ReportingPolicy;
 
 import java.util.UUID;
 
-import static org.mapstruct.MappingConstants.ComponentModel.SPRING;
-
-@Mapper(
-    componentModel = SPRING,
-    unmappedTargetPolicy = ReportingPolicy.ERROR
-)
+@Mapper(config = CentralMapperConfig.class)
 public interface ProductRestMapper {
 
     default CreateProductCommand toCommand(CreateProductRequest request) {
