@@ -14,6 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -233,6 +234,95 @@ class SalesReturnApiIntegrationTest {
 
         assertEquals(new BigDecimal("10.0000"), cashRefund);
         assertEquals(0, cardCashMovements);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void shouldRollbackReturnWhenNoCapturedPaymentCanFundRefund()
+        throws Exception {
+        insertUser("unfunded_return_admin", "correct-password", "SYSTEM_ADMIN");
+        String token = login("unfunded_return_admin", "correct-password");
+        TestContext context = createContext("UNFUNDED-RETURN");
+        UUID presentationId = insertProductPresentation("UNFUNDED-RETURN");
+        insertStock(
+            context.warehouseId(),
+            presentationId,
+            null,
+            new BigDecimal("3.000")
+        );
+        SaleFixture sale = insertSale(
+            context,
+            presentationId,
+            null,
+            new BigDecimal("2.000"),
+            new BigDecimal("42.9200"),
+            "PENDING"
+        );
+        UUID returnId = createReturn(token, sale, new BigDecimal("2.000"));
+
+        mockMvc.perform(
+                post("/api/v1/sales/returns/{returnId}/confirm", returnId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("SALES_RETURN_REFUND_UNFUNDED"));
+
+        assertReturnConfirmationRolledBack(
+            returnId,
+            sale.salesOrderId(),
+            context.warehouseId(),
+            presentationId,
+            new BigDecimal("3.000")
+        );
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void shouldRollbackReturnWhenCapturedPaymentsAreInsufficient()
+        throws Exception {
+        insertUser("underfunded_return_admin", "correct-password", "SYSTEM_ADMIN");
+        String token = login("underfunded_return_admin", "correct-password");
+        TestContext context = createContext("UNDERFUNDED-RETURN");
+        UUID presentationId = insertProductPresentation("UNDERFUNDED-RETURN");
+        insertStock(
+            context.warehouseId(),
+            presentationId,
+            null,
+            new BigDecimal("3.000")
+        );
+        SaleFixture sale = insertSale(
+            context,
+            presentationId,
+            null,
+            new BigDecimal("2.000"),
+            new BigDecimal("42.9200"),
+            "PARTIAL"
+        );
+        insertCapturedPayment(
+            sale.salesOrderId(),
+            "CARD",
+            new BigDecimal("10.0000")
+        );
+        UUID returnId = createReturn(token, sale, new BigDecimal("2.000"));
+
+        mockMvc.perform(
+                post("/api/v1/sales/returns/{returnId}/confirm", returnId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("SALES_RETURN_REFUND_UNFUNDED"));
+
+        assertReturnConfirmationRolledBack(
+            returnId,
+            sale.salesOrderId(),
+            context.warehouseId(),
+            presentationId,
+            new BigDecimal("3.000")
+        );
     }
 
     @Test
@@ -551,6 +641,82 @@ class SalesReturnApiIntegrationTest {
 
     private UUID insertCapturedCashPayment(UUID salesOrderId, BigDecimal amount) {
         return insertCapturedPayment(salesOrderId, "CASH", amount);
+    }
+
+    private UUID createReturn(
+        String token,
+        SaleFixture sale,
+        BigDecimal quantity
+    ) throws Exception {
+        MvcResult created = mockMvc.perform(
+                post(
+                    "/api/v1/sales/orders/{salesOrderId}/returns",
+                    sale.salesOrderId()
+                )
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "reason": "Validar rollback financiero",
+                          "items": [
+                            {
+                              "salesOrderItemId": "%s",
+                              "quantity": %s
+                            }
+                          ]
+                        }
+                        """.formatted(sale.salesOrderItemId(), quantity))
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+        return UUID.fromString(
+            JsonPath.read(
+                created.getResponse().getContentAsString(),
+                "$.data.returnId"
+            )
+        );
+    }
+
+    private void assertReturnConfirmationRolledBack(
+        UUID returnId,
+        UUID salesOrderId,
+        UUID warehouseId,
+        UUID presentationId,
+        BigDecimal expectedStock
+    ) {
+        assertEquals(
+            "DRAFT",
+            jdbcTemplate.queryForObject(
+                "SELECT status FROM sales.returns WHERE return_id = ?",
+                String.class,
+                returnId
+            )
+        );
+        assertEquals(
+            "CONFIRMED",
+            jdbcTemplate.queryForObject(
+                "SELECT status FROM sales.sales_orders WHERE sales_order_id = ?",
+                String.class,
+                salesOrderId
+            )
+        );
+        assertEquals(expectedStock, stockOnHand(warehouseId, presentationId));
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM inventory.stock_movements WHERE source_id = ?",
+                Integer.class,
+                returnId
+            )
+        );
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sales.refund_allocations WHERE return_id = ?",
+                Integer.class,
+                returnId
+            )
+        );
     }
 
     private UUID insertCapturedPayment(UUID salesOrderId, String paymentMethod, BigDecimal amount) {

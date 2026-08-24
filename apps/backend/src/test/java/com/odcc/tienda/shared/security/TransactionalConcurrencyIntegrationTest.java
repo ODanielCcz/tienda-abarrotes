@@ -104,6 +104,10 @@ class TransactionalConcurrencyIntegrationTest {
         Fixture fixture = createFixture();
         String token = login(fixture.username(), "correct-password");
         ReturnFixture returnFixture = createReturnFixture(fixture);
+        insertCapturedCardPayment(
+            returnFixture.salesOrderId(),
+            new BigDecimal("40.0000")
+        );
 
         MvcResult createResult = mockMvc.perform(
                 post("/api/v1/sales/orders/{salesOrderId}/returns", returnFixture.salesOrderId())
@@ -510,6 +514,24 @@ class TransactionalConcurrencyIntegrationTest {
                     }
                     """.formatted(warehouseId, supplierId, idempotencyKey, presentationId, unitCost))
         ).andReturn();
+    }
+
+    private void insertCapturedCardPayment(
+        UUID salesOrderId,
+        BigDecimal amount
+    ) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO sales.payments (
+                    payment_id, sales_order_id, payment_method, status,
+                    amount, idempotency_key, paid_at
+                ) VALUES (?, ?, 'CARD', 'CAPTURED', ?, ?, clock_timestamp())
+                """,
+            UUID.randomUUID(),
+            salesOrderId,
+            amount,
+            UUID.randomUUID()
+        );
     }
 
     private Callable<MvcResult> salesOrderRequest(

@@ -44,7 +44,7 @@ docker compose up -d backend
 Resultados:
 
 - ArchUnit: correcto.
-- Suite completa: 272 pruebas, todas correctas.
+- Suite completa: 316 pruebas, todas correctas.
 - `bootJar`: correcto.
 - Contenedor de PostgreSQL: saludable.
 - Contenedor backend: saludable en `http://localhost:8080`.
@@ -53,7 +53,9 @@ Resultados:
 
 ## Decisiones Y Riesgos Residuales
 
-- Los límites de login continúan en memoria y son apropiados para una sola instancia. Antes de escalar horizontalmente debe evaluarse Redis u otro almacén compartido.
+- El proveedor en memoria queda limitado a `local` y pruebas. Producción exige Redis compartido y falla de forma cerrada si Redis no está disponible.
+- Cada intento reserva de forma atómica capacidad por IP, IP+cuenta y cuenta antes de verificar la contraseña. Además, cinco contraseñas incorrectas mantienen el bloqueo persistente de la cuenta durante 15 minutos.
+- La confirmación de una devolución falla y revierte inventario, movimientos y asignaciones si los pagos capturados no cubren el reembolso completo.
 - Los reembolsos no efectivos quedan trazados por asignación; la integración real con adquirentes de tarjeta continúa fuera del MVP.
 - Los listados conservan el límite fijo de 200 registros, pero la autorización ahora se aplica antes del límite. La paginación por cursor queda como mejora posterior.
 - `API_MAX_JSON_PAYLOAD_BYTES` permite ajustar el máximo general sin recompilar.

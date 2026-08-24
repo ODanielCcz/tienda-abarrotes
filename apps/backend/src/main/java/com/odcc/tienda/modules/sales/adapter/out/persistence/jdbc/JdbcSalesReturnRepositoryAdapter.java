@@ -8,6 +8,7 @@ import com.odcc.tienda.modules.sales.application.exception.SalesOrderNotFoundExc
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnNotFoundException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnAlreadyProcessedException;
 import com.odcc.tienda.modules.sales.application.exception.SalesReturnOrderConflictException;
+import com.odcc.tienda.modules.sales.application.exception.SalesReturnRefundUnfundedException;
 import com.odcc.tienda.modules.sales.application.model.SalesReturn;
 import com.odcc.tienda.modules.sales.application.model.SalesReturnItem;
 import com.odcc.tienda.modules.sales.application.port.out.SalesReturnRepositoryPort;
@@ -241,6 +242,9 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
                 insertCashRefund(cashSessionId, salesReturn, payment.paymentId(), allocationId, allocationAmount, createdBy);
             }
             remaining = remaining.subtract(allocationAmount);
+        }
+        if (remaining.signum() > 0) {
+            throw new SalesReturnRefundUnfundedException(money(remaining));
         }
         if (isFullReturn(order.salesOrderId())) {
             jdbc.update("UPDATE sales.sales_orders SET payment_status = 'REFUNDED' WHERE sales_order_id = :salesOrderId", new MapSqlParameterSource("salesOrderId", order.salesOrderId()));
