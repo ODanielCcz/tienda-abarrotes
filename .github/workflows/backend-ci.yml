@@ -43,6 +43,7 @@ jobs:
           POSTGRES_DB=tienda_ci
           POSTGRES_USER=tienda_owner
           POSTGRES_PASSWORD=$(openssl rand -hex 32)
+          REDIS_PASSWORD=$(openssl rand -hex 32)
           POSTGRES_PORT=55433
           BACKEND_PORT=58080
           JWT_SECRET_BASE64=$(openssl rand -base64 48 | tr -d '\n')
