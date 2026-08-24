@@ -1,8 +1,10 @@
 package com.odcc.tienda.modules.catalog.adapter.in.rest.mapper;
 
+import com.odcc.tienda.modules.catalog.adapter.in.rest.request.ChangeBrandStatusRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.request.CreateBrandRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.request.UpdateBrandRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.BrandResponse;
+import com.odcc.tienda.modules.catalog.application.command.ChangeBrandStatusCommand;
 import com.odcc.tienda.modules.catalog.application.command.CreateBrandCommand;
 import com.odcc.tienda.modules.catalog.application.command.UpdateBrandCommand;
 import com.odcc.tienda.modules.catalog.domain.model.Brand;
@@ -24,6 +26,10 @@ public interface BrandRestMapper {
         UUID brandId,
         UpdateBrandRequest request
     );
+
+    @Mapping(target = "brandId", source = "brandId")
+    @Mapping(target = "status", source = "request.status")
+    ChangeBrandStatusCommand toStatusCommand(UUID brandId, ChangeBrandStatusRequest request);
 
     BrandResponse toResponse(Brand brand);
 }
