@@ -1,3 +1,9 @@
+buildscript {
+	configurations.classpath {
+		resolutionStrategy.force("org.apache.commons:commons-lang3:3.20.0")
+	}
+}
+
 plugins {
 	java
 	id("org.springframework.boot") version "4.1.1"
