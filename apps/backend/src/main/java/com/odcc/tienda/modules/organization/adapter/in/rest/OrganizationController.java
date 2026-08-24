@@ -1,5 +1,6 @@
 package com.odcc.tienda.modules.organization.adapter.in.rest;
 
+import com.odcc.tienda.modules.organization.adapter.in.rest.mapper.OrganizationRestMapper;
 import com.odcc.tienda.modules.organization.adapter.in.rest.request.BranchRequests.ChangeBranchStatusRequest;
 import com.odcc.tienda.modules.organization.adapter.in.rest.request.BranchRequests.CreateBranchRequest;
 import com.odcc.tienda.modules.organization.adapter.in.rest.request.BranchRequests.UpdateBranchRequest;
@@ -12,18 +13,6 @@ import com.odcc.tienda.modules.organization.adapter.in.rest.request.DeviceReques
 import com.odcc.tienda.modules.organization.adapter.in.rest.request.WarehouseRequests.ChangeWarehouseStatusRequest;
 import com.odcc.tienda.modules.organization.adapter.in.rest.request.WarehouseRequests.CreateWarehouseRequest;
 import com.odcc.tienda.modules.organization.adapter.in.rest.request.WarehouseRequests.UpdateWarehouseRequest;
-import com.odcc.tienda.modules.organization.application.command.BranchCommands.ChangeBranchStatusCommand;
-import com.odcc.tienda.modules.organization.application.command.BranchCommands.CreateBranchCommand;
-import com.odcc.tienda.modules.organization.application.command.BranchCommands.UpdateBranchCommand;
-import com.odcc.tienda.modules.organization.application.command.CashRegisterCommands.ChangeCashRegisterStatusCommand;
-import com.odcc.tienda.modules.organization.application.command.CashRegisterCommands.CreateCashRegisterCommand;
-import com.odcc.tienda.modules.organization.application.command.CashRegisterCommands.UpdateCashRegisterCommand;
-import com.odcc.tienda.modules.organization.application.command.DeviceCommands.ChangeDeviceStatusCommand;
-import com.odcc.tienda.modules.organization.application.command.DeviceCommands.CreateDeviceCommand;
-import com.odcc.tienda.modules.organization.application.command.DeviceCommands.UpdateDeviceCommand;
-import com.odcc.tienda.modules.organization.application.command.WarehouseCommands.ChangeWarehouseStatusCommand;
-import com.odcc.tienda.modules.organization.application.command.WarehouseCommands.CreateWarehouseCommand;
-import com.odcc.tienda.modules.organization.application.command.WarehouseCommands.UpdateWarehouseCommand;
 import com.odcc.tienda.modules.organization.application.model.BranchView;
 import com.odcc.tienda.modules.organization.application.model.CashRegisterView;
 import com.odcc.tienda.modules.organization.application.model.DeviceView;
@@ -64,12 +53,13 @@ import java.util.UUID;
 public class OrganizationController {
 
     private final OrganizationUseCases useCases;
+    private final OrganizationRestMapper mapper;
 
     @PostMapping("/branches")
     @Operation(summary = "Crear sucursal")
     @PreAuthorize("hasAuthority('ORGANIZATION_BRANCH_CREATE')")
     public ResponseEntity<ApiResponseDto<BranchView>> createBranch(@Valid @RequestBody CreateBranchRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        BranchView branch = useCases.createBranch(new CreateBranchCommand(request.code(), request.name(), request.legalName(), request.timezone(), request.currencyCode()), currentUserId(jwt));
+        BranchView branch = useCases.createBranch(mapper.toCreateBranchCommand(request), currentUserId(jwt));
         return created("BRANCH_CREATED", "Sucursal creada correctamente", branch, servletRequest);
     }
 
@@ -91,7 +81,7 @@ public class OrganizationController {
     @Operation(summary = "Actualizar sucursal")
     @PreAuthorize("hasAuthority('ORGANIZATION_BRANCH_UPDATE')")
     public ResponseEntity<ApiResponseDto<BranchView>> updateBranch(@PathVariable UUID branchId, @Valid @RequestBody UpdateBranchRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        BranchView branch = useCases.updateBranch(new UpdateBranchCommand(branchId, request.code(), request.name(), request.legalName(), request.timezone(), request.currencyCode()), currentUserId(jwt));
+        BranchView branch = useCases.updateBranch(mapper.toUpdateBranchCommand(branchId, request), currentUserId(jwt));
         return ok("BRANCH_UPDATED", "Sucursal actualizada correctamente", branch, servletRequest);
     }
 
@@ -99,7 +89,7 @@ public class OrganizationController {
     @Operation(summary = "Cambiar estado de sucursal")
     @PreAuthorize("hasAuthority('ORGANIZATION_BRANCH_STATUS')")
     public ResponseEntity<ApiResponseDto<BranchView>> changeBranchStatus(@PathVariable UUID branchId, @Valid @RequestBody ChangeBranchStatusRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        BranchView branch = useCases.changeBranchStatus(new ChangeBranchStatusCommand(branchId, request.status()), currentUserId(jwt));
+        BranchView branch = useCases.changeBranchStatus(mapper.toBranchStatusCommand(branchId, request), currentUserId(jwt));
         return ok("BRANCH_STATUS_UPDATED", "Estado de sucursal actualizado correctamente", branch, servletRequest);
     }
 
@@ -107,7 +97,7 @@ public class OrganizationController {
     @Operation(summary = "Crear almacen")
     @PreAuthorize("hasAuthority('ORGANIZATION_WAREHOUSE_CREATE')")
     public ResponseEntity<ApiResponseDto<WarehouseView>> createWarehouse(@Valid @RequestBody CreateWarehouseRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        WarehouseView warehouse = useCases.createWarehouse(new CreateWarehouseCommand(request.branchId(), request.code(), request.name(), request.warehouseType()), currentUserId(jwt));
+        WarehouseView warehouse = useCases.createWarehouse(mapper.toCreateWarehouseCommand(request), currentUserId(jwt));
         return created("WAREHOUSE_CREATED", "Almacen creado correctamente", warehouse, servletRequest);
     }
 
@@ -129,7 +119,7 @@ public class OrganizationController {
     @Operation(summary = "Actualizar almacen")
     @PreAuthorize("hasAuthority('ORGANIZATION_WAREHOUSE_UPDATE')")
     public ResponseEntity<ApiResponseDto<WarehouseView>> updateWarehouse(@PathVariable UUID warehouseId, @Valid @RequestBody UpdateWarehouseRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        WarehouseView warehouse = useCases.updateWarehouse(new UpdateWarehouseCommand(warehouseId, request.branchId(), request.code(), request.name(), request.warehouseType()), currentUserId(jwt));
+        WarehouseView warehouse = useCases.updateWarehouse(mapper.toUpdateWarehouseCommand(warehouseId, request), currentUserId(jwt));
         return ok("WAREHOUSE_UPDATED", "Almacen actualizado correctamente", warehouse, servletRequest);
     }
 
@@ -137,7 +127,7 @@ public class OrganizationController {
     @Operation(summary = "Cambiar estado de almacen")
     @PreAuthorize("hasAuthority('ORGANIZATION_WAREHOUSE_STATUS')")
     public ResponseEntity<ApiResponseDto<WarehouseView>> changeWarehouseStatus(@PathVariable UUID warehouseId, @Valid @RequestBody ChangeWarehouseStatusRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        WarehouseView warehouse = useCases.changeWarehouseStatus(new ChangeWarehouseStatusCommand(warehouseId, request.status()), currentUserId(jwt));
+        WarehouseView warehouse = useCases.changeWarehouseStatus(mapper.toWarehouseStatusCommand(warehouseId, request), currentUserId(jwt));
         return ok("WAREHOUSE_STATUS_UPDATED", "Estado de almacen actualizado correctamente", warehouse, servletRequest);
     }
 
@@ -145,7 +135,7 @@ public class OrganizationController {
     @Operation(summary = "Crear caja registradora")
     @PreAuthorize("hasAuthority('ORGANIZATION_CASH_REGISTER_CREATE')")
     public ResponseEntity<ApiResponseDto<CashRegisterView>> createCashRegister(@Valid @RequestBody CreateCashRegisterRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        CashRegisterView register = useCases.createCashRegister(new CreateCashRegisterCommand(request.branchId(), request.deviceId(), request.code(), request.name()), currentUserId(jwt));
+        CashRegisterView register = useCases.createCashRegister(mapper.toCreateCashRegisterCommand(request), currentUserId(jwt));
         return created("CASH_REGISTER_CREATED", "Caja registradora creada correctamente", register, servletRequest);
     }
 
@@ -167,7 +157,7 @@ public class OrganizationController {
     @Operation(summary = "Actualizar caja registradora")
     @PreAuthorize("hasAuthority('ORGANIZATION_CASH_REGISTER_UPDATE')")
     public ResponseEntity<ApiResponseDto<CashRegisterView>> updateCashRegister(@PathVariable UUID cashRegisterId, @Valid @RequestBody UpdateCashRegisterRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        CashRegisterView register = useCases.updateCashRegister(new UpdateCashRegisterCommand(cashRegisterId, request.branchId(), request.deviceId(), request.code(), request.name()), currentUserId(jwt));
+        CashRegisterView register = useCases.updateCashRegister(mapper.toUpdateCashRegisterCommand(cashRegisterId, request), currentUserId(jwt));
         return ok("CASH_REGISTER_UPDATED", "Caja registradora actualizada correctamente", register, servletRequest);
     }
 
@@ -175,7 +165,7 @@ public class OrganizationController {
     @Operation(summary = "Cambiar estado de caja registradora")
     @PreAuthorize("hasAuthority('ORGANIZATION_CASH_REGISTER_STATUS')")
     public ResponseEntity<ApiResponseDto<CashRegisterView>> changeCashRegisterStatus(@PathVariable UUID cashRegisterId, @Valid @RequestBody ChangeCashRegisterStatusRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        CashRegisterView register = useCases.changeCashRegisterStatus(new ChangeCashRegisterStatusCommand(cashRegisterId, request.status()), currentUserId(jwt));
+        CashRegisterView register = useCases.changeCashRegisterStatus(mapper.toCashRegisterStatusCommand(cashRegisterId, request), currentUserId(jwt));
         return ok("CASH_REGISTER_STATUS_UPDATED", "Estado de caja registradora actualizado correctamente", register, servletRequest);
     }
 
@@ -183,7 +173,7 @@ public class OrganizationController {
     @Operation(summary = "Crear dispositivo")
     @PreAuthorize("hasAuthority('ORGANIZATION_DEVICE_CREATE')")
     public ResponseEntity<ApiResponseDto<DeviceView>> createDevice(@Valid @RequestBody CreateDeviceRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        DeviceView device = useCases.createDevice(new CreateDeviceCommand(request.branchId(), request.warehouseId(), request.deviceCode(), request.deviceType(), request.platform(), request.appVersion()), currentUserId(jwt));
+        DeviceView device = useCases.createDevice(mapper.toCreateDeviceCommand(request), currentUserId(jwt));
         return created("DEVICE_CREATED", "Dispositivo creado correctamente", device, servletRequest);
     }
 
@@ -205,7 +195,7 @@ public class OrganizationController {
     @Operation(summary = "Actualizar dispositivo")
     @PreAuthorize("hasAuthority('ORGANIZATION_DEVICE_UPDATE')")
     public ResponseEntity<ApiResponseDto<DeviceView>> updateDevice(@PathVariable UUID deviceId, @Valid @RequestBody UpdateDeviceRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        DeviceView device = useCases.updateDevice(new UpdateDeviceCommand(deviceId, request.branchId(), request.warehouseId(), request.deviceCode(), request.deviceType(), request.platform(), request.appVersion()), currentUserId(jwt));
+        DeviceView device = useCases.updateDevice(mapper.toUpdateDeviceCommand(deviceId, request), currentUserId(jwt));
         return ok("DEVICE_UPDATED", "Dispositivo actualizado correctamente", device, servletRequest);
     }
 
@@ -213,7 +203,7 @@ public class OrganizationController {
     @Operation(summary = "Cambiar estado de dispositivo")
     @PreAuthorize("hasAuthority('ORGANIZATION_DEVICE_STATUS')")
     public ResponseEntity<ApiResponseDto<DeviceView>> changeDeviceStatus(@PathVariable UUID deviceId, @Valid @RequestBody ChangeDeviceStatusRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        DeviceView device = useCases.changeDeviceStatus(new ChangeDeviceStatusCommand(deviceId, request.status()), currentUserId(jwt));
+        DeviceView device = useCases.changeDeviceStatus(mapper.toDeviceStatusCommand(deviceId, request), currentUserId(jwt));
         return ok("DEVICE_STATUS_UPDATED", "Estado de dispositivo actualizado correctamente", device, servletRequest);
     }
 

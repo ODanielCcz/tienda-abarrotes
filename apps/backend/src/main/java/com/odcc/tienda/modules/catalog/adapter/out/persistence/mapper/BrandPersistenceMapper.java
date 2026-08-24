@@ -2,14 +2,10 @@ package com.odcc.tienda.modules.catalog.adapter.out.persistence.mapper;
 
 import com.odcc.tienda.modules.catalog.adapter.out.persistence.entity.BrandJpaEntity;
 import com.odcc.tienda.modules.catalog.domain.model.Brand;
+import com.odcc.tienda.shared.infrastructure.mapping.CentralMapperConfig;
 import org.mapstruct.Mapper;
-import org.mapstruct.MappingConstants;
-import org.mapstruct.ReportingPolicy;
 
-@Mapper(
-    componentModel = MappingConstants.ComponentModel.SPRING,
-    unmappedTargetPolicy = ReportingPolicy.ERROR
-)
+@Mapper(config = CentralMapperConfig.class)
 public interface BrandPersistenceMapper {
 
     BrandJpaEntity toEntity(Brand brand);
