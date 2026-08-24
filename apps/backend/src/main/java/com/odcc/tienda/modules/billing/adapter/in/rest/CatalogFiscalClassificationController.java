@@ -1,9 +1,8 @@
 package com.odcc.tienda.modules.billing.adapter.in.rest;
 
+import com.odcc.tienda.modules.billing.adapter.in.rest.mapper.CatalogFiscalClassificationRestMapper;
 import com.odcc.tienda.modules.billing.adapter.in.rest.request.BillingRequests.ProductFiscalClassificationRequest;
 import com.odcc.tienda.modules.billing.adapter.in.rest.request.BillingRequests.UnitFiscalClassificationRequest;
-import com.odcc.tienda.modules.billing.application.command.BillingCommands.UpdateProductFiscalClassificationCommand;
-import com.odcc.tienda.modules.billing.application.command.BillingCommands.UpdateUnitFiscalClassificationCommand;
 import com.odcc.tienda.modules.billing.application.port.in.BillingUseCases;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +29,7 @@ import java.util.UUID;
 public class CatalogFiscalClassificationController {
 
     private final BillingUseCases useCases;
+    private final CatalogFiscalClassificationRestMapper mapper;
 
     @PutMapping("/products/{productId}/fiscal-classification")
     @Operation(summary = "Asignar codigo SAT a producto")
@@ -39,8 +39,10 @@ public class CatalogFiscalClassificationController {
         @Valid @RequestBody ProductFiscalClassificationRequest request,
         HttpServletRequest servletRequest
     ) {
-        useCases.updateProductFiscalClassification(new UpdateProductFiscalClassificationCommand(
-            productId, request.satProductServiceCode()), currentUserId(servletRequest));
+        useCases.updateProductFiscalClassification(
+            mapper.toProductCommand(productId, request),
+            currentUserId(servletRequest)
+        );
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "PRODUCT_FISCAL_CLASSIFICATION_UPDATED",
             "Clasificacion fiscal del producto actualizada correctamente",
             Map.of("productId", productId, "satProductServiceCode", request.satProductServiceCode().trim()),
@@ -56,7 +58,7 @@ public class CatalogFiscalClassificationController {
         HttpServletRequest servletRequest
     ) {
         useCases.updateUnitFiscalClassification(
-            new UpdateUnitFiscalClassificationCommand(unitId, request.satUnitCode()),
+            mapper.toUnitCommand(unitId, request),
             currentUserId(servletRequest)
         );
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "UNIT_FISCAL_CLASSIFICATION_UPDATED",

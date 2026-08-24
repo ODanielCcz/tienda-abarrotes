@@ -7,7 +7,6 @@ import com.odcc.tienda.modules.catalog.adapter.in.rest.request.ChangeBrandStatus
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.BrandResponse;
 import com.odcc.tienda.modules.catalog.application.command.CreateBrandCommand;
 import com.odcc.tienda.modules.catalog.application.command.UpdateBrandCommand;
-import com.odcc.tienda.modules.catalog.application.command.ChangeBrandStatusCommand;
 import com.odcc.tienda.modules.catalog.application.port.in.CreateBrandUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.GetBrandByIdUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.ListBrandsUseCase;
@@ -227,12 +226,7 @@ public class BrandController {
         @Valid @RequestBody ChangeBrandStatusRequest request,
         HttpServletRequest servletRequest
     ) {
-        ChangeBrandStatusCommand command = new ChangeBrandStatusCommand(
-            brandId,
-            request.status()
-        );
-
-        Brand updatedBrand = changeBrandStatusUseCase.execute(command);
+        Brand updatedBrand = changeBrandStatusUseCase.execute(mapper.toStatusCommand(brandId, request));
 
         return ResponseEntity.ok(
             ApiResponseDto.success(

@@ -1,11 +1,9 @@
 package com.odcc.tienda.modules.sales.adapter.in.rest;
 
+import com.odcc.tienda.modules.sales.adapter.in.rest.mapper.CustomerRestMapper;
 import com.odcc.tienda.modules.sales.adapter.in.rest.request.ChangeCustomerStatusRequest;
 import com.odcc.tienda.modules.sales.adapter.in.rest.request.CreateCustomerRequest;
 import com.odcc.tienda.modules.sales.adapter.in.rest.request.UpdateCustomerRequest;
-import com.odcc.tienda.modules.sales.application.command.ChangeCustomerStatusCommand;
-import com.odcc.tienda.modules.sales.application.command.CreateCustomerCommand;
-import com.odcc.tienda.modules.sales.application.command.UpdateCustomerCommand;
 import com.odcc.tienda.modules.sales.application.model.Customer;
 import com.odcc.tienda.modules.sales.application.port.in.CustomerUseCases;
 import com.odcc.tienda.modules.sales.application.query.ListCustomersQuery;
@@ -38,12 +36,13 @@ import java.util.UUID;
 public class CustomerController {
 
     private final CustomerUseCases useCases;
+    private final CustomerRestMapper mapper;
 
     @PostMapping
     @Operation(summary = "Crear cliente")
     @PreAuthorize("hasAuthority('SALES_CUSTOMER_CREATE')")
     public ResponseEntity<ApiResponseDto<Customer>> create(@Valid @RequestBody CreateCustomerRequest request, HttpServletRequest servletRequest) {
-        Customer customer = useCases.create(new CreateCustomerCommand(request.customerCode(), request.customerType(), request.displayName(), request.email(), request.phone()), currentUserId(servletRequest));
+        Customer customer = useCases.create(mapper.toCreateCommand(request), currentUserId(servletRequest));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "CUSTOMER_CREATED", "Cliente creado correctamente", customer, servletRequest.getRequestURI()));
     }
 
@@ -67,7 +66,7 @@ public class CustomerController {
     @Operation(summary = "Actualizar cliente")
     @PreAuthorize("hasAuthority('SALES_CUSTOMER_UPDATE')")
     public ResponseEntity<ApiResponseDto<Customer>> update(@PathVariable UUID customerId, @Valid @RequestBody UpdateCustomerRequest request, HttpServletRequest servletRequest) {
-        Customer customer = useCases.update(new UpdateCustomerCommand(customerId, request.customerCode(), request.customerType(), request.displayName(), request.email(), request.phone()), currentUserId(servletRequest));
+        Customer customer = useCases.update(mapper.toUpdateCommand(customerId, request), currentUserId(servletRequest));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CUSTOMER_UPDATED", "Cliente actualizado correctamente", customer, servletRequest.getRequestURI()));
     }
 
@@ -75,7 +74,7 @@ public class CustomerController {
     @Operation(summary = "Cambiar estado de cliente")
     @PreAuthorize("hasAuthority('SALES_CUSTOMER_STATUS')")
     public ResponseEntity<ApiResponseDto<Customer>> changeStatus(@PathVariable UUID customerId, @Valid @RequestBody ChangeCustomerStatusRequest request, HttpServletRequest servletRequest) {
-        Customer customer = useCases.changeStatus(new ChangeCustomerStatusCommand(customerId, request.status()), currentUserId(servletRequest));
+        Customer customer = useCases.changeStatus(mapper.toStatusCommand(customerId, request), currentUserId(servletRequest));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "CUSTOMER_STATUS_UPDATED", "Estado de cliente actualizado correctamente", customer, servletRequest.getRequestURI()));
     }
 

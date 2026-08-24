@@ -4,7 +4,6 @@ import com.odcc.tienda.modules.catalog.adapter.in.rest.mapper.ProductPresentatio
 import com.odcc.tienda.modules.catalog.adapter.in.rest.request.ChangeProductPresentationStatusRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.request.UpdateProductPresentationRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.ProductPresentationResponse;
-import com.odcc.tienda.modules.catalog.application.command.ChangeProductPresentationStatusCommand;
 import com.odcc.tienda.modules.catalog.application.command.UpdateProductPresentationCommand;
 import com.odcc.tienda.modules.catalog.application.port.in.ChangeProductPresentationStatusUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.GetProductPresentationByIdUseCase;
@@ -85,7 +84,7 @@ public class ProductPresentationController {
         HttpServletRequest servletRequest
     ) {
         ProductPresentation presentation = changeProductPresentationStatusUseCase.execute(
-            new ChangeProductPresentationStatusCommand(presentationId, request.status())
+            mapper.toStatusCommand(presentationId, request)
         );
         return ResponseEntity.ok(ApiResponseDto.success(
             HttpStatus.OK,
