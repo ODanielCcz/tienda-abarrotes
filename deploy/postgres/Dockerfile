@@ -1,4 +1,4 @@
-FROM postgres:18.4
+FROM postgres:18.6
 
 ARG PGAUDIT_VERSION=18.0
 
