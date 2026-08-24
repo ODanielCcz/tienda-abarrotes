@@ -1,9 +1,7 @@
 package com.odcc.tienda.modules.sales.adapter.in.rest;
 
-import com.odcc.tienda.modules.sales.adapter.in.rest.request.CreateSalesOrderItemRequest;
+import com.odcc.tienda.modules.sales.adapter.in.rest.mapper.SalesOrderRestMapper;
 import com.odcc.tienda.modules.sales.adapter.in.rest.request.CreateSalesOrderRequest;
-import com.odcc.tienda.modules.sales.application.command.CreateSalesOrderCommand;
-import com.odcc.tienda.modules.sales.application.command.CreateSalesOrderItemCommand;
 import com.odcc.tienda.modules.sales.application.model.SalesOrder;
 import com.odcc.tienda.modules.sales.application.port.in.SalesOrderUseCases;
 import com.odcc.tienda.modules.sales.application.query.ListSalesOrdersQuery;
@@ -36,6 +34,7 @@ import java.util.UUID;
 public class SalesOrderController {
 
     private final SalesOrderUseCases useCases;
+    private final SalesOrderRestMapper mapper;
 
     @PostMapping
     @Operation(summary = "Crear venta confirmada")
@@ -45,15 +44,10 @@ public class SalesOrderController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        SalesOrder salesOrder = useCases.create(new CreateSalesOrderCommand(
-            request.warehouseId(),
-            request.customerId(),
-            request.deviceId(),
-            request.channel(),
-            request.currencyCode(),
-            request.idempotencyKey(),
-            request.items().stream().map(this::toItemCommand).toList()
-        ), currentUserId(jwt));
+        SalesOrder salesOrder = useCases.create(
+            mapper.toCreateCommand(request),
+            currentUserId(jwt)
+        );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(
             HttpStatus.CREATED,
@@ -118,15 +112,6 @@ public class SalesOrderController {
             salesOrder,
             servletRequest.getRequestURI()
         ));
-    }
-
-    private CreateSalesOrderItemCommand toItemCommand(CreateSalesOrderItemRequest request) {
-        return new CreateSalesOrderItemCommand(
-            request.productPresentationId(),
-            request.quantity(),
-            request.unitPrice(),
-            request.discountAmount()
-        );
     }
 
     private static UUID currentUserId(Jwt jwt) {

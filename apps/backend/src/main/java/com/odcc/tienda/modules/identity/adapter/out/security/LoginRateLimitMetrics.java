@@ -4,17 +4,15 @@ import com.odcc.tienda.modules.identity.application.model.LoginRateLimitDimensio
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import lombok.RequiredArgsConstructor;
 
 import java.util.Locale;
 import java.util.function.Supplier;
 
+@RequiredArgsConstructor
 public final class LoginRateLimitMetrics {
 
     private final MeterRegistry meterRegistry;
-
-    public LoginRateLimitMetrics(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-    }
 
     public void allowed(String provider) {
         counter("auth.rate.limit.allowed", provider, null, null).increment();

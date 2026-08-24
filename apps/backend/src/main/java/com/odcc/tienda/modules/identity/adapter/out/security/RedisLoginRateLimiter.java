@@ -5,12 +5,14 @@ import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitUnav
 import com.odcc.tienda.modules.identity.application.exception.LoginRateLimitedException;
 import com.odcc.tienda.modules.identity.application.model.LoginRateLimitDimension;
 import com.odcc.tienda.modules.identity.application.port.out.LoginRateLimitPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 
 import java.util.function.Supplier;
 
+@RequiredArgsConstructor
 public final class RedisLoginRateLimiter implements LoginRateLimitPort {
 
     private static final String PROVIDER = "redis";
@@ -21,22 +23,6 @@ public final class RedisLoginRateLimiter implements LoginRateLimitPort {
     private final RateLimitKeyEncoder keyEncoder;
     private final LoginRateLimitProperties properties;
     private final LoginRateLimitMetrics metrics;
-
-    public RedisLoginRateLimiter(
-        StringRedisTemplate redis,
-        RedisScript<String> checkScript,
-        RedisScript<Long> successScript,
-        RateLimitKeyEncoder keyEncoder,
-        LoginRateLimitProperties properties,
-        LoginRateLimitMetrics metrics
-    ) {
-        this.redis = redis;
-        this.checkScript = checkScript;
-        this.successScript = successScript;
-        this.keyEncoder = keyEncoder;
-        this.properties = properties;
-        this.metrics = metrics;
-    }
 
     @Override
     public void check(String clientAddress) {

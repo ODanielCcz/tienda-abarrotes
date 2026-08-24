@@ -1,15 +1,10 @@
 package com.odcc.tienda.modules.billing.adapter.in.rest;
 
+import com.odcc.tienda.modules.billing.adapter.in.rest.mapper.BillingRestMapper;
 import com.odcc.tienda.modules.billing.adapter.in.rest.request.BillingRequests.ChangeStatusRequest;
 import com.odcc.tienda.modules.billing.adapter.in.rest.request.BillingRequests.CreateFiscalDocumentRequest;
 import com.odcc.tienda.modules.billing.adapter.in.rest.request.BillingRequests.FiscalProfileRequest;
 import com.odcc.tienda.modules.billing.adapter.in.rest.request.BillingRequests.IssuerProfileRequest;
-import com.odcc.tienda.modules.billing.application.command.BillingCommands.ChangeStatusCommand;
-import com.odcc.tienda.modules.billing.application.command.BillingCommands.CreateFiscalDocumentCommand;
-import com.odcc.tienda.modules.billing.application.command.BillingCommands.CreateFiscalProfileCommand;
-import com.odcc.tienda.modules.billing.application.command.BillingCommands.CreateIssuerProfileCommand;
-import com.odcc.tienda.modules.billing.application.command.BillingCommands.UpdateFiscalProfileCommand;
-import com.odcc.tienda.modules.billing.application.command.BillingCommands.UpdateIssuerProfileCommand;
 import com.odcc.tienda.modules.billing.application.model.BillingModels.FiscalDocument;
 import com.odcc.tienda.modules.billing.application.model.BillingModels.FiscalProfile;
 import com.odcc.tienda.modules.billing.application.model.BillingModels.IssuerProfile;
@@ -43,6 +38,7 @@ import java.util.UUID;
 public class BillingController {
 
     private final BillingUseCases useCases;
+    private final BillingRestMapper mapper;
 
     @PostMapping("/issuer-profiles")
     @Operation(summary = "Crear perfil fiscal emisor")
@@ -50,9 +46,10 @@ public class BillingController {
     public ResponseEntity<ApiResponseDto<IssuerProfile>> createIssuer(
         @Valid @RequestBody IssuerProfileRequest request, HttpServletRequest servletRequest
     ) {
-        IssuerProfile result = useCases.createIssuerProfile(new CreateIssuerProfileCommand(
-            request.branchId(), request.rfc(), request.legalName(), request.postalCode(),
-            request.fiscalRegimeCode(), request.defaultSeries()), currentUserId(servletRequest));
+        IssuerProfile result = useCases.createIssuerProfile(
+            mapper.toCreateIssuerCommand(request),
+            currentUserId(servletRequest)
+        );
         return created("ISSUER_PROFILE_CREATED", "Perfil emisor creado correctamente", result, servletRequest);
     }
 
@@ -86,9 +83,10 @@ public class BillingController {
         @Valid @RequestBody IssuerProfileRequest request,
         HttpServletRequest servletRequest
     ) {
-        IssuerProfile result = useCases.updateIssuerProfile(new UpdateIssuerProfileCommand(
-            issuerProfileId, request.branchId(), request.rfc(), request.legalName(),
-            request.postalCode(), request.fiscalRegimeCode(), request.defaultSeries()), currentUserId(servletRequest));
+        IssuerProfile result = useCases.updateIssuerProfile(
+            mapper.toUpdateIssuerCommand(issuerProfileId, request),
+            currentUserId(servletRequest)
+        );
         return ok("ISSUER_PROFILE_UPDATED", "Perfil emisor actualizado correctamente", result, servletRequest);
     }
 
@@ -101,7 +99,7 @@ public class BillingController {
         HttpServletRequest servletRequest
     ) {
         return ok("ISSUER_PROFILE_STATUS_UPDATED", "Estado del perfil emisor actualizado correctamente",
-            useCases.changeIssuerProfileStatus(new ChangeStatusCommand(issuerProfileId, request.status()), currentUserId(servletRequest)), servletRequest);
+            useCases.changeIssuerProfileStatus(mapper.toStatusCommand(issuerProfileId, request), currentUserId(servletRequest)), servletRequest);
     }
 
     @PostMapping("/fiscal-profiles")
@@ -110,9 +108,10 @@ public class BillingController {
     public ResponseEntity<ApiResponseDto<FiscalProfile>> createFiscalProfile(
         @Valid @RequestBody FiscalProfileRequest request, HttpServletRequest servletRequest
     ) {
-        FiscalProfile result = useCases.createFiscalProfile(new CreateFiscalProfileCommand(
-            request.customerId(), request.rfc(), request.legalName(), request.postalCode(),
-            request.fiscalRegimeCode(), request.cfdiUseCode(), request.email()), currentUserId(servletRequest));
+        FiscalProfile result = useCases.createFiscalProfile(
+            mapper.toCreateFiscalProfileCommand(request),
+            currentUserId(servletRequest)
+        );
         return created("FISCAL_PROFILE_CREATED", "Perfil fiscal creado correctamente", result, servletRequest);
     }
 
@@ -146,9 +145,10 @@ public class BillingController {
         @Valid @RequestBody FiscalProfileRequest request,
         HttpServletRequest servletRequest
     ) {
-        FiscalProfile result = useCases.updateFiscalProfile(new UpdateFiscalProfileCommand(
-            fiscalProfileId, request.customerId(), request.rfc(), request.legalName(),
-            request.postalCode(), request.fiscalRegimeCode(), request.cfdiUseCode(), request.email()), currentUserId(servletRequest));
+        FiscalProfile result = useCases.updateFiscalProfile(
+            mapper.toUpdateFiscalProfileCommand(fiscalProfileId, request),
+            currentUserId(servletRequest)
+        );
         return ok("FISCAL_PROFILE_UPDATED", "Perfil fiscal actualizado correctamente", result, servletRequest);
     }
 
@@ -161,7 +161,7 @@ public class BillingController {
         HttpServletRequest servletRequest
     ) {
         return ok("FISCAL_PROFILE_STATUS_UPDATED", "Estado del perfil fiscal actualizado correctamente",
-            useCases.changeFiscalProfileStatus(new ChangeStatusCommand(fiscalProfileId, request.status()), currentUserId(servletRequest)), servletRequest);
+            useCases.changeFiscalProfileStatus(mapper.toStatusCommand(fiscalProfileId, request), currentUserId(servletRequest)), servletRequest);
     }
 
     @PostMapping("/fiscal-documents")
@@ -170,9 +170,10 @@ public class BillingController {
     public ResponseEntity<ApiResponseDto<FiscalDocument>> createDocument(
         @Valid @RequestBody CreateFiscalDocumentRequest request, HttpServletRequest servletRequest
     ) {
-        FiscalDocument result = useCases.createFiscalDocument(new CreateFiscalDocumentCommand(
-            request.salesOrderId(), request.issuerProfileId(), request.fiscalProfileId(),
-            request.series(), request.folio(), request.paymentFormCode(), request.paymentMethodCode()), currentUserId(servletRequest));
+        FiscalDocument result = useCases.createFiscalDocument(
+            mapper.toCreateDocumentCommand(request),
+            currentUserId(servletRequest)
+        );
         return created("FISCAL_DOCUMENT_CREATED", "Documento fiscal creado correctamente", result, servletRequest);
     }
 

@@ -1,11 +1,8 @@
 package com.odcc.tienda.modules.sales.adapter.in.rest;
 
+import com.odcc.tienda.modules.sales.adapter.in.rest.mapper.SalesReturnRestMapper;
 import com.odcc.tienda.modules.sales.adapter.in.rest.request.ConfirmSalesReturnRequest;
-import com.odcc.tienda.modules.sales.adapter.in.rest.request.CreateSalesReturnItemRequest;
 import com.odcc.tienda.modules.sales.adapter.in.rest.request.CreateSalesReturnRequest;
-import com.odcc.tienda.modules.sales.application.command.ConfirmSalesReturnCommand;
-import com.odcc.tienda.modules.sales.application.command.CreateSalesReturnCommand;
-import com.odcc.tienda.modules.sales.application.command.CreateSalesReturnItemCommand;
 import com.odcc.tienda.modules.sales.application.model.SalesReturn;
 import com.odcc.tienda.modules.sales.application.port.in.SalesReturnUseCases;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
@@ -35,6 +32,7 @@ import java.util.UUID;
 public class SalesReturnController {
 
     private final SalesReturnUseCases useCases;
+    private final SalesReturnRestMapper mapper;
 
     @PostMapping("/sales/orders/{salesOrderId}/returns")
     @Operation(summary = "Crear borrador de devolucion de venta")
@@ -45,12 +43,9 @@ public class SalesReturnController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        SalesReturn salesReturn = useCases.create(new CreateSalesReturnCommand(
-            salesOrderId,
-            request.reason(),
-            currentUserId(jwt),
-            request.items().stream().map(this::toItemCommand).toList()
-        ));
+        SalesReturn salesReturn = useCases.create(
+            mapper.toCreateCommand(salesOrderId, request, currentUserId(jwt))
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "SALES_RETURN_CREATED", "Devolucion creada correctamente", salesReturn, servletRequest.getRequestURI()));
     }
 
@@ -70,8 +65,9 @@ public class SalesReturnController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        UUID cashSessionId = request == null ? null : request.cashSessionId();
-        SalesReturn salesReturn = useCases.confirm(new ConfirmSalesReturnCommand(returnId, cashSessionId, currentUserId(jwt)));
+        SalesReturn salesReturn = useCases.confirm(
+            mapper.toConfirmCommand(returnId, request, currentUserId(jwt))
+        );
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_RETURN_CONFIRMED", "Devolucion confirmada correctamente", salesReturn, servletRequest.getRequestURI()));
     }
 
@@ -81,10 +77,6 @@ public class SalesReturnController {
     public ResponseEntity<ApiResponseDto<SalesReturn>> cancel(@PathVariable UUID returnId, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
         SalesReturn salesReturn = useCases.cancel(returnId, currentUserId(jwt));
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SALES_RETURN_CANCELLED", "Devolucion cancelada correctamente", salesReturn, servletRequest.getRequestURI()));
-    }
-
-    private CreateSalesReturnItemCommand toItemCommand(CreateSalesReturnItemRequest request) {
-        return new CreateSalesReturnItemCommand(request.salesOrderItemId(), request.quantity());
     }
 
     private UUID currentUserId(Jwt jwt) {

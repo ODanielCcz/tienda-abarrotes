@@ -1,22 +1,20 @@
 package com.odcc.tienda.modules.catalog.adapter.in.rest.mapper;
 
+import com.odcc.tienda.modules.catalog.adapter.in.rest.request.ChangeProductPresentationStatusRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.request.CreateProductPresentationRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.request.UpdateProductPresentationRequest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.ProductPresentationResponse;
+import com.odcc.tienda.modules.catalog.application.command.ChangeProductPresentationStatusCommand;
 import com.odcc.tienda.modules.catalog.application.command.CreateProductPresentationCommand;
 import com.odcc.tienda.modules.catalog.application.command.UpdateProductPresentationCommand;
 import com.odcc.tienda.modules.catalog.domain.model.ProductPresentation;
+import com.odcc.tienda.shared.infrastructure.mapping.CentralMapperConfig;
 import org.mapstruct.Mapper;
-import org.mapstruct.ReportingPolicy;
+import org.mapstruct.Mapping;
 
 import java.util.UUID;
 
-import static org.mapstruct.MappingConstants.ComponentModel.SPRING;
-
-@Mapper(
-    componentModel = SPRING,
-    unmappedTargetPolicy = ReportingPolicy.ERROR
-)
+@Mapper(config = CentralMapperConfig.class)
 public interface ProductPresentationRestMapper {
 
     default CreateProductPresentationCommand toCreateCommand(UUID productId, CreateProductPresentationRequest request) {
@@ -44,6 +42,13 @@ public interface ProductPresentationRestMapper {
             request.minimumStock()
         );
     }
+
+    @Mapping(target = "presentationId", source = "presentationId")
+    @Mapping(target = "status", source = "request.status")
+    ChangeProductPresentationStatusCommand toStatusCommand(
+        UUID presentationId,
+        ChangeProductPresentationStatusRequest request
+    );
 
     ProductPresentationResponse toResponse(ProductPresentation presentation);
 }
