@@ -1,11 +1,9 @@
 package com.odcc.tienda.modules.purchasing.adapter.in.rest;
 
+import com.odcc.tienda.modules.purchasing.adapter.in.rest.mapper.SupplierRestMapper;
 import com.odcc.tienda.modules.purchasing.adapter.in.rest.request.ChangeSupplierStatusRequest;
 import com.odcc.tienda.modules.purchasing.adapter.in.rest.request.CreateSupplierRequest;
 import com.odcc.tienda.modules.purchasing.adapter.in.rest.request.UpdateSupplierRequest;
-import com.odcc.tienda.modules.purchasing.application.command.ChangeSupplierStatusCommand;
-import com.odcc.tienda.modules.purchasing.application.command.CreateSupplierCommand;
-import com.odcc.tienda.modules.purchasing.application.command.UpdateSupplierCommand;
 import com.odcc.tienda.modules.purchasing.application.model.Supplier;
 import com.odcc.tienda.modules.purchasing.application.port.in.SupplierUseCases;
 import com.odcc.tienda.modules.purchasing.application.query.ListSuppliersQuery;
@@ -40,12 +38,16 @@ import java.util.UUID;
 public class SupplierController {
 
     private final SupplierUseCases useCases;
+    private final SupplierRestMapper mapper;
 
     @PostMapping
     @Operation(summary = "Crear proveedor")
     @PreAuthorize("hasAuthority('PURCHASING_SUPPLIER_CREATE')")
     public ResponseEntity<ApiResponseDto<Supplier>> create(@Valid @RequestBody CreateSupplierRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        Supplier supplier = useCases.create(new CreateSupplierCommand(request.supplierCode(), request.legalName(), request.tradeName(), request.taxId(), request.email(), request.phone(), request.creditDays()), currentUserId(jwt));
+        Supplier supplier = useCases.create(
+            mapper.toCreateCommand(request),
+            currentUserId(jwt)
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "SUPPLIER_CREATED", "Proveedor creado correctamente", supplier, servletRequest.getRequestURI()));
     }
 
@@ -69,7 +71,10 @@ public class SupplierController {
     @Operation(summary = "Actualizar proveedor")
     @PreAuthorize("hasAuthority('PURCHASING_SUPPLIER_UPDATE')")
     public ResponseEntity<ApiResponseDto<Supplier>> update(@PathVariable UUID supplierId, @Valid @RequestBody UpdateSupplierRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        Supplier supplier = useCases.update(new UpdateSupplierCommand(supplierId, request.supplierCode(), request.legalName(), request.tradeName(), request.taxId(), request.email(), request.phone(), request.creditDays()), currentUserId(jwt));
+        Supplier supplier = useCases.update(
+            mapper.toUpdateCommand(supplierId, request),
+            currentUserId(jwt)
+        );
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SUPPLIER_UPDATED", "Proveedor actualizado correctamente", supplier, servletRequest.getRequestURI()));
     }
 
@@ -77,7 +82,10 @@ public class SupplierController {
     @Operation(summary = "Cambiar estado de proveedor")
     @PreAuthorize("hasAuthority('PURCHASING_SUPPLIER_STATUS')")
     public ResponseEntity<ApiResponseDto<Supplier>> changeStatus(@PathVariable UUID supplierId, @Valid @RequestBody ChangeSupplierStatusRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        Supplier supplier = useCases.changeStatus(new ChangeSupplierStatusCommand(supplierId, request.status()), currentUserId(jwt));
+        Supplier supplier = useCases.changeStatus(
+            mapper.toStatusCommand(supplierId, request),
+            currentUserId(jwt)
+        );
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "SUPPLIER_STATUS_UPDATED", "Estado de proveedor actualizado correctamente", supplier, servletRequest.getRequestURI()));
     }
 

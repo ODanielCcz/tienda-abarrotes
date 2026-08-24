@@ -1,7 +1,7 @@
 package com.odcc.tienda.modules.sales.adapter.in.rest;
 
+import com.odcc.tienda.modules.sales.adapter.in.rest.mapper.SalesPaymentRestMapper;
 import com.odcc.tienda.modules.sales.adapter.in.rest.request.CreateSalesPaymentRequest;
-import com.odcc.tienda.modules.sales.application.command.CreateSalesPaymentCommand;
 import com.odcc.tienda.modules.sales.application.model.SalesPayment;
 import com.odcc.tienda.modules.sales.application.port.in.SalesPaymentUseCases;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
@@ -32,6 +32,7 @@ import java.util.UUID;
 public class SalesPaymentController {
 
     private final SalesPaymentUseCases useCases;
+    private final SalesPaymentRestMapper mapper;
 
     @PostMapping
     @Operation(summary = "Registrar pago de venta")
@@ -42,16 +43,9 @@ public class SalesPaymentController {
         @AuthenticationPrincipal Jwt jwt,
         HttpServletRequest servletRequest
     ) {
-        SalesPayment payment = useCases.create(new CreateSalesPaymentCommand(
-            salesOrderId,
-            request.cashSessionId(),
-            request.paymentMethod(),
-            request.amount(),
-            request.currencyCode(),
-            request.reference(),
-            request.idempotencyKey(),
-            currentUserId(jwt)
-        ));
+        SalesPayment payment = useCases.create(
+            mapper.toCreateCommand(salesOrderId, request, currentUserId(jwt))
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "SALES_PAYMENT_CREATED", "Pago registrado correctamente", payment, servletRequest.getRequestURI()));
     }
 

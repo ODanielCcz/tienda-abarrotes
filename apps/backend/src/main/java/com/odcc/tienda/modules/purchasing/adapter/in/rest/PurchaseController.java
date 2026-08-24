@@ -1,16 +1,9 @@
 package com.odcc.tienda.modules.purchasing.adapter.in.rest;
 
 import com.odcc.tienda.modules.inventory.application.model.InventoryReceipt;
-import com.odcc.tienda.modules.purchasing.adapter.in.rest.request.CreatePurchaseItemRequest;
+import com.odcc.tienda.modules.purchasing.adapter.in.rest.mapper.PurchaseRestMapper;
 import com.odcc.tienda.modules.purchasing.adapter.in.rest.request.CreatePurchaseRequest;
-import com.odcc.tienda.modules.purchasing.adapter.in.rest.request.ReceivePurchaseItemRequest;
-import com.odcc.tienda.modules.purchasing.adapter.in.rest.request.ReceivePurchasePalletRequest;
 import com.odcc.tienda.modules.purchasing.adapter.in.rest.request.ReceivePurchaseRequest;
-import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseCommand;
-import com.odcc.tienda.modules.purchasing.application.command.CreatePurchaseItemCommand;
-import com.odcc.tienda.modules.purchasing.application.command.ReceivePurchaseCommand;
-import com.odcc.tienda.modules.purchasing.application.command.ReceivePurchaseItemCommand;
-import com.odcc.tienda.modules.purchasing.application.command.ReceivePurchasePalletCommand;
 import com.odcc.tienda.modules.purchasing.application.model.Purchase;
 import com.odcc.tienda.modules.purchasing.application.port.in.PurchaseUseCases;
 import com.odcc.tienda.modules.purchasing.application.query.ListPurchasesQuery;
@@ -43,12 +36,16 @@ import java.util.UUID;
 public class PurchaseController {
 
     private final PurchaseUseCases useCases;
+    private final PurchaseRestMapper mapper;
 
     @PostMapping
     @Operation(summary = "Crear compra")
     @PreAuthorize("hasAuthority('PURCHASING_PURCHASE_CREATE')")
     public ResponseEntity<ApiResponseDto<Purchase>> create(@Valid @RequestBody CreatePurchaseRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        Purchase purchase = useCases.create(new CreatePurchaseCommand(request.warehouseId(), request.supplierId(), request.supplierDocument(), request.currencyCode(), request.idempotencyKey(), request.items().stream().map(this::toCreateItemCommand).toList()), currentUserId(jwt));
+        Purchase purchase = useCases.create(
+            mapper.toCreateCommand(request),
+            currentUserId(jwt)
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "PURCHASE_CREATED", "Compra creada correctamente", purchase, servletRequest.getRequestURI()));
     }
 
@@ -80,20 +77,11 @@ public class PurchaseController {
     @Operation(summary = "Recibir mercancia de compra")
     @PreAuthorize("hasAuthority('PURCHASING_PURCHASE_RECEIVE')")
     public ResponseEntity<ApiResponseDto<InventoryReceipt>> receive(@PathVariable UUID purchaseId, @Valid @RequestBody ReceivePurchaseRequest request, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest) {
-        InventoryReceipt receipt = useCases.receive(new ReceivePurchaseCommand(purchaseId, request.idempotencyKey(), request.items() == null ? List.of() : request.items().stream().map(this::toReceiveItemCommand).toList(), request.pallets() == null ? List.of() : request.pallets().stream().map(this::toReceivePalletCommand).toList()), currentUserId(jwt));
+        InventoryReceipt receipt = useCases.receive(
+            mapper.toReceiveCommand(request, purchaseId),
+            currentUserId(jwt)
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "PURCHASE_RECEIVED", "Compra recibida correctamente", receipt, servletRequest.getRequestURI()));
-    }
-
-    private CreatePurchaseItemCommand toCreateItemCommand(CreatePurchaseItemRequest request) {
-        return new CreatePurchaseItemCommand(request.productPresentationId(), request.quantity(), request.unitCost(), request.discountAmount(), request.taxAmount());
-    }
-
-    private ReceivePurchaseItemCommand toReceiveItemCommand(ReceivePurchaseItemRequest request) {
-        return new ReceivePurchaseItemCommand(request.purchaseItemId(), request.lotNumber(), request.manufacturedAt(), request.expiresAt(), request.quantity());
-    }
-
-    private ReceivePurchasePalletCommand toReceivePalletCommand(ReceivePurchasePalletRequest request) {
-        return new ReceivePurchasePalletCommand(request.externalPalletCode(), request.items().stream().map(this::toReceiveItemCommand).toList());
     }
 
     private UUID currentUserId(Jwt jwt) {
