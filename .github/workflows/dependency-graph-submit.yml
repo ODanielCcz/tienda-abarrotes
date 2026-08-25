@@ -19,6 +19,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download and submit dependency graph
-        uses: gradle/actions/dependency-submission@16f3e46a58d2b926c34615132d7969a96bccb22b # v6.0.0
+        uses: gradle/actions/dependency-submission@0f4528296b4bc09e8ae0fc7be30185a4ab435545 # v6.0.0
         with:
           dependency-graph: download-and-submit
