@@ -13,15 +13,22 @@
   </header>
 
   <div class="filters">
-    <label>
-      <span>Buscar</span>
-      <input type="search" [formControl]="searchControl" placeholder="Código o nombre" />
-    </label>
+    @if (viewMode() === 'LIST') {
+      <label>
+        <span>Buscar</span>
+        <input type="search" [formControl]="searchControl" placeholder="Código o nombre" />
+      </label>
+    }
 
     <mat-button-toggle-group [formControl]="statusControl" aria-label="Estado de categoría">
       <mat-button-toggle value="ALL">Todas</mat-button-toggle>
       <mat-button-toggle value="ACTIVE">Activas</mat-button-toggle>
       <mat-button-toggle value="INACTIVE">Inactivas</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <mat-button-toggle-group [formControl]="viewModeControl" aria-label="Vista de categorías">
+      <mat-button-toggle value="LIST">Lista</mat-button-toggle>
+      <mat-button-toggle value="TREE">Árbol</mat-button-toggle>
     </mat-button-toggle-group>
   </div>
 
@@ -32,6 +39,17 @@
     </div>
   } @else if (errorMessage()) {
     <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  } @else if (viewMode() === 'TREE') {
+    @if (categoryTree().length === 0) {
+      <p class="empty-state">No hay categorías para mostrar.</p>
+    } @else {
+      <div class="tree-shell">
+        <ng-container
+          [ngTemplateOutlet]="categoryTreeTemplate"
+          [ngTemplateOutletContext]="{ $implicit: categoryTree() }"
+        />
+      </div>
+    }
   } @else {
     <div class="table-shell">
       <table mat-table [dataSource]="categories()">
@@ -78,4 +96,31 @@
       </table>
     </div>
   }
+
+  <ng-template #categoryTreeTemplate let-nodes>
+    <ul class="category-tree">
+      @for (node of nodes; track node.id) {
+        <li>
+          <div class="tree-node">
+            <mat-icon>{{ node.children.length > 0 ? 'folder' : 'label' }}</mat-icon>
+            <span class="tree-code">{{ node.code }}</span>
+            <span>{{ node.name }}</span>
+            <span
+              class="status-pill"
+              [class.status-pill-inactive]="node.status === 'INACTIVE'"
+            >
+              {{ node.status === 'ACTIVE' ? 'Activa' : 'Inactiva' }}
+            </span>
+          </div>
+
+          @if (node.children.length > 0) {
+            <ng-container
+              [ngTemplateOutlet]="categoryTreeTemplate"
+              [ngTemplateOutletContext]="{ $implicit: node.children }"
+            />
+          }
+        </li>
+      }
+    </ul>
+  </ng-template>
 </section>

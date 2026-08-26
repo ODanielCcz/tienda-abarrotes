@@ -7,6 +7,7 @@ export interface Category {
   name: string;
   status: CategoryStatus;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface CategoryTreeNode extends Category {

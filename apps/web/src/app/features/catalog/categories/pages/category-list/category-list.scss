@@ -73,6 +73,42 @@ input {
   border-radius: 0.5rem;
 }
 
+.tree-shell {
+  padding: 1rem;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+  background: var(--mat-sys-surface-container-low);
+}
+
+.category-tree {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: none;
+}
+
+.category-tree > li {
+  margin-bottom: 0.5rem;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.35rem;
+  background: var(--mat-sys-surface);
+}
+
+.tree-node mat-icon {
+  color: var(--mat-sys-primary);
+}
+
+.tree-code {
+  min-width: 8rem;
+  font-weight: 600;
+}
+
 table {
   width: 100%;
 }
@@ -96,6 +132,11 @@ table {
 .empty-row td {
   padding: 1rem;
   text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.empty-state {
+  margin: 0;
   color: var(--mat-sys-on-surface-variant);
 }
 

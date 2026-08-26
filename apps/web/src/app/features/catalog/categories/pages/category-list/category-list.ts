@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -9,12 +9,17 @@ import { MatTableModule } from '@angular/material/table';
 import { debounceTime, distinctUntilChanged, finalize, startWith } from 'rxjs';
 
 import { CategoryApi } from '../../data-access/category-api.service';
-import { Category, CategoryStatus } from '../../models/category.model';
+import {
+  Category,
+  CategoryStatus,
+  CategoryTreeNode,
+} from '../../models/category.model';
 
 @Component({
   selector: 'app-category-list',
   imports: [
     DatePipe,
+    NgTemplateOutlet,
     ReactiveFormsModule,
     MatButtonModule,
     MatButtonToggleModule,
@@ -30,11 +35,16 @@ export class CategoryList {
 
   protected readonly displayedColumns = ['code', 'name', 'parent', 'status', 'createdAt'];
   protected readonly categories = signal<Category[]>([]);
+  protected readonly categoryTree = signal<CategoryTreeNode[]>([]);
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly viewMode = signal<'LIST' | 'TREE'>('LIST');
 
   protected readonly searchControl = new FormControl('', { nonNullable: true });
   protected readonly statusControl = new FormControl<CategoryStatus | 'ALL'>('ALL', {
+    nonNullable: true,
+  });
+  protected readonly viewModeControl = new FormControl<'LIST' | 'TREE'>('LIST', {
     nonNullable: true,
   });
 
@@ -45,10 +55,26 @@ export class CategoryList {
 
     this.statusControl.valueChanges
       .pipe(startWith(this.statusControl.value), distinctUntilChanged())
-      .subscribe(() => this.loadCategories());
+      .subscribe(() => this.refreshData());
+
+    this.viewModeControl.valueChanges
+      .pipe(distinctUntilChanged())
+      .subscribe((mode) => {
+        this.viewMode.set(mode);
+        this.refreshData();
+      });
   }
 
   protected refresh(): void {
+    this.refreshData();
+  }
+
+  private refreshData(): void {
+    if (this.viewMode() === 'TREE') {
+      this.loadCategoryTree();
+      return;
+    }
+
     this.loadCategories();
   }
 
@@ -69,6 +95,24 @@ export class CategoryList {
         error: () => {
           this.categories.set([]);
           this.errorMessage.set('No fue posible consultar las categorías.');
+        },
+      });
+  }
+
+  private loadCategoryTree(): void {
+    this.loading.set(true);
+    this.errorMessage.set(null);
+
+    const status = this.statusControl.value === 'ALL' ? undefined : this.statusControl.value;
+
+    this.categoryApi
+      .tree(status)
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (tree) => this.categoryTree.set(tree),
+        error: () => {
+          this.categoryTree.set([]);
+          this.errorMessage.set('No fue posible consultar el árbol de categorías.');
         },
       });
   }
