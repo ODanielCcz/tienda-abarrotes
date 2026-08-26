@@ -1,0 +1,119 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.page-header p {
+  margin: 0.25rem 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.eyebrow {
+  color: var(--mat-sys-primary) !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(15rem, 2fr) repeat(3, minmax(10rem, 1fr)) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.filters mat-form-field {
+  width: 100%;
+}
+
+.table-shell {
+  overflow-x: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.75rem;
+}
+
+table {
+  width: 100%;
+  min-width: 70rem;
+}
+
+td strong,
+td small {
+  display: block;
+}
+
+td small {
+  color: var(--mat-sys-on-surface-variant);
+  margin-top: 0.2rem;
+}
+
+.policy {
+  display: inline-block;
+  margin: 0.15rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 1rem;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  font-size: 0.75rem;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.55rem;
+  border-radius: 1rem;
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.status-pill.inactive {
+  background: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.state {
+  display: grid;
+  min-height: 12rem;
+  place-items: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.error-state {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+@media (max-width: 1100px) {
+  .filters {
+    grid-template-columns: repeat(2, minmax(12rem, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .page-header {
+    flex-direction: column;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+}
