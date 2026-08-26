@@ -4,17 +4,8 @@ import { map, Observable } from 'rxjs';
 
 import { API_CONFIG } from '../../../../core/config/api.config';
 import { ApiResponse } from '../../../../shared/models/api-response.model';
+import { PageResponse } from '../../../../shared/models/page-response.model';
 import { Category, CategoryStatus, CategoryTreeNode } from '../models/category.model';
-
-interface PageResponse<T> {
-  content: T[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  first: boolean;
-  last: boolean;
-}
 
 export interface CategoryListFilters {
   search?: string;

@@ -4,21 +4,12 @@ import { map, Observable } from 'rxjs';
 
 import { API_CONFIG } from '../../../../core/config/api.config';
 import { ApiResponse } from '../../../../shared/models/api-response.model';
+import { PageResponse } from '../../../../shared/models/page-response.model';
 import { Brand, BrandStatus } from '../models/brand.model';
 
 export interface BrandListFilters {
   search?: string;
   status?: BrandStatus;
-}
-
-interface PageResponse<T> {
-  content: T[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  first: boolean;
-  last: boolean;
 }
 
 @Injectable({
