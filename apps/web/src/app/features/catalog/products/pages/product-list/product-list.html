@@ -6,10 +6,18 @@
       <p>Consulta productos, políticas operativas y estado comercial.</p>
     </div>
 
-    <button mat-stroked-button type="button" (click)="refresh()">
-      <mat-icon>refresh</mat-icon>
-      Actualizar
-    </button>
+    <div class="page-actions">
+      <button mat-stroked-button type="button" (click)="refresh()">
+        <mat-icon>refresh</mat-icon>
+        Actualizar
+      </button>
+      @if (canCreate) {
+        <a mat-flat-button routerLink="/catalog/products/new" data-testid="create-product">
+          <mat-icon>add</mat-icon>
+          Nuevo producto
+        </a>
+      }
+    </div>
   </header>
 
   <div class="filters">

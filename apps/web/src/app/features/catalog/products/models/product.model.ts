@@ -6,7 +6,7 @@ export type SortDirection = 'ASC' | 'DESC';
 
 export interface Product {
   id: string;
-  categoryId: string;
+  categoryId: string | null;
   brandId: string | null;
   name: string;
   description: string | null;

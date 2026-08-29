@@ -153,4 +153,68 @@ describe('ProductApi', () => {
       correlationId: 'product-presentations-test',
     });
   });
+
+  it('creates a product', () => {
+    const payload = {
+      categoryId: page.content[0].categoryId,
+      brandId: page.content[0].brandId,
+      name: 'Arroz 1 kg',
+      description: null,
+      productType: 'GOODS' as const,
+      tracksInventory: true,
+      tracksLots: true,
+      tracksExpiration: true,
+    };
+    service.create(payload).subscribe((result) => expect(result.id).toBe(page.content[0].id));
+
+    const request = httpTesting.expectOne('/api/v1/catalog/products');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(payload);
+    request.flush(productResponse('PRODUCT_CREATED', page.content[0]));
+  });
+
+  it('updates a product', () => {
+    const product = page.content[0];
+    const payload = {
+      categoryId: product.categoryId,
+      brandId: product.brandId,
+      name: 'Arroz premium 1 kg',
+      description: product.description,
+      productType: product.productType,
+      tracksInventory: product.tracksInventory,
+      tracksLots: product.tracksLots,
+      tracksExpiration: product.tracksExpiration,
+    };
+    service.update(product.id, payload).subscribe((result) => expect(result.name).toBe(payload.name));
+
+    const request = httpTesting.expectOne(`/api/v1/catalog/products/${product.id}`);
+    expect(request.request.method).toBe('PUT');
+    request.flush(productResponse('PRODUCT_UPDATED', { ...product, name: payload.name }));
+  });
+
+  it('changes product status', () => {
+    const product = page.content[0];
+    service.changeStatus(product.id, 'INACTIVE').subscribe((result) => {
+      expect(result.status).toBe('INACTIVE');
+    });
+
+    const request = httpTesting.expectOne(`/api/v1/catalog/products/${product.id}/status`);
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({ status: 'INACTIVE' });
+    request.flush(productResponse('PRODUCT_STATUS_UPDATED', { ...product, status: 'INACTIVE' }));
+  });
+
+  function productResponse(code: string, data: Product) {
+    return {
+      timestamp: '2026-08-25T00:00:00Z',
+      status: 200,
+      code,
+      reason: 'OK',
+      message: 'Operación correcta',
+      data,
+      errors: null,
+      path: '/api/v1/catalog/products',
+      correlationId: 'product-write-test',
+    };
+  }
 });

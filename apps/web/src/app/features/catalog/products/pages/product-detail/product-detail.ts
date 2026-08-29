@@ -3,12 +3,26 @@ import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { catchError, forkJoin, map, of, startWith, Subject, switchMap, tap } from 'rxjs';
+import {
+  catchError,
+  filter,
+  finalize,
+  forkJoin,
+  map,
+  of,
+  startWith,
+  Subject,
+  switchMap,
+  tap,
+} from 'rxjs';
 
+import { AuthSessionStore } from '../../../../../core/auth/auth-session-store';
+import { ConfirmationDialog } from '../../../../../shared/dialogs/confirmation-dialog/confirmation-dialog';
 import { apiErrorMessage } from '../../../../../shared/utilities/api-error-message';
 import { BrandApi } from '../../../brands/data-access/brand-api';
 import { Brand } from '../../../brands/models/brand.model';
@@ -36,6 +50,8 @@ export class ProductDetail {
   private readonly productApi = inject(ProductApi);
   private readonly brandApi = inject(BrandApi);
   private readonly categoryApi = inject(CategoryApi);
+  private readonly sessionStore = inject(AuthSessionStore);
+  private readonly dialog = inject(MatDialog);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly reload = new Subject<void>();
@@ -48,6 +64,9 @@ export class ProductDetail {
   protected readonly categories = signal<Category[]>([]);
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly statusChanging = signal(false);
+  protected readonly canUpdate = this.sessionStore.hasPermission('CATALOG_PRODUCT_UPDATE');
+  protected readonly canChangeStatus = this.sessionStore.hasPermission('CATALOG_PRODUCT_STATUS');
   protected readonly displayedColumns = [
     'name',
     'sku',
@@ -114,10 +133,44 @@ export class ProductDetail {
     return this.brands().find((brand) => brand.id === brandId)?.name ?? 'Marca no disponible';
   }
 
-  protected categoryName(categoryId: string): string {
+  protected categoryName(categoryId: string | null): string {
+    if (categoryId === null) return 'Sin categoría';
     return (
       this.categories().find((category) => category.id === categoryId)?.name ??
       'Categoría no disponible'
     );
+  }
+
+  protected changeStatus(product: Product): void {
+    const nextStatus = product.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const action = nextStatus === 'ACTIVE' ? 'activar' : 'desactivar';
+
+    this.dialog
+      .open(ConfirmationDialog, {
+        width: '28rem',
+        maxWidth: '95vw',
+        data: {
+          title: `${nextStatus === 'ACTIVE' ? 'Activar' : 'Desactivar'} producto`,
+          message: `¿Deseas ${action} el producto ${product.name}?`,
+          confirmLabel: nextStatus === 'ACTIVE' ? 'Activar' : 'Desactivar',
+        },
+      })
+      .afterClosed()
+      .pipe(
+        filter((confirmed) => confirmed === true),
+        switchMap(() => {
+          this.statusChanging.set(true);
+          this.errorMessage.set(null);
+          return this.productApi
+            .changeStatus(product.id, nextStatus)
+            .pipe(finalize(() => this.statusChanging.set(false)));
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => this.reload.next(),
+        error: (error: unknown) =>
+          this.errorMessage.set(apiErrorMessage(error, 'No fue posible cambiar el estado.')),
+      });
   }
 }

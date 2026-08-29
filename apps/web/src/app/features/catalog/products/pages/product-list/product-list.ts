@@ -25,6 +25,7 @@ import {
 } from 'rxjs';
 
 import { apiErrorMessage } from '../../../../../shared/utilities/api-error-message';
+import { AuthSessionStore } from '../../../../../core/auth/auth-session-store';
 import { BrandApi } from '../../../brands/data-access/brand-api';
 import { Brand } from '../../../brands/models/brand.model';
 import { CategoryApi } from '../../../categories/data-access/category-api.service';
@@ -87,6 +88,7 @@ export class ProductList {
   private readonly brandApi = inject(BrandApi);
   private readonly categoryApi = inject(CategoryApi);
   private readonly route = inject(ActivatedRoute);
+  private readonly sessionStore = inject(AuthSessionStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly queryTrigger = new Subject<void>();
 
@@ -98,6 +100,7 @@ export class ProductList {
   protected readonly pageIndex = signal(0);
   protected readonly pageSize = signal(20);
   protected readonly totalElements = signal(0);
+  protected readonly canCreate = this.sessionStore.hasPermission('CATALOG_PRODUCT_CREATE');
   protected readonly displayedColumns = [
     'name',
     'brand',
@@ -204,7 +207,8 @@ export class ProductList {
     return this.brands().find((brand) => brand.id === brandId)?.name ?? 'Marca no disponible';
   }
 
-  protected categoryName(categoryId: string): string {
+  protected categoryName(categoryId: string | null): string {
+    if (categoryId === null) return 'Sin categoría';
     return (
       this.categories().find((category) => category.id === categoryId)?.name ??
       'Categoría no disponible'

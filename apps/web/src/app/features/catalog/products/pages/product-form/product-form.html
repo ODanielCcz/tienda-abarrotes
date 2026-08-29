@@ -1,0 +1,95 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <a mat-button routerLink="/catalog/products">
+        <mat-icon>arrow_back</mat-icon>
+        Productos
+      </a>
+      <p class="eyebrow">Catálogo</p>
+      <h1>{{ editing ? 'Editar producto' : 'Nuevo producto' }}</h1>
+      <p>Define los datos comerciales y las políticas operativas del producto.</p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else {
+    <mat-card appearance="outlined">
+      <mat-card-content>
+        <form id="product-form" [formGroup]="form" (ngSubmit)="submit()">
+          <div class="form-grid">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Nombre</mat-label>
+              <input matInput formControlName="name" maxlength="200" autocomplete="off" />
+              @if (form.controls.name.hasError('required')) {
+                <mat-error>El nombre es obligatorio.</mat-error>
+              } @else if (form.controls.name.hasError('maxlength')) {
+                <mat-error>El nombre admite hasta 200 caracteres.</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Categoría</mat-label>
+              <mat-select formControlName="categoryId">
+                <mat-option [value]="null">Sin categoría</mat-option>
+                @for (category of categories(); track category.id) {
+                  <mat-option [value]="category.id">{{ category.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Marca</mat-label>
+              <mat-select formControlName="brandId">
+                <mat-option [value]="null">Sin marca</mat-option>
+                @for (brand of brands(); track brand.id) {
+                  <mat-option [value]="brand.id">{{ brand.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Tipo</mat-label>
+              <mat-select formControlName="productType">
+                <mat-option value="GOODS">Producto</mat-option>
+                <mat-option value="SERVICE">Servicio</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Descripción</mat-label>
+              <textarea matInput formControlName="description" maxlength="1000" rows="4"></textarea>
+              <mat-hint align="end">{{ form.controls.description.value.length }}/1000</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <fieldset>
+            <legend>Políticas operativas</legend>
+            <mat-checkbox formControlName="tracksInventory">Controla inventario</mat-checkbox>
+            <mat-checkbox formControlName="tracksLots">Controla lotes</mat-checkbox>
+            <mat-checkbox formControlName="tracksExpiration">Controla caducidad</mat-checkbox>
+          </fieldset>
+
+          @if (trackingError(); as message) {
+            <p class="validation-state" role="alert">{{ message }}</p>
+          }
+        </form>
+
+        @if (errorMessage()) {
+          <p class="error-state" role="alert">{{ errorMessage() }}</p>
+        }
+      </mat-card-content>
+
+      <mat-card-actions align="end">
+        <a mat-button routerLink="/catalog/products" [class.disabled]="submitting()">Cancelar</a>
+        <button mat-flat-button type="submit" form="product-form" [disabled]="form.invalid || submitting()">
+          @if (submitting()) {
+            <mat-spinner diameter="20" />
+          } @else {
+            Guardar producto
+          }
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  }
+</section>

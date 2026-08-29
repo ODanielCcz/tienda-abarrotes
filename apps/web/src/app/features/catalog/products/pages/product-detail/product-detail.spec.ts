@@ -1,9 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
+import { AuthSessionStore } from '../../../../../core/auth/auth-session-store';
+import { ConfirmationDialog } from '../../../../../shared/dialogs/confirmation-dialog/confirmation-dialog';
 import { BrandApi } from '../../../brands/data-access/brand-api';
 import { CategoryApi } from '../../../categories/data-access/category-api.service';
 import { ProductApi } from '../../data-access/product-api';
@@ -14,11 +17,17 @@ describe('ProductDetail', () => {
   const productApi = {
     getById: vi.fn(),
     listPresentations: vi.fn(),
+    changeStatus: vi.fn(),
   };
   const brandApi = { list: vi.fn() };
   const categoryApi = { list: vi.fn() };
+  const sessionStore = { hasPermission: vi.fn() };
+  const dialog = { open: vi.fn() };
 
   beforeEach(async () => {
+    vi.clearAllMocks();
+    sessionStore.hasPermission.mockReturnValue(true);
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
     productApi.getById.mockReturnValue(
       of({
         id: 'product-1',
@@ -76,6 +85,8 @@ describe('ProductDetail', () => {
         { provide: ProductApi, useValue: productApi },
         { provide: BrandApi, useValue: brandApi },
         { provide: CategoryApi, useValue: categoryApi },
+        { provide: AuthSessionStore, useValue: sessionStore },
+        { provide: MatDialog, useValue: dialog },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -130,5 +141,46 @@ describe('ProductDetail', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Producto no encontrado (Referencia: product-ref-404)',
     );
+  });
+
+  it('exposes edit and status actions when permissions are granted', () => {
+    const editLink = fixture.nativeElement.querySelector(
+      '[data-testid="edit-product"]',
+    ) as HTMLAnchorElement | null;
+    const statusButton = fixture.nativeElement.querySelector(
+      '[data-testid="status-product"]',
+    ) as HTMLButtonElement | null;
+
+    expect(editLink?.getAttribute('href')).toContain('/catalog/products/product-1/edit');
+    expect(statusButton).not.toBeNull();
+  });
+
+  it('confirms a product status change and reloads the detail', () => {
+    dialog.open.mockReturnValueOnce({ afterClosed: () => of(true) });
+    productApi.changeStatus.mockReturnValueOnce(
+      of({
+        id: 'product-1',
+        categoryId: 'category-1',
+        brandId: 'brand-1',
+        name: 'Arroz 1 kg',
+        description: null,
+        productType: 'GOODS',
+        tracksInventory: true,
+        tracksLots: true,
+        tracksExpiration: true,
+        status: 'INACTIVE',
+        createdAt: '',
+        updatedAt: '',
+      }),
+    );
+
+    const statusButton = fixture.nativeElement.querySelector(
+      '[data-testid="status-product"]',
+    ) as HTMLButtonElement;
+    statusButton.click();
+
+    expect(dialog.open).toHaveBeenCalledWith(ConfirmationDialog, expect.any(Object));
+    expect(productApi.changeStatus).toHaveBeenCalledWith('product-1', 'INACTIVE');
+    expect(productApi.getById).toHaveBeenCalledTimes(2);
   });
 });

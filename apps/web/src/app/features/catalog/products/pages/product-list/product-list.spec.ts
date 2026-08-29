@@ -4,6 +4,7 @@ import { convertToParamMap, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
+import { AuthSessionStore } from '../../../../../core/auth/auth-session-store';
 import { BrandApi } from '../../../brands/data-access/brand-api';
 import { CategoryApi } from '../../../categories/data-access/category-api.service';
 import { ProductApi } from '../../data-access/product-api';
@@ -14,6 +15,7 @@ describe('ProductList', () => {
   const productApi = { list: vi.fn() };
   const brandApi = { list: vi.fn() };
   const categoryApi = { list: vi.fn() };
+  const sessionStore = { hasPermission: vi.fn() };
 
   it('restores filters and pagination from query parameters', () => {
     expect(
@@ -38,6 +40,7 @@ describe('ProductList', () => {
   });
 
   beforeEach(async () => {
+    sessionStore.hasPermission.mockReturnValue(true);
     productApi.list.mockReturnValue(
       of({
         content: [
@@ -88,6 +91,7 @@ describe('ProductList', () => {
         { provide: ProductApi, useValue: productApi },
         { provide: BrandApi, useValue: brandApi },
         { provide: CategoryApi, useValue: categoryApi },
+        { provide: AuthSessionStore, useValue: sessionStore },
       ],
     }).compileComponents();
 
@@ -113,6 +117,14 @@ describe('ProductList', () => {
     expect(link?.getAttribute('href')).toContain('/catalog/products/product-1?');
     expect(link?.getAttribute('href')).toContain('page=0');
     expect(link?.getAttribute('href')).toContain('size=20');
+  });
+
+  it('shows the create action only with product create permission', () => {
+    const createLink = fixture.nativeElement.querySelector(
+      '[data-testid="create-product"]',
+    ) as HTMLAnchorElement | null;
+
+    expect(createLink?.getAttribute('href')).toContain('/catalog/products/new');
   });
 
   it('shows the backend error reference', async () => {

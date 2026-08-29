@@ -14,10 +14,36 @@
       <h1>Detalle del producto</h1>
     </div>
 
-    <button mat-stroked-button type="button" (click)="refresh()">
-      <mat-icon>refresh</mat-icon>
-      Actualizar
-    </button>
+    <div class="page-actions">
+      <button mat-stroked-button type="button" (click)="refresh()">
+        <mat-icon>refresh</mat-icon>
+        Actualizar
+      </button>
+      @if (product(); as currentProduct) {
+        @if (canUpdate) {
+          <a
+            mat-stroked-button
+            [routerLink]="['/catalog/products', currentProduct.id, 'edit']"
+            data-testid="edit-product"
+          >
+            <mat-icon>edit</mat-icon>
+            Editar
+          </a>
+        }
+        @if (canChangeStatus) {
+          <button
+            mat-flat-button
+            type="button"
+            data-testid="status-product"
+            [disabled]="statusChanging()"
+            (click)="changeStatus(currentProduct)"
+          >
+            <mat-icon>{{ currentProduct.status === 'ACTIVE' ? 'block' : 'check_circle' }}</mat-icon>
+            {{ currentProduct.status === 'ACTIVE' ? 'Desactivar' : 'Activar' }}
+          </button>
+        }
+      }
+    </div>
   </header>
 
   @if (loading()) {

@@ -39,6 +39,28 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'catalog/products/new',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: ['CATALOG_PRODUCT_CREATE'],
+        },
+        loadComponent: () =>
+          import('./features/catalog/products/pages/product-form/product-form').then(
+            (module) => module.ProductForm,
+          ),
+      },
+      {
+        path: 'catalog/products/:productId/edit',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: ['CATALOG_PRODUCT_UPDATE'],
+        },
+        loadComponent: () =>
+          import('./features/catalog/products/pages/product-form/product-form').then(
+            (module) => module.ProductForm,
+          ),
+      },
+      {
         path: 'catalog/products/:productId',
         canActivate: [permissionGuard],
         data: {

@@ -5,7 +5,13 @@ import { map, Observable } from 'rxjs';
 import { API_CONFIG } from '../../../../core/config/api.config';
 import { ApiResponse } from '../../../../shared/models/api-response.model';
 import { PageResponse } from '../../../../shared/models/page-response.model';
-import { Product, ProductListFilters, ProductPresentation } from '../models/product.model';
+import { ProductUpsertRequest } from '../models/product-request.model';
+import {
+  Product,
+  ProductListFilters,
+  ProductPresentation,
+  ProductStatus,
+} from '../models/product.model';
 
 @Injectable({ providedIn: 'root' })
 export class ProductApi {
@@ -63,5 +69,32 @@ export class ProductApi {
         `${this.apiConfig.baseUrl}/catalog/products/${productId}/presentations`,
       )
       .pipe(map((response) => response.data ?? []));
+  }
+
+  create(request: ProductUpsertRequest): Observable<Product> {
+    return this.http
+      .post<ApiResponse<Product>>(`${this.apiConfig.baseUrl}/catalog/products`, request)
+      .pipe(map((response) => this.requireProduct(response)));
+  }
+
+  update(productId: string, request: ProductUpsertRequest): Observable<Product> {
+    return this.http
+      .put<ApiResponse<Product>>(`${this.apiConfig.baseUrl}/catalog/products/${productId}`, request)
+      .pipe(map((response) => this.requireProduct(response)));
+  }
+
+  changeStatus(productId: string, status: ProductStatus): Observable<Product> {
+    return this.http
+      .patch<ApiResponse<Product>>(`${this.apiConfig.baseUrl}/catalog/products/${productId}/status`, {
+        status,
+      })
+      .pipe(map((response) => this.requireProduct(response)));
+  }
+
+  private requireProduct(response: ApiResponse<Product>): Product {
+    if (response.data === null) {
+      throw new Error('La API respondió sin datos del producto.');
+    }
+    return response.data;
   }
 }
