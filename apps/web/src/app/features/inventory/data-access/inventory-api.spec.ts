@@ -53,6 +53,42 @@ describe('InventoryApi', () => {
     movements.flush(response([]));
   });
 
+  it('creates an inventory receipt with its idempotency key unchanged', () => {
+    const payload = {
+      warehouseId: 'warehouse-a',
+      supplierId: null,
+      idempotencyKey: 'receipt-key-1',
+      reason: 'Recepción de prueba',
+      items: [
+        {
+          productPresentationId: 'presentation-1',
+          lotNumber: 'LOT-001',
+          manufacturedAt: '2026-08-01',
+          expiresAt: '2027-08-01',
+          quantity: 10,
+          unitCost: 18.5,
+        },
+      ],
+      pallets: [],
+    };
+    const receipt = {
+      receiptId: 'receipt-1',
+      warehouseId: 'warehouse-a',
+      supplierId: null,
+      status: 'CONFIRMED',
+      receivedAt: '2026-08-29T10:00:00Z',
+      items: [],
+      pallets: [],
+    };
+
+    api.createReceipt(payload).subscribe((data) => expect(data).toEqual(receipt));
+
+    const request = http.expectOne('/api/v1/inventory/receipts');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(payload);
+    request.flush(response(receipt));
+  });
+
   function expectGet(url: string, warehouseId: string): void {
     const request = http.expectOne(
       (candidate) =>

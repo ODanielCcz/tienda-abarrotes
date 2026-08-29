@@ -110,6 +110,18 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'inventory/receipts/new',
+        canActivate: [permissionGuard, operationalContextGuard],
+        data: {
+          permissions: ['INVENTORY_RECEIPT_CREATE'],
+          operationalContext: 'WAREHOUSE',
+        },
+        loadComponent: () =>
+          import(
+            './features/inventory/pages/inventory-receipt-form/inventory-receipt-form'
+          ).then((module) => module.InventoryReceiptForm),
+      },
+      {
         path: 'sales',
         canActivate: [permissionGuard, operationalContextGuard],
         data: {

@@ -5,6 +5,8 @@ import { map, Observable } from 'rxjs';
 import { API_CONFIG } from '../../../core/config/api.config';
 import { ApiResponse } from '../../../shared/models/api-response.model';
 import {
+  CreateInventoryReceiptRequest,
+  InventoryReceipt,
   InventoryLot,
   InventoryPallet,
   LotFilters,
@@ -44,6 +46,19 @@ export class InventoryApi {
     if (filters.movementType) params = params.set('movementType', filters.movementType);
     if (filters.status) params = params.set('status', filters.status);
     return this.getList('/inventory/movements', params);
+  }
+
+  createReceipt(request: CreateInventoryReceiptRequest): Observable<InventoryReceipt> {
+    return this.http
+      .post<ApiResponse<InventoryReceipt>>(`${this.apiConfig.baseUrl}/inventory/receipts`, request)
+      .pipe(
+        map((response) => {
+          if (response.data === null) {
+            throw new Error('La API respondió sin datos de la recepción.');
+          }
+          return response.data;
+        }),
+      );
   }
 
   private getList<T>(path: string, params: HttpParams): Observable<T[]> {

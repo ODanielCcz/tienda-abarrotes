@@ -77,6 +77,60 @@ export interface StockMovement {
   items: StockMovementItem[];
 }
 
+export interface InventoryReceiptItemRequest {
+  productPresentationId: string;
+  lotNumber: string | null;
+  manufacturedAt: string | null;
+  expiresAt: string | null;
+  quantity: number;
+  unitCost: number | null;
+}
+
+export interface InventoryReceiptPalletRequest {
+  externalPalletCode: string | null;
+  items: InventoryReceiptItemRequest[];
+}
+
+export interface CreateInventoryReceiptRequest {
+  warehouseId: string;
+  supplierId: string | null;
+  idempotencyKey: string;
+  reason: string | null;
+  items: InventoryReceiptItemRequest[];
+  pallets: InventoryReceiptPalletRequest[];
+}
+
+export interface InventoryReceiptItem {
+  stockMovementItemId: string;
+  productPresentationId: string;
+  lotId: string | null;
+  lotNumber: string | null;
+  quantity: number;
+  unitCost: number | null;
+  quantityBefore: number;
+  quantityAfter: number;
+  manufacturedAt: string | null;
+  expiresAt: string | null;
+}
+
+export interface InventoryReceiptPallet {
+  palletId: string;
+  palletCode: string;
+  externalPalletCode: string | null;
+  status: string;
+  items: InventoryReceiptItem[];
+}
+
+export interface InventoryReceipt {
+  receiptId: string;
+  warehouseId: string;
+  supplierId: string | null;
+  status: string;
+  receivedAt: string;
+  items: InventoryReceiptItem[];
+  pallets: InventoryReceiptPallet[];
+}
+
 export interface LotFilters {
   warehouseId: string;
   productPresentationId?: string;

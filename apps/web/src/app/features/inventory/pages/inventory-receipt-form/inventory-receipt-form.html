@@ -1,0 +1,182 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <a mat-button routerLink="/inventory">
+        <mat-icon>arrow_back</mat-icon>
+        Inventario
+      </a>
+      <p class="eyebrow">Recepción de mercancía</p>
+      <h1>Nueva recepción</h1>
+      <p>{{ selectedWarehouse()?.name || 'Almacén seleccionado' }}</p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else {
+    <form id="receipt-form" [formGroup]="form" (ngSubmit)="submit()">
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Datos generales</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Motivo o referencia</mat-label>
+            <textarea matInput formControlName="reason" rows="2" maxlength="500"></textarea>
+            <mat-hint align="end">{{ form.controls.reason.value.length }}/500</mat-hint>
+          </mat-form-field>
+          <p class="idempotency">Referencia segura: <code>{{ idempotencyKey }}</code></p>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Partidas sin pallet</mat-card-title>
+          <span class="spacer"></span>
+          <button mat-stroked-button type="button" (click)="addItem()">
+            <mat-icon>add</mat-icon>
+            Agregar partida
+          </button>
+        </mat-card-header>
+        <mat-card-content formArrayName="items">
+          @if (items.length === 0) {
+            <p class="state compact">No hay partidas fuera de pallet.</p>
+          }
+          @for (item of items.controls; track item; let itemIndex = $index) {
+            <section class="item-row" [formGroupName]="itemIndex">
+              <ng-container
+                [ngTemplateOutlet]="itemFields"
+                [ngTemplateOutletContext]="{ $implicit: item }"
+              />
+              <button
+                mat-icon-button
+                type="button"
+                aria-label="Eliminar partida"
+                (click)="removeItem(itemIndex)"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </section>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Pallets opcionales</mat-card-title>
+          <span class="spacer"></span>
+          <button mat-stroked-button type="button" (click)="addPallet()">
+            <mat-icon>pallet</mat-icon>
+            Agregar pallet
+          </button>
+        </mat-card-header>
+        <mat-card-content formArrayName="pallets">
+          @if (pallets.length === 0) {
+            <p class="state compact">La recepción no contiene pallets.</p>
+          }
+          @for (pallet of pallets.controls; track pallet; let palletIndex = $index) {
+            <section class="pallet" [formGroupName]="palletIndex">
+              <header>
+                <mat-form-field appearance="outline">
+                  <mat-label>Código externo / SSCC</mat-label>
+                  <input matInput formControlName="externalPalletCode" maxlength="100" />
+                </mat-form-field>
+                <button mat-button type="button" (click)="removePallet(palletIndex)">
+                  <mat-icon>delete</mat-icon>
+                  Eliminar pallet
+                </button>
+              </header>
+              <div formArrayName="items">
+                @for (item of palletItems(palletIndex).controls; track item; let itemIndex = $index) {
+                  <section class="item-row" [formGroupName]="itemIndex">
+                    <ng-container
+                      [ngTemplateOutlet]="itemFields"
+                      [ngTemplateOutletContext]="{ $implicit: item }"
+                    />
+                    <button
+                      mat-icon-button
+                      type="button"
+                      aria-label="Eliminar partida del pallet"
+                      (click)="removeItem(itemIndex, palletItems(palletIndex))"
+                    >
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </section>
+                }
+              </div>
+              <button mat-button type="button" (click)="addItem(palletItems(palletIndex))">
+                <mat-icon>add</mat-icon>
+                Agregar partida al pallet
+              </button>
+            </section>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      @if (policyMessage()) {
+        <p class="validation-state" role="alert">{{ policyMessage() }}</p>
+      }
+      @if (errorMessage()) {
+        <p class="error-state" role="alert">{{ errorMessage() }}</p>
+      }
+
+      <footer class="actions">
+        <a mat-button routerLink="/inventory" [class.disabled]="submitting()">Cancelar</a>
+        @if (submitting()) {
+          <button mat-flat-button type="submit" disabled>
+            <mat-spinner diameter="20" />
+          </button>
+        } @else {
+          <button mat-flat-button type="submit" [disabled]="form.invalid">
+            <mat-icon>inventory</mat-icon>
+            Registrar recepción
+          </button>
+        }
+      </footer>
+    </form>
+  }
+</section>
+
+<ng-template #itemFields let-item>
+  <div class="item-grid" [formGroup]="item">
+    <mat-form-field appearance="outline">
+      <mat-label>Producto</mat-label>
+      <mat-select
+        formControlName="productId"
+        (selectionChange)="loadPresentations($event.value, item)"
+      >
+        @for (product of products(); track product.id) {
+          <mat-option [value]="product.id">{{ product.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Presentación</mat-label>
+      <mat-select formControlName="productPresentationId">
+        @for (presentation of presentationsFor(item.controls.productId.value); track presentation.id) {
+          <mat-option [value]="presentation.id">{{ presentation.name }} · {{ presentation.sku }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Lote</mat-label>
+      <input matInput formControlName="lotNumber" maxlength="100" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Fecha de producción</mat-label>
+      <input matInput type="date" formControlName="manufacturedAt" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Fecha de caducidad</mat-label>
+      <input matInput type="date" formControlName="expiresAt" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Cantidad</mat-label>
+      <input matInput type="number" min="0.001" step="0.001" formControlName="quantity" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Costo unitario</mat-label>
+      <input matInput type="number" min="0" step="0.0001" formControlName="unitCost" />
+    </mat-form-field>
+  </div>
+</ng-template>

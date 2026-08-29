@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -99,6 +100,7 @@ describe('InventoryOverview', () => {
         { provide: InventoryApi, useValue: api },
         { provide: OperationalContextStore, useValue: contextStore },
         { provide: AuthSessionStore, useValue: sessionStore },
+        { provide: ActivatedRoute, useValue: {} },
       ],
     }).compileComponents();
 

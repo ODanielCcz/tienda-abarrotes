@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
+import { RouterLink } from '@angular/router';
 import { finalize, forkJoin, of } from 'rxjs';
 
 import { AuthSessionStore } from '../../../../core/auth/auth-session-store';
@@ -30,6 +31,7 @@ import {
     MatProgressSpinnerModule,
     MatTableModule,
     MatTabsModule,
+    RouterLink,
   ],
   templateUrl: './inventory-overview.html',
   styleUrl: './inventory-overview.scss',
@@ -51,6 +53,7 @@ export class InventoryOverview {
   protected readonly canReadLots = this.sessionStore.hasPermission('INVENTORY_LOT_READ');
   protected readonly canReadPallets = this.sessionStore.hasPermission('INVENTORY_PALLET_READ');
   protected readonly canReadMovements = this.sessionStore.hasPermission('INVENTORY_MOVEMENT_READ');
+  protected readonly canCreateReceipt = this.sessionStore.hasPermission('INVENTORY_RECEIPT_CREATE');
 
   protected readonly stockColumns = [
     'product',

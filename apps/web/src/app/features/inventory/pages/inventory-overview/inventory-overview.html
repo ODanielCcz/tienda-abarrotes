@@ -5,10 +5,18 @@
       <h1>Existencias del almacén</h1>
       <p>{{ selectedWarehouse()?.name || 'Almacén seleccionado' }}</p>
     </div>
-    <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()">
-      <mat-icon>refresh</mat-icon>
-      Actualizar
-    </button>
+    <div class="header-actions">
+      @if (canCreateReceipt) {
+        <a mat-flat-button routerLink="/inventory/receipts/new">
+          <mat-icon>add_box</mat-icon>
+          Recibir mercancía
+        </a>
+      }
+      <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()">
+        <mat-icon>refresh</mat-icon>
+        Actualizar
+      </button>
+    </div>
   </header>
 
   @if (loading()) {
