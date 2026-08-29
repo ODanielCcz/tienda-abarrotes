@@ -1,4 +1,5 @@
 import { routes } from './app.routes';
+import { operationalContextGuard } from './core/guards/operational-context-guard';
 
 describe('application routes', () => {
   it('protects the product catalog with the read permission', () => {
@@ -45,5 +46,19 @@ describe('application routes', () => {
     expect(paths.indexOf('catalog/products/:productId/edit')).toBeLessThan(
       paths.indexOf('catalog/products/:productId'),
     );
+  });
+
+  it('requires the appropriate operational context for inventory, sales and cash', () => {
+    const shell = routes.find((route) => route.path === '');
+    const inventory = shell?.children?.find((route) => route.path === 'inventory');
+    const sales = shell?.children?.find((route) => route.path === 'sales');
+    const cash = shell?.children?.find((route) => route.path === 'cash');
+
+    expect(inventory?.data?.['operationalContext']).toBe('WAREHOUSE');
+    expect(inventory?.canActivate).toContain(operationalContextGuard);
+    expect(sales?.data?.['operationalContext']).toBe('WAREHOUSE');
+    expect(sales?.canActivate).toContain(operationalContextGuard);
+    expect(cash?.data?.['operationalContext']).toBe('CASH_REGISTER');
+    expect(cash?.canActivate).toContain(operationalContextGuard);
   });
 });

@@ -1,0 +1,24 @@
+.context-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+mat-form-field {
+  width: clamp(9rem, 14vw, 13rem);
+}
+
+.context-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-small);
+}
+
+@media (max-width: 1050px) {
+  .context-selector {
+    display: none;
+  }
+}

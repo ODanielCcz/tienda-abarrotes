@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth-guard';
 import { guestGuard } from './core/guards/guest-guard';
 import { permissionGuard } from './core/guards/permission-guard';
+import { operationalContextGuard } from './core/guards/operational-context-guard';
 
 export const routes: Routes = [
   {
@@ -95,9 +96,10 @@ export const routes: Routes = [
       },
       {
         path: 'inventory',
-        canActivate: [permissionGuard],
+        canActivate: [permissionGuard, operationalContextGuard],
         data: {
           permissions: ['INVENTORY_STOCK_READ'],
+          operationalContext: 'WAREHOUSE',
           title: 'Inventario',
           description: 'Consulta stock, lotes, movimientos, ajustes y recepciones.',
           icon: 'warehouse',
@@ -109,9 +111,10 @@ export const routes: Routes = [
       },
       {
         path: 'sales',
-        canActivate: [permissionGuard],
+        canActivate: [permissionGuard, operationalContextGuard],
         data: {
           permissions: ['SALES_ORDER_READ'],
+          operationalContext: 'WAREHOUSE',
           title: 'Ventas',
           description: 'Gestiona ventas, devoluciones y pagos asociados.',
           icon: 'point_of_sale',
@@ -123,9 +126,10 @@ export const routes: Routes = [
       },
       {
         path: 'cash',
-        canActivate: [permissionGuard],
+        canActivate: [permissionGuard, operationalContextGuard],
         data: {
           permissions: ['CASH_SESSION_READ'],
+          operationalContext: 'CASH_REGISTER',
           title: 'Caja',
           description: 'Administra sesiones, movimientos y cortes de caja.',
           icon: 'payments',

@@ -1,6 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { LoginResponse } from '../../features/authentication/models/login-response';
 import { AuthSessionUser } from './auth-session-user';
+import { OperationalContextStore } from '../context/operational-context.store';
 
 const AUTH_SESSION_KEY = 'tienda.auth.session';
 
@@ -8,11 +9,13 @@ const AUTH_SESSION_KEY = 'tienda.auth.session';
   providedIn: 'root',
 })
 export class AuthSessionStore {
+  private readonly operationalContext = inject(OperationalContextStore);
   private readonly sessionState = signal<LoginResponse | null>(this.restoreSession());
 
   readonly session = this.sessionState.asReadonly();
 
   save(session: LoginResponse): void {
+    this.operationalContext.clear();
     sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
     this.sessionState.set(session);
   }
@@ -20,6 +23,7 @@ export class AuthSessionStore {
   clear(): void {
     sessionStorage.removeItem(AUTH_SESSION_KEY);
     this.sessionState.set(null);
+    this.operationalContext.clear();
   }
 
   accessToken(): string | null {

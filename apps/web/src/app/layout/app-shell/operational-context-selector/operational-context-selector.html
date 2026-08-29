@@ -1,0 +1,60 @@
+<section class="context-selector" aria-label="Contexto operativo">
+  @if (loading()) {
+    <mat-spinner diameter="24" aria-label="Validando contexto operativo" />
+  } @else {
+    @if (canReadBranches) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Sucursal</mat-label>
+        <mat-icon matPrefix>store</mat-icon>
+        <mat-select
+          [value]="context().branchId ?? null"
+          (selectionChange)="branchChanged($event.value)"
+        >
+          <mat-option [value]="null">Seleccionar</mat-option>
+          @for (branch of branches(); track branch.branchId) {
+            <mat-option [value]="branch.branchId">{{ branch.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (canReadWarehouses && context().branchId) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Almacén</mat-label>
+        <mat-icon matPrefix>warehouse</mat-icon>
+        <mat-select
+          [value]="context().warehouseId ?? null"
+          (selectionChange)="warehouseChanged($event.value)"
+        >
+          <mat-option [value]="null">Seleccionar</mat-option>
+          @for (warehouse of warehouses(); track warehouse.warehouseId) {
+            <mat-option [value]="warehouse.warehouseId">{{ warehouse.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (canReadCashRegisters && context().branchId) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Caja</mat-label>
+        <mat-icon matPrefix>point_of_sale</mat-icon>
+        <mat-select
+          [value]="context().cashRegisterId ?? null"
+          (selectionChange)="cashRegisterChanged($event.value)"
+        >
+          <mat-option [value]="null">Seleccionar</mat-option>
+          @for (register of cashRegisters(); track register.cashRegisterId) {
+            <mat-option [value]="register.cashRegisterId">{{ register.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+  }
+
+  @if (errorMessage()) {
+    <span class="context-error" role="alert" [attr.title]="errorMessage()">
+      <mat-icon>warning</mat-icon>
+      Contexto no disponible
+    </span>
+  }
+</section>

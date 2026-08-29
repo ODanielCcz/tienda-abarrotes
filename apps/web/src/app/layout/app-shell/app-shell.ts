@@ -10,6 +10,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { AuthSessionStore } from '../../core/auth/auth-session-store';
 import { AuthApi } from '../../features/authentication/data-access/auth-api';
 import { ThemeStore } from '../../core/theme/theme-store';
+import { OperationalContextSelector } from './operational-context-selector/operational-context-selector';
 
 interface NavigationItem {
   label: string;
@@ -30,6 +31,7 @@ interface NavigationItem {
     MatListModule,
     MatSidenavModule,
     MatToolbarModule,
+    OperationalContextSelector,
   ],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.scss',
