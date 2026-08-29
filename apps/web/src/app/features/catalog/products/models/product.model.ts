@@ -34,7 +34,7 @@ export interface ProductPresentation {
   id: string;
   productId: string;
   unitId: string;
-  taxId: string;
+  taxId: string | null;
   sku: string;
   name: string;
   conversionFactor: number;

@@ -41,6 +41,7 @@ export class ProductDetail {
   private readonly reload = new Subject<void>();
   private readonly productId = this.route.snapshot.paramMap.get('productId') ?? '';
 
+  protected readonly backQueryParams = this.route.snapshot.queryParams;
   protected readonly product = signal<Product | null>(null);
   protected readonly presentations = signal<ProductPresentation[]>([]);
   protected readonly brands = signal<Brand[]>([]);
@@ -50,6 +51,8 @@ export class ProductDetail {
   protected readonly displayedColumns = [
     'name',
     'sku',
+    'unit',
+    'tax',
     'conversionFactor',
     'netContent',
     'minimumStock',

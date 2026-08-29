@@ -1,7 +1,12 @@
 <section class="page">
   <header class="page-header">
     <div>
-      <a mat-button routerLink="/catalog/products">
+      <a
+        mat-button
+        routerLink="/catalog/products"
+        [queryParams]="backQueryParams"
+        aria-label="Volver al listado de productos"
+      >
         <mat-icon>arrow_back</mat-icon>
         Productos
       </a>
@@ -60,6 +65,16 @@
             <ng-container matColumnDef="sku">
               <th mat-header-cell *matHeaderCellDef>SKU</th>
               <td mat-cell *matCellDef="let presentation">{{ presentation.sku }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="unit">
+              <th mat-header-cell *matHeaderCellDef>Unidad</th>
+              <td mat-cell *matCellDef="let presentation">{{ presentation.unitId }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="tax">
+              <th mat-header-cell *matHeaderCellDef>Impuesto</th>
+              <td mat-cell *matCellDef="let presentation">{{ presentation.taxId || 'Sin impuesto' }}</td>
             </ng-container>
 
             <ng-container matColumnDef="conversionFactor">

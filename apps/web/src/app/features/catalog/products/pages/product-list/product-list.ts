@@ -10,7 +10,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, ParamMap, RouterLink } from '@angular/router';
 import {
   catchError,
   debounceTime,
@@ -31,6 +31,38 @@ import { CategoryApi } from '../../../categories/data-access/category-api.servic
 import { Category } from '../../../categories/models/category.model';
 import { ProductApi } from '../../data-access/product-api';
 import { Product, ProductStatus } from '../../models/product.model';
+
+export interface RestoredProductListState {
+  page: number;
+  size: number;
+  search?: string;
+  status?: ProductStatus;
+  brandId?: string;
+  categoryId?: string;
+}
+
+export function readProductListQueryParams(params: ParamMap): RestoredProductListState {
+  const pageCandidate = Number(params.get('page'));
+  const sizeCandidate = Number(params.get('size'));
+  const statusCandidate = params.get('status');
+  const search = params.get('search')?.trim() || undefined;
+  const brandId = params.get('brandId')?.trim() || undefined;
+  const categoryId = params.get('categoryId')?.trim() || undefined;
+
+  return {
+    page: Number.isInteger(pageCandidate) && pageCandidate >= 0 ? pageCandidate : 0,
+    size: [10, 20, 50].includes(sizeCandidate) ? sizeCandidate : 20,
+    search,
+    status:
+      statusCandidate === 'ACTIVE' ||
+      statusCandidate === 'INACTIVE' ||
+      statusCandidate === 'DISCONTINUED'
+        ? statusCandidate
+        : undefined,
+    brandId,
+    categoryId,
+  };
+}
 
 @Component({
   selector: 'app-product-list',
@@ -54,6 +86,7 @@ export class ProductList {
   private readonly productApi = inject(ProductApi);
   private readonly brandApi = inject(BrandApi);
   private readonly categoryApi = inject(CategoryApi);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly queryTrigger = new Subject<void>();
 
@@ -84,6 +117,14 @@ export class ProductList {
   protected readonly categoryControl = new FormControl('ALL', { nonNullable: true });
 
   constructor() {
+    const restored = readProductListQueryParams(this.route.snapshot.queryParamMap);
+    this.pageIndex.set(restored.page);
+    this.pageSize.set(restored.size);
+    this.searchControl.setValue(restored.search ?? '', { emitEvent: false });
+    this.statusControl.setValue(restored.status ?? 'ALL', { emitEvent: false });
+    this.brandControl.setValue(restored.brandId ?? 'ALL', { emitEvent: false });
+    this.categoryControl.setValue(restored.categoryId ?? 'ALL', { emitEvent: false });
+
     merge(
       this.searchControl.valueChanges.pipe(debounceTime(300), distinctUntilChanged()),
       this.statusControl.valueChanges.pipe(distinctUntilChanged()),
@@ -168,6 +209,20 @@ export class ProductList {
       this.categories().find((category) => category.id === categoryId)?.name ??
       'Categoría no disponible'
     );
+  }
+
+  protected currentQueryParams(): Record<string, string | number | undefined> {
+    const filters = this.currentFilters();
+    return {
+      page: filters.page,
+      size: filters.size,
+      search: filters.search,
+      status: filters.status,
+      brandId: filters.brandId,
+      categoryId: filters.categoryId,
+      sortBy: filters.sortBy,
+      direction: filters.direction,
+    };
   }
 
   private currentFilters() {

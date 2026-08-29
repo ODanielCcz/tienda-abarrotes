@@ -78,7 +78,12 @@ describe('ProductDetail', () => {
         { provide: CategoryApi, useValue: categoryApi },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: convertToParamMap({ productId: 'product-1' }) } },
+          useValue: {
+            snapshot: {
+              paramMap: convertToParamMap({ productId: 'product-1' }),
+              queryParams: { search: 'arroz', page: '1', size: '20' },
+            },
+          },
         },
       ],
     }).compileComponents();
@@ -96,6 +101,14 @@ describe('ProductDetail', () => {
     expect(fixture.nativeElement.textContent).toContain('Abarrotes');
     expect(fixture.nativeElement.textContent).toContain('Bolsa 1 kg');
     expect(fixture.nativeElement.textContent).toContain('ARROZ-1KG');
+    expect(fixture.nativeElement.textContent).toContain('unit-1');
+    expect(fixture.nativeElement.textContent).toContain('tax-1');
+
+    const backLink = fixture.nativeElement.querySelector(
+      'a[aria-label="Volver al listado de productos"]',
+    ) as HTMLAnchorElement | null;
+    expect(backLink?.getAttribute('href')).toContain('search=arroz');
+    expect(backLink?.getAttribute('href')).toContain('page=1');
   });
 
   it('shows the backend reference when detail loading fails', async () => {

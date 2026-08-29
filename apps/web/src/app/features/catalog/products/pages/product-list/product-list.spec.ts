@@ -1,19 +1,41 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { convertToParamMap, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { BrandApi } from '../../../brands/data-access/brand-api';
 import { CategoryApi } from '../../../categories/data-access/category-api.service';
 import { ProductApi } from '../../data-access/product-api';
-import { ProductList } from './product-list';
+import { ProductList, readProductListQueryParams } from './product-list';
 
 describe('ProductList', () => {
   let fixture: ComponentFixture<ProductList>;
   const productApi = { list: vi.fn() };
   const brandApi = { list: vi.fn() };
   const categoryApi = { list: vi.fn() };
+
+  it('restores filters and pagination from query parameters', () => {
+    expect(
+      readProductListQueryParams(
+        convertToParamMap({
+          page: '2',
+          size: '50',
+          search: 'arroz',
+          status: 'ACTIVE',
+          brandId: 'brand-1',
+          categoryId: 'category-1',
+        }),
+      ),
+    ).toEqual({
+      page: 2,
+      size: 50,
+      search: 'arroz',
+      status: 'ACTIVE',
+      brandId: 'brand-1',
+      categoryId: 'category-1',
+    });
+  });
 
   beforeEach(async () => {
     productApi.list.mockReturnValue(
@@ -88,7 +110,9 @@ describe('ProductList', () => {
       'a[aria-label="Ver detalle de Arroz 1 kg"]',
     ) as HTMLAnchorElement | null;
 
-    expect(link?.getAttribute('href')).toBe('/catalog/products/product-1');
+    expect(link?.getAttribute('href')).toContain('/catalog/products/product-1?');
+    expect(link?.getAttribute('href')).toContain('page=0');
+    expect(link?.getAttribute('href')).toContain('size=20');
   });
 
   it('shows the backend error reference', async () => {

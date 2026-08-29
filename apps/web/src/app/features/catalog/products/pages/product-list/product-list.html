@@ -121,6 +121,7 @@
             <a
               mat-icon-button
               [routerLink]="['/catalog/products', product.id]"
+              [queryParams]="currentQueryParams()"
               [attr.aria-label]="'Ver detalle de ' + product.name"
             >
               <mat-icon>visibility</mat-icon>
