@@ -1,0 +1,101 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Inventario</p>
+      <h1>Existencias del almacén</h1>
+      <p>{{ selectedWarehouse()?.name || 'Almacén seleccionado' }}</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()">
+      <mat-icon>refresh</mat-icon>
+      Actualizar
+    </button>
+  </header>
+
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  } @else {
+    <mat-tab-group animationDuration="0ms">
+      <mat-tab label="Stock">
+        <ng-container *ngTemplateOutlet="stockView" />
+      </mat-tab>
+      @if (canReadLots) {
+        <mat-tab label="Lotes">
+          <ng-container *ngTemplateOutlet="lotsView" />
+        </mat-tab>
+      }
+      @if (canReadPallets) {
+        <mat-tab label="Pallets">
+          <ng-container *ngTemplateOutlet="palletsView" />
+        </mat-tab>
+      }
+      @if (canReadMovements) {
+        <mat-tab label="Movimientos">
+          <ng-container *ngTemplateOutlet="movementsView" />
+        </mat-tab>
+      }
+    </mat-tab-group>
+  }
+</section>
+
+<ng-template #stockView>
+  @if (stock().length === 0) {
+    <p class="state">No hay existencias en este almacén.</p>
+  } @else {
+    <div class="table-shell">
+      <table mat-table [dataSource]="stock()">
+        <ng-container matColumnDef="product"><th mat-header-cell *matHeaderCellDef>Producto</th><td mat-cell *matCellDef="let item"><strong>{{ item.productName }}</strong><small>{{ item.presentationName }}</small></td></ng-container>
+        <ng-container matColumnDef="sku"><th mat-header-cell *matHeaderCellDef>SKU</th><td mat-cell *matCellDef="let item">{{ item.sku }}</td></ng-container>
+        <ng-container matColumnDef="onHand"><th mat-header-cell *matHeaderCellDef>Físico</th><td mat-cell *matCellDef="let item">{{ item.onHandQuantity | number: '1.0-3' }}</td></ng-container>
+        <ng-container matColumnDef="reserved"><th mat-header-cell *matHeaderCellDef>Reservado</th><td mat-cell *matCellDef="let item">{{ item.reservedQuantity | number: '1.0-3' }}</td></ng-container>
+        <ng-container matColumnDef="allocated"><th mat-header-cell *matHeaderCellDef>Asignado</th><td mat-cell *matCellDef="let item">{{ item.allocatedQuantity | number: '1.0-3' }}</td></ng-container>
+        <ng-container matColumnDef="available"><th mat-header-cell *matHeaderCellDef>Disponible</th><td mat-cell *matCellDef="let item"><strong>{{ item.availableQuantity | number: '1.0-3' }}</strong></td></ng-container>
+        <ng-container matColumnDef="averageCost"><th mat-header-cell *matHeaderCellDef>Costo promedio</th><td mat-cell *matCellDef="let item">{{ item.averageUnitCost | number: '1.2-4' }}</td></ng-container>
+        <ng-container matColumnDef="updatedAt"><th mat-header-cell *matHeaderCellDef>Actualizado</th><td mat-cell *matCellDef="let item">{{ item.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</td></ng-container>
+        <tr mat-header-row *matHeaderRowDef="stockColumns"></tr><tr mat-row *matRowDef="let row; columns: stockColumns"></tr>
+      </table>
+    </div>
+  }
+</ng-template>
+
+<ng-template #lotsView>
+  @if (lots().length === 0) { <p class="state">No hay lotes para este almacén.</p> } @else {
+    <div class="table-shell"><table mat-table [dataSource]="lots()">
+      <ng-container matColumnDef="lotNumber"><th mat-header-cell *matHeaderCellDef>Lote</th><td mat-cell *matCellDef="let lot"><strong>{{ lot.lotNumber }}</strong></td></ng-container>
+      <ng-container matColumnDef="presentation"><th mat-header-cell *matHeaderCellDef>Presentación</th><td mat-cell *matCellDef="let lot">{{ presentationName(lot.productPresentationId) }}</td></ng-container>
+      <ng-container matColumnDef="manufacturedAt"><th mat-header-cell *matHeaderCellDef>Producción</th><td mat-cell *matCellDef="let lot">{{ lot.manufacturedAt ? (lot.manufacturedAt | date: 'dd/MM/yyyy') : 'No informada' }}</td></ng-container>
+      <ng-container matColumnDef="expiresAt"><th mat-header-cell *matHeaderCellDef>Caducidad</th><td mat-cell *matCellDef="let lot">{{ lot.expiresAt ? (lot.expiresAt | date: 'dd/MM/yyyy') : 'No aplica' }}</td></ng-container>
+      <ng-container matColumnDef="onHand"><th mat-header-cell *matHeaderCellDef>Físico</th><td mat-cell *matCellDef="let lot">{{ lot.onHandQuantity | number: '1.0-3' }}</td></ng-container>
+      <ng-container matColumnDef="available"><th mat-header-cell *matHeaderCellDef>Disponible</th><td mat-cell *matCellDef="let lot">{{ lot.availableQuantity | number: '1.0-3' }}</td></ng-container>
+      <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let lot">{{ lot.status }}</td></ng-container>
+      <tr mat-header-row *matHeaderRowDef="lotColumns"></tr><tr mat-row *matRowDef="let row; columns: lotColumns"></tr>
+    </table></div>
+  }
+</ng-template>
+
+<ng-template #palletsView>
+  @if (pallets().length === 0) { <p class="state">No hay pallets en este almacén.</p> } @else {
+    <div class="table-shell"><table mat-table [dataSource]="pallets()">
+      <ng-container matColumnDef="code"><th mat-header-cell *matHeaderCellDef>Pallet</th><td mat-cell *matCellDef="let pallet"><strong>{{ pallet.palletCode }}</strong></td></ng-container>
+      <ng-container matColumnDef="externalCode"><th mat-header-cell *matHeaderCellDef>Código externo</th><td mat-cell *matCellDef="let pallet">{{ pallet.externalPalletCode || 'Sin código' }}</td></ng-container>
+      <ng-container matColumnDef="items"><th mat-header-cell *matHeaderCellDef>Cantidad</th><td mat-cell *matCellDef="let pallet">{{ palletItemCount(pallet) | number: '1.0-3' }}</td></ng-container>
+      <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let pallet">{{ pallet.status }}</td></ng-container>
+      <ng-container matColumnDef="receivedAt"><th mat-header-cell *matHeaderCellDef>Recibido</th><td mat-cell *matCellDef="let pallet">{{ pallet.receivedAt | date: 'dd/MM/yyyy HH:mm' }}</td></ng-container>
+      <tr mat-header-row *matHeaderRowDef="palletColumns"></tr><tr mat-row *matRowDef="let row; columns: palletColumns"></tr>
+    </table></div>
+  }
+</ng-template>
+
+<ng-template #movementsView>
+  @if (movements().length === 0) { <p class="state">No hay movimientos en este almacén.</p> } @else {
+    <div class="table-shell"><table mat-table [dataSource]="movements()">
+      <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let movement"><strong>{{ movement.movementType }}</strong></td></ng-container>
+      <ng-container matColumnDef="source"><th mat-header-cell *matHeaderCellDef>Origen</th><td mat-cell *matCellDef="let movement">{{ movement.sourceType || 'Manual' }}</td></ng-container>
+      <ng-container matColumnDef="items"><th mat-header-cell *matHeaderCellDef>Partidas</th><td mat-cell *matCellDef="let movement">{{ movement.items.length }}</td></ng-container>
+      <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let movement">{{ movement.status }}</td></ng-container>
+      <ng-container matColumnDef="createdAt"><th mat-header-cell *matHeaderCellDef>Fecha</th><td mat-cell *matCellDef="let movement">{{ movement.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td></ng-container>
+      <tr mat-header-row *matHeaderRowDef="movementColumns"></tr><tr mat-row *matRowDef="let row; columns: movementColumns"></tr>
+    </table></div>
+  }
+</ng-template>

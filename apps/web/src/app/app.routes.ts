@@ -105,8 +105,8 @@ export const routes: Routes = [
           icon: 'warehouse',
         },
         loadComponent: () =>
-          import('./shared/pages/module-placeholder/module-placeholder').then(
-            (module) => module.ModulePlaceholder,
+          import('./features/inventory/pages/inventory-overview/inventory-overview').then(
+            (module) => module.InventoryOverview,
           ),
       },
       {
