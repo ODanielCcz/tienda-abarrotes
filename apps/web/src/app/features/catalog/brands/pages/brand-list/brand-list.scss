@@ -26,6 +26,17 @@ h1 {
   color: var(--mat-sys-on-surface-variant);
 }
 
+.header-actions,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row-actions {
+  justify-content: flex-end;
+}
+
 .filters {
   display: flex;
   align-items: end;

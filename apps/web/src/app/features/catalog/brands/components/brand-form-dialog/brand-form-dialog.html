@@ -1,0 +1,45 @@
+<h2 mat-dialog-title>{{ data.brand ? 'Editar marca' : 'Nueva marca' }}</h2>
+
+<mat-dialog-content>
+  <form id="brand-form" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline">
+      <mat-label>Código</mat-label>
+      <input matInput formControlName="code" maxlength="50" autocomplete="off" />
+      <mat-hint>Se guardará en mayúsculas.</mat-hint>
+      @if (form.controls.code.hasError('required')) {
+        <mat-error>El código es obligatorio.</mat-error>
+      } @else if (form.controls.code.hasError('pattern')) {
+        <mat-error>Usa letras, números, guiones o guiones bajos.</mat-error>
+      } @else if (form.controls.code.hasError('maxlength')) {
+        <mat-error>El código admite hasta 50 caracteres.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre</mat-label>
+      <input matInput formControlName="name" maxlength="150" autocomplete="off" />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>El nombre es obligatorio.</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error>El nombre admite hasta 150 caracteres.</mat-error>
+      }
+    </mat-form-field>
+  </form>
+
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="null" [disabled]="submitting()">
+    Cancelar
+  </button>
+  <button mat-flat-button type="submit" form="brand-form" [disabled]="form.invalid || submitting()">
+    @if (submitting()) {
+      <mat-spinner diameter="20" />
+    } @else {
+      Guardar
+    }
+  </button>
+</mat-dialog-actions>
