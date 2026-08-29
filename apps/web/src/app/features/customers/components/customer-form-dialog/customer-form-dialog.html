@@ -1,0 +1,37 @@
+<h2 mat-dialog-title>{{ data.customer ? 'Editar cliente' : 'Nuevo cliente' }}</h2>
+<mat-dialog-content
+  ><form id="customer-form" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline"
+      ><mat-label>Código</mat-label
+      ><input matInput formControlName="customerCode" maxlength="50" /></mat-form-field
+    ><mat-form-field appearance="outline"
+      ><mat-label>Tipo</mat-label
+      ><mat-select formControlName="customerType"
+        ><mat-option value="GENERAL">General</mat-option
+        ><mat-option value="PERSON">Persona</mat-option
+        ><mat-option value="BUSINESS">Empresa</mat-option></mat-select
+      ></mat-form-field
+    ><mat-form-field appearance="outline" class="wide"
+      ><mat-label>Nombre</mat-label
+      ><input matInput formControlName="displayName" maxlength="200" /></mat-form-field
+    ><mat-form-field appearance="outline"
+      ><mat-label>Correo</mat-label
+      ><input matInput type="email" formControlName="email" maxlength="254" /></mat-form-field
+    ><mat-form-field appearance="outline"
+      ><mat-label>Teléfono</mat-label><input matInput formControlName="phone" maxlength="40"
+    /></mat-form-field>
+  </form>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }</mat-dialog-content
+><mat-dialog-actions align="end"
+  ><button mat-button type="button" [mat-dialog-close]="null">Cancelar</button
+  ><button
+    mat-flat-button
+    type="submit"
+    form="customer-form"
+    [disabled]="form.invalid || submitting()"
+  >
+    Guardar
+  </button></mat-dialog-actions
+>

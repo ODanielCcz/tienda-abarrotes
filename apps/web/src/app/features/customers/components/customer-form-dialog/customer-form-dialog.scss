@@ -1,0 +1,19 @@
+form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.wide {
+  grid-column: 1/-1;
+}
+.error-state {
+  color: var(--mat-sys-error);
+}
+@media (max-width: 600px) {
+  form {
+    grid-template-columns: 1fr;
+  }
+  .wide {
+    grid-column: auto;
+  }
+}

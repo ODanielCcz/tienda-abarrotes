@@ -207,15 +207,10 @@ export const routes: Routes = [
       {
         path: 'customers',
         canActivate: [permissionGuard],
-        data: {
-          permissions: ['SALES_CUSTOMER_READ'],
-          title: 'Clientes',
-          description: 'Consulta y administra clientes de la tienda.',
-          icon: 'groups',
-        },
+        data: { permissions: ['SALES_CUSTOMER_READ'] },
         loadComponent: () =>
-          import('./shared/pages/module-placeholder/module-placeholder').then(
-            (module) => module.ModulePlaceholder,
+          import('./features/customers/pages/customer-list/customer-list').then(
+            (module) => module.CustomerList,
           ),
       },
       {
