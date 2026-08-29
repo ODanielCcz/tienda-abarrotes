@@ -1,0 +1,54 @@
+<h2 mat-dialog-title>{{ data.supplier ? 'Editar proveedor' : 'Nuevo proveedor' }}</h2>
+<mat-dialog-content>
+  <form id="supplier-form" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline"
+      ><mat-label>Código</mat-label
+      ><input matInput formControlName="supplierCode" maxlength="50" /><mat-hint
+        >Se guardará en mayúsculas.</mat-hint
+      ></mat-form-field
+    >
+    <mat-form-field appearance="outline"
+      ><mat-label>Razón social</mat-label
+      ><input matInput formControlName="legalName" maxlength="200"
+    /></mat-form-field>
+    <mat-form-field appearance="outline"
+      ><mat-label>Nombre comercial</mat-label
+      ><input matInput formControlName="tradeName" maxlength="200"
+    /></mat-form-field>
+    <mat-form-field appearance="outline"
+      ><mat-label>RFC / identificación fiscal</mat-label
+      ><input matInput formControlName="taxId" maxlength="20"
+    /></mat-form-field>
+    <mat-form-field appearance="outline"
+      ><mat-label>Correo</mat-label
+      ><input matInput type="email" formControlName="email" maxlength="254"
+    /></mat-form-field>
+    <mat-form-field appearance="outline"
+      ><mat-label>Teléfono</mat-label><input matInput formControlName="phone" maxlength="40"
+    /></mat-form-field>
+    <mat-form-field appearance="outline"
+      ><mat-label>Días de crédito</mat-label
+      ><input matInput type="number" min="0" formControlName="creditDays"
+    /></mat-form-field>
+  </form>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="null" [disabled]="submitting()">
+    Cancelar
+  </button>
+  <button
+    mat-flat-button
+    type="submit"
+    form="supplier-form"
+    [disabled]="form.invalid || submitting()"
+  >
+    @if (submitting()) {
+      <mat-spinner diameter="20" />
+    } @else {
+      Guardar
+    }
+  </button>
+</mat-dialog-actions>

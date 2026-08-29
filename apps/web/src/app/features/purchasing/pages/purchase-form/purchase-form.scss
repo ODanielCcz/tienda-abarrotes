@@ -1,0 +1,52 @@
+:host,
+.page,
+form {
+  display: block;
+}
+.page,
+form {
+  display: grid;
+  gap: 1rem;
+}
+.eyebrow {
+  margin: 0;
+  color: var(--mat-sys-primary);
+  font-weight: 700;
+}
+h1 {
+  margin: 0.25rem 0;
+}
+.general-grid,
+.item {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.item {
+  align-items: start;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+mat-card-header,
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+footer {
+  justify-content: flex-end;
+}
+.state {
+  text-align: center;
+  padding: 2rem;
+}
+.error-state {
+  color: var(--mat-sys-error);
+}
+@media (max-width: 800px) {
+  .general-grid,
+  .item {
+    grid-template-columns: 1fr;
+  }
+}

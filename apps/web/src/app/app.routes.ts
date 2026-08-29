@@ -90,9 +90,9 @@ export const routes: Routes = [
           permissions: ['CATALOG_CATEGORY_READ'],
         },
         loadComponent: () =>
-          import(
-            './features/catalog/categories/pages/category-list/category-list'
-          ).then((module) => module.CategoryList),
+          import('./features/catalog/categories/pages/category-list/category-list').then(
+            (module) => module.CategoryList,
+          ),
       },
       {
         path: 'inventory',
@@ -117,9 +117,43 @@ export const routes: Routes = [
           operationalContext: 'WAREHOUSE',
         },
         loadComponent: () =>
-          import(
-            './features/inventory/pages/inventory-receipt-form/inventory-receipt-form'
-          ).then((module) => module.InventoryReceiptForm),
+          import('./features/inventory/pages/inventory-receipt-form/inventory-receipt-form').then(
+            (module) => module.InventoryReceiptForm,
+          ),
+      },
+      {
+        path: 'purchasing',
+        canActivate: [permissionGuard, operationalContextGuard],
+        data: {
+          permissions: ['PURCHASING_PURCHASE_READ', 'PURCHASING_SUPPLIER_READ'],
+          permissionMatch: 'ANY',
+          operationalContext: 'WAREHOUSE',
+        },
+        loadComponent: () =>
+          import('./features/purchasing/pages/purchasing-overview/purchasing-overview').then(
+            (module) => module.PurchasingOverview,
+          ),
+      },
+      {
+        path: 'purchasing/purchases/new',
+        canActivate: [permissionGuard, operationalContextGuard],
+        data: {
+          permissions: ['PURCHASING_PURCHASE_CREATE'],
+          operationalContext: 'WAREHOUSE',
+        },
+        loadComponent: () =>
+          import('./features/purchasing/pages/purchase-form/purchase-form').then(
+            (module) => module.PurchaseForm,
+          ),
+      },
+      {
+        path: 'purchasing/purchases/:purchaseId',
+        canActivate: [permissionGuard],
+        data: { permissions: ['PURCHASING_PURCHASE_READ'] },
+        loadComponent: () =>
+          import('./features/purchasing/pages/purchase-detail/purchase-detail').then(
+            (module) => module.PurchaseDetail,
+          ),
       },
       {
         path: 'sales',

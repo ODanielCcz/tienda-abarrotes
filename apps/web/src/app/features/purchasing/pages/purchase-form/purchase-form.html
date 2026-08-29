@@ -1,0 +1,111 @@
+<section class="page">
+  <header>
+    <a mat-button routerLink="/purchasing"><mat-icon>arrow_back</mat-icon>Compras</a>
+    <p class="eyebrow">Abastecimiento</p>
+    <h1>Nueva compra</h1>
+    <p>{{ selectedWarehouse()?.name || 'Almacén seleccionado' }}</p>
+  </header>
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <mat-card appearance="outlined"
+        ><mat-card-content
+          ><div class="general-grid">
+            <mat-form-field appearance="outline"
+              ><mat-label>Proveedor</mat-label
+              ><mat-select formControlName="supplierId">
+                @for (s of suppliers(); track s.supplierId) {
+                  <mat-option [value]="s.supplierId">{{ s.tradeName || s.legalName }}</mat-option>
+                }
+              </mat-select></mat-form-field
+            ><mat-form-field appearance="outline"
+              ><mat-label>Documento del proveedor</mat-label
+              ><input matInput formControlName="supplierDocument" maxlength="100" /></mat-form-field
+            ><mat-form-field appearance="outline"
+              ><mat-label>Moneda</mat-label
+              ><input matInput formControlName="currencyCode" maxlength="3"
+            /></mat-form-field></div></mat-card-content
+      ></mat-card>
+      <mat-card appearance="outlined"
+        ><mat-card-header
+          ><mat-card-title>Partidas</mat-card-title><span></span
+          ><button mat-stroked-button type="button" (click)="addItem()">
+            <mat-icon>add</mat-icon>Agregar
+          </button></mat-card-header
+        ><mat-card-content formArrayName="items">
+          @for (item of items.controls; track item; let i = $index) {
+            <section class="item" [formGroupName]="i">
+              <mat-form-field appearance="outline"
+                ><mat-label>Producto</mat-label
+                ><mat-select
+                  formControlName="productId"
+                  (selectionChange)="loadPresentations($event.value, item)"
+                >
+                  @for (p of products(); track p.id) {
+                    <mat-option [value]="p.id">{{ p.name }}</mat-option>
+                  }
+                </mat-select></mat-form-field
+              ><mat-form-field appearance="outline"
+                ><mat-label>Presentación</mat-label
+                ><mat-select formControlName="productPresentationId">
+                  @for (p of presentationsFor(item.controls['productId'].value); track p.id) {
+                    <mat-option [value]="p.id">{{ p.name }} · {{ p.sku }}</mat-option>
+                  }
+                </mat-select></mat-form-field
+              ><mat-form-field appearance="outline"
+                ><mat-label>Cantidad</mat-label
+                ><input
+                  matInput
+                  type="number"
+                  min=".001"
+                  step=".001"
+                  formControlName="quantity" /></mat-form-field
+              ><mat-form-field appearance="outline"
+                ><mat-label>Costo unitario</mat-label
+                ><input
+                  matInput
+                  type="number"
+                  min="0"
+                  step=".0001"
+                  formControlName="unitCost" /></mat-form-field
+              ><mat-form-field appearance="outline"
+                ><mat-label>Descuento</mat-label
+                ><input
+                  matInput
+                  type="number"
+                  min="0"
+                  step=".01"
+                  formControlName="discountAmount" /></mat-form-field
+              ><mat-form-field appearance="outline"
+                ><mat-label>Impuesto total</mat-label
+                ><input
+                  matInput
+                  type="number"
+                  min="0"
+                  step=".01"
+                  formControlName="taxAmount" /></mat-form-field
+              ><button
+                mat-icon-button
+                type="button"
+                (click)="removeItem(i)"
+                aria-label="Eliminar partida"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </section>
+          }
+        </mat-card-content></mat-card
+      >
+      @if (errorMessage()) {
+        <p class="error-state" role="alert">{{ errorMessage() }}</p>
+      }
+      <footer>
+        <a mat-button routerLink="/purchasing">Cancelar</a
+        ><button mat-flat-button type="submit" [disabled]="form.invalid || submitting()">
+          Guardar borrador
+        </button>
+      </footer>
+    </form>
+  }
+</section>

@@ -1,0 +1,71 @@
+:host,
+.page {
+  display: block;
+}
+.page {
+  display: grid;
+  gap: 1rem;
+}
+.page-header,
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.eyebrow {
+  margin: 0;
+  color: var(--mat-sys-primary);
+  font-weight: 700;
+}
+h1 {
+  margin: 0.25rem 0;
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.summary div,
+td strong,
+td small,
+.receipt-item > div {
+  display: grid;
+  gap: 0.2rem;
+}
+.summary span,
+td small,
+.receipt-item small {
+  color: var(--mat-sys-on-surface-variant);
+}
+.table-shell {
+  overflow: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+}
+table {
+  width: 100%;
+}
+.receipt-item {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(4, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem 0;
+}
+.state {
+  text-align: center;
+  padding: 2rem;
+}
+.error-state {
+  color: var(--mat-sys-error);
+}
+@media (max-width: 900px) {
+  .summary,
+  .receipt-item {
+    grid-template-columns: 1fr 1fr;
+  }
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

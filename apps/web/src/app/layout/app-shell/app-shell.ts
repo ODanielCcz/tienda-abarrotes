@@ -82,6 +82,12 @@ export class AppShell {
         permissions: ['INVENTORY_STOCK_READ', 'INVENTORY_MOVEMENT_READ'],
       },
       {
+        label: 'Compras',
+        icon: 'shopping_cart',
+        route: '/purchasing',
+        permissions: ['PURCHASING_PURCHASE_READ', 'PURCHASING_SUPPLIER_READ'],
+      },
+      {
         label: 'Ventas',
         icon: 'point_of_sale',
         route: '/sales',
