@@ -16,6 +16,8 @@ import com.odcc.tienda.modules.catalog.application.port.in.GetProductByIdUseCase
 import com.odcc.tienda.modules.catalog.application.port.in.GetProductPresentationByIdUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.ListBrandsUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.ListCategoriesUseCase;
+import com.odcc.tienda.modules.catalog.application.port.in.ListCatalogTaxesUseCase;
+import com.odcc.tienda.modules.catalog.application.port.in.ListCatalogUnitsUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.ListProductPresentationsUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.ListProductsUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.UpdateBrandUseCase;
@@ -24,6 +26,7 @@ import com.odcc.tienda.modules.catalog.application.port.in.UpdateProductPresenta
 import com.odcc.tienda.modules.catalog.application.port.in.UpdateProductUseCase;
 import com.odcc.tienda.modules.catalog.application.port.out.BrandRepositoryPort;
 import com.odcc.tienda.modules.catalog.application.port.out.CategoryRepositoryPort;
+import com.odcc.tienda.modules.catalog.application.port.out.CatalogReferenceDataRepositoryPort;
 import com.odcc.tienda.modules.catalog.application.port.out.ProductPresentationRepositoryPort;
 import com.odcc.tienda.modules.catalog.application.port.out.ProductRepositoryPort;
 import com.odcc.tienda.modules.catalog.application.usecase.ChangeBrandStatusService;
@@ -42,6 +45,8 @@ import com.odcc.tienda.modules.catalog.application.usecase.GetProductByIdService
 import com.odcc.tienda.modules.catalog.application.usecase.GetProductPresentationByIdService;
 import com.odcc.tienda.modules.catalog.application.usecase.ListBrandsService;
 import com.odcc.tienda.modules.catalog.application.usecase.ListCategoriesService;
+import com.odcc.tienda.modules.catalog.application.usecase.ListCatalogTaxesService;
+import com.odcc.tienda.modules.catalog.application.usecase.ListCatalogUnitsService;
 import com.odcc.tienda.modules.catalog.application.usecase.ListProductPresentationsService;
 import com.odcc.tienda.modules.catalog.application.usecase.ListProductsService;
 import com.odcc.tienda.modules.catalog.application.usecase.UpdateBrandService;
@@ -55,6 +60,16 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration(proxyBeanMethods = false)
 public class CatalogConfiguration {
+
+    @Bean
+    ListCatalogUnitsUseCase listCatalogUnitsUseCase(CatalogReferenceDataRepositoryPort repository) {
+        return new ListCatalogUnitsService(repository);
+    }
+
+    @Bean
+    ListCatalogTaxesUseCase listCatalogTaxesUseCase(CatalogReferenceDataRepositoryPort repository) {
+        return new ListCatalogTaxesService(repository);
+    }
 
     @Bean
     CreateBrandUseCase createBrandUseCase(
