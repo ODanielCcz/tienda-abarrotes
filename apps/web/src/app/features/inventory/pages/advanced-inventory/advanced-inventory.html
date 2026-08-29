@@ -1,0 +1,278 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <a mat-button routerLink="/inventory"><mat-icon>arrow_back</mat-icon>Inventario</a>
+      <p class="eyebrow">Operaciones</p>
+      <h1>Inventario avanzado</h1>
+      <p>{{ selectedWarehouse()?.name || 'Almacén seleccionado' }}</p>
+    </div>
+  </header>
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else {
+    @if (successMessage()) {
+      <p class="success-state" role="status">{{ successMessage() }}</p>
+    }
+    @if (errorMessage()) {
+      <p class="error-state" role="alert">{{ errorMessage() }}</p>
+    }
+    <mat-tab-group animationDuration="0ms">
+      @if (canAdjust) {
+        <mat-tab label="Ajuste"><ng-container *ngTemplateOutlet="adjustment" /></mat-tab>
+      }
+      @if (canTransfer) {
+        <mat-tab label="Traspaso"><ng-container *ngTemplateOutlet="transferView" /></mat-tab>
+      }
+      @if (canCreateCount) {
+        <mat-tab label="Conteo"><ng-container *ngTemplateOutlet="countView" /></mat-tab>
+      }
+      @if (canReserve) {
+        <mat-tab label="Reserva"><ng-container *ngTemplateOutlet="reservationView" /></mat-tab>
+      }
+      @if (canReadExpiring) {
+        <mat-tab label="Caducidades"><ng-container *ngTemplateOutlet="expirationView" /></mat-tab>
+      }
+    </mat-tab-group>
+  }
+</section>
+
+<ng-template #adjustment
+  ><mat-card appearance="outlined"
+    ><mat-card-content
+      ><form [formGroup]="adjustmentForm" (ngSubmit)="adjust()">
+        <div class="form-grid">
+          <ng-container
+            *ngTemplateOutlet="presentationField; context: { form: adjustmentForm }"
+          /><ng-container
+            *ngTemplateOutlet="lotField; context: { form: adjustmentForm }"
+          /><mat-form-field appearance="outline"
+            ><mat-label>Dirección</mat-label
+            ><mat-select formControlName="direction"
+              ><mat-option value="IN">Entrada</mat-option
+              ><mat-option value="OUT">Salida</mat-option></mat-select
+            ></mat-form-field
+          ><mat-form-field appearance="outline"
+            ><mat-label>Cantidad</mat-label
+            ><input
+              matInput
+              type="number"
+              min=".001"
+              step=".001"
+              formControlName="quantity" /></mat-form-field
+          ><mat-form-field appearance="outline"
+            ><mat-label>Costo unitario</mat-label
+            ><input
+              matInput
+              type="number"
+              min="0"
+              step=".0001"
+              formControlName="unitCost" /></mat-form-field
+          ><mat-form-field appearance="outline" class="wide"
+            ><mat-label>Motivo</mat-label><input matInput formControlName="reason"
+          /></mat-form-field>
+        </div>
+        <button mat-flat-button type="submit" [disabled]="adjustmentForm.invalid || processing()">
+          Registrar ajuste
+        </button>
+      </form></mat-card-content
+    ></mat-card
+  ></ng-template
+>
+
+<ng-template #transferView
+  ><mat-card appearance="outlined"
+    ><mat-card-content
+      ><form [formGroup]="transferForm" (ngSubmit)="transfer()">
+        <div class="form-grid">
+          <mat-form-field appearance="outline"
+            ><mat-label>Almacén destino</mat-label
+            ><mat-select formControlName="toWarehouseId">
+              @for (warehouse of destinations(); track warehouse.warehouseId) {
+                <mat-option [value]="warehouse.warehouseId">{{ warehouse.name }}</mat-option>
+              }
+            </mat-select></mat-form-field
+          ><ng-container
+            *ngTemplateOutlet="presentationField; context: { form: transferForm }"
+          /><ng-container
+            *ngTemplateOutlet="lotField; context: { form: transferForm }"
+          /><mat-form-field appearance="outline"
+            ><mat-label>Cantidad</mat-label
+            ><input
+              matInput
+              type="number"
+              min=".001"
+              step=".001"
+              formControlName="quantity" /></mat-form-field
+          ><mat-form-field appearance="outline"
+            ><mat-label>Costo unitario</mat-label
+            ><input
+              matInput
+              type="number"
+              min="0"
+              step=".0001"
+              formControlName="unitCost" /></mat-form-field
+          ><mat-form-field appearance="outline"
+            ><mat-label>Motivo</mat-label><input matInput formControlName="reason"
+          /></mat-form-field>
+        </div>
+        <button mat-flat-button type="submit" [disabled]="transferForm.invalid || processing()">
+          Registrar traspaso
+        </button>
+      </form></mat-card-content
+    ></mat-card
+  ></ng-template
+>
+
+<ng-template #countView
+  ><mat-card appearance="outlined"
+    ><mat-card-content
+      ><form [formGroup]="countForm" (ngSubmit)="createCount()">
+        <div class="form-grid">
+          <ng-container
+            *ngTemplateOutlet="presentationField; context: { form: countForm }"
+          /><ng-container
+            *ngTemplateOutlet="lotField; context: { form: countForm }"
+          /><mat-form-field appearance="outline"
+            ><mat-label>Cantidad contada</mat-label
+            ><input matInput type="number" min="0" step=".001" formControlName="countedQuantity"
+          /></mat-form-field>
+        </div>
+        <button mat-flat-button type="submit" [disabled]="countForm.invalid || processing()">
+          Crear conteo
+        </button>
+      </form>
+      @if (pendingCount(); as count) {
+        <div class="pending">
+          <div>
+            <strong>Conteo {{ count.inventoryCountId }}</strong>
+            <p>Estado: {{ count.status }}. La diferencia se aplicará al confirmar.</p>
+          </div>
+          @if (canConfirmCount) {
+            <button
+              mat-flat-button
+              type="button"
+              (click)="confirmCount()"
+              [disabled]="processing()"
+            >
+              Confirmar conteo
+            </button>
+          }
+        </div>
+      }
+    </mat-card-content></mat-card
+  ></ng-template
+>
+
+<ng-template #reservationView
+  ><mat-card appearance="outlined"
+    ><mat-card-content
+      ><form [formGroup]="reservationForm" (ngSubmit)="reserve()">
+        <div class="form-grid">
+          <ng-container
+            *ngTemplateOutlet="presentationField; context: { form: reservationForm }"
+          /><ng-container
+            *ngTemplateOutlet="lotField; context: { form: reservationForm }"
+          /><mat-form-field appearance="outline"
+            ><mat-label>Cantidad</mat-label
+            ><input
+              matInput
+              type="number"
+              min=".001"
+              step=".001"
+              formControlName="quantity" /></mat-form-field
+          ><mat-form-field appearance="outline"
+            ><mat-label>Tipo de origen</mat-label
+            ><input matInput formControlName="sourceType" /></mat-form-field
+          ><mat-form-field appearance="outline"
+            ><mat-label>Expira</mat-label
+            ><input matInput type="datetime-local" formControlName="expiresAt"
+          /></mat-form-field>
+        </div>
+        <button mat-flat-button type="submit" [disabled]="reservationForm.invalid || processing()">
+          Crear reserva
+        </button>
+      </form>
+      @if (recentReservation(); as reservation) {
+        <div class="pending">
+          <div>
+            <strong>Reserva {{ reservation.reservationId }}</strong>
+            <p>Estado: {{ reservation.status }}</p>
+          </div>
+          @if (canRelease && reservation.status === 'ACTIVE') {
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="releaseReservation()"
+              [disabled]="processing()"
+            >
+              Liberar reserva
+            </button>
+          }
+        </div>
+      }
+    </mat-card-content></mat-card
+  ></ng-template
+>
+
+<ng-template #expirationView
+  ><mat-card appearance="outlined"
+    ><mat-card-content
+      ><form class="expiration-filter" [formGroup]="expirationForm" (ngSubmit)="refreshExpiring()">
+        <mat-form-field appearance="outline"
+          ><mat-label>Caduca hasta</mat-label
+          ><input matInput type="date" formControlName="expiresBefore" /></mat-form-field
+        ><button mat-stroked-button type="submit">Consultar</button>
+      </form>
+      <div class="table-shell">
+        <table mat-table [dataSource]="expiringLots()">
+          <ng-container matColumnDef="lot"
+            ><th mat-header-cell *matHeaderCellDef>Lote</th>
+            <td mat-cell *matCellDef="let lot">{{ lot.lotNumber }}</td></ng-container
+          ><ng-container matColumnDef="product"
+            ><th mat-header-cell *matHeaderCellDef>Presentación</th>
+            <td mat-cell *matCellDef="let lot">
+              {{ presentationLabel(lot.productPresentationId) }}
+            </td></ng-container
+          ><ng-container matColumnDef="expiresAt"
+            ><th mat-header-cell *matHeaderCellDef>Caducidad</th>
+            <td mat-cell *matCellDef="let lot">
+              {{ lot.expiresAt | date: 'dd/MM/yyyy' }}
+            </td></ng-container
+          ><ng-container matColumnDef="available"
+            ><th mat-header-cell *matHeaderCellDef>Disponible</th>
+            <td mat-cell *matCellDef="let lot">
+              {{ lot.availableQuantity | number: '1.0-3' }}
+            </td></ng-container
+          >
+          <tr mat-header-row *matHeaderRowDef="lotColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: lotColumns"></tr>
+        </table></div></mat-card-content></mat-card
+></ng-template>
+
+<ng-template #presentationField let-form="form"
+  ><div [formGroup]="form">
+    <mat-form-field appearance="outline"
+      ><mat-label>Presentación</mat-label
+      ><mat-select formControlName="productPresentationId">
+        @for (item of stock(); track item.productPresentationId) {
+          <mat-option [value]="item.productPresentationId">{{ stockLabel(item) }}</mat-option>
+        }
+      </mat-select></mat-form-field
+    >
+  </div></ng-template
+>
+<ng-template #lotField let-form="form"
+  ><div [formGroup]="form">
+    <mat-form-field appearance="outline"
+      ><mat-label>Lote</mat-label
+      ><mat-select formControlName="lotId"
+        ><mat-option [value]="null">Sin lote</mat-option>
+        @for (lot of lotsFor(form.controls.productPresentationId.value); track lot.lotId) {
+          <mat-option [value]="lot.lotId"
+            >{{ lot.lotNumber }} · disponible {{ lot.availableQuantity }}</mat-option
+          >
+        }
+      </mat-select></mat-form-field
+    >
+  </div></ng-template
+>

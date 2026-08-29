@@ -122,6 +122,25 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'inventory/operations',
+        canActivate: [permissionGuard, operationalContextGuard],
+        data: {
+          permissions: [
+            'INVENTORY_ADJUSTMENT_CREATE',
+            'INVENTORY_TRANSFER_CREATE',
+            'INVENTORY_COUNT_CREATE',
+            'INVENTORY_RESERVATION_CREATE',
+            'INVENTORY_EXPIRING_LOT_READ',
+          ],
+          permissionMatch: 'ANY',
+          operationalContext: 'WAREHOUSE',
+        },
+        loadComponent: () =>
+          import('./features/inventory/pages/advanced-inventory/advanced-inventory').then(
+            (module) => module.AdvancedInventory,
+          ),
+      },
+      {
         path: 'purchasing',
         canActivate: [permissionGuard, operationalContextGuard],
         data: {

@@ -6,13 +6,19 @@ import { API_CONFIG } from '../../../core/config/api.config';
 import { ApiResponse } from '../../../shared/models/api-response.model';
 import {
   CreateInventoryReceiptRequest,
+  InventoryAdjustmentRequest,
+  InventoryCount,
+  InventoryCountRequest,
   InventoryReceipt,
+  InventoryReservation,
+  InventoryTransferRequest,
   InventoryLot,
   InventoryPallet,
   LotFilters,
   MovementFilters,
   StockBalance,
   StockMovement,
+  ReservationRequest,
 } from '../models/inventory.model';
 
 @Injectable({ providedIn: 'root' })
@@ -61,9 +67,50 @@ export class InventoryApi {
       );
   }
 
+  adjust(request: InventoryAdjustmentRequest): Observable<StockMovement> {
+    return this.postWithData('/inventory/adjustments', request, 'ajuste');
+  }
+
+  transfer(request: InventoryTransferRequest): Observable<StockMovement[]> {
+    return this.postWithData('/inventory/transfers', request, 'traspaso');
+  }
+
+  createCount(request: InventoryCountRequest): Observable<InventoryCount> {
+    return this.postWithData('/inventory/counts', request, 'conteo');
+  }
+
+  confirmCount(inventoryCountId: string): Observable<InventoryCount> {
+    return this.postWithData(`/inventory/counts/${inventoryCountId}/confirm`, {}, 'conteo');
+  }
+
+  reserve(request: ReservationRequest): Observable<InventoryReservation> {
+    return this.postWithData('/inventory/reservations', request, 'reserva');
+  }
+
+  releaseReservation(reservationId: string): Observable<InventoryReservation> {
+    return this.postWithData(`/inventory/reservations/${reservationId}/release`, {}, 'reserva');
+  }
+
+  listExpiringLots(expiresBefore?: string): Observable<InventoryLot[]> {
+    let params = new HttpParams();
+    if (expiresBefore) params = params.set('expiresBefore', expiresBefore);
+    return this.getList('/inventory/expiring-lots', params);
+  }
+
   private getList<T>(path: string, params: HttpParams): Observable<T[]> {
     return this.http
       .get<ApiResponse<T[]>>(`${this.apiConfig.baseUrl}${path}`, { params })
       .pipe(map((response) => response.data ?? []));
+  }
+
+  private postWithData<T>(path: string, body: unknown, resource: string): Observable<T> {
+    return this.http.post<ApiResponse<T>>(`${this.apiConfig.baseUrl}${path}`, body).pipe(
+      map((response) => {
+        if (response.data === null) {
+          throw new Error(`La API respondió sin datos de ${resource}.`);
+        }
+        return response.data;
+      }),
+    );
   }
 }

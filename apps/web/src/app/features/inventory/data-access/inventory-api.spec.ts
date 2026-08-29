@@ -41,9 +41,9 @@ describe('InventoryApi', () => {
     api.listPallets(warehouseId).subscribe((data) => expect(data).toEqual([]));
     expectGet('/api/v1/inventory/pallets', warehouseId);
 
-    api.listMovements({ warehouseId, status: 'CONFIRMED' }).subscribe((data) =>
-      expect(data).toEqual([]),
-    );
+    api
+      .listMovements({ warehouseId, status: 'CONFIRMED' })
+      .subscribe((data) => expect(data).toEqual([]));
     const movements = http.expectOne(
       (request) =>
         request.url === '/api/v1/inventory/movements' &&
@@ -89,13 +89,58 @@ describe('InventoryApi', () => {
     request.flush(response(receipt));
   });
 
+  it('sends advanced inventory operations to their dedicated endpoints', () => {
+    const adjustment = {
+      warehouseId: 'warehouse-a',
+      reason: 'Conteo extraordinario',
+      items: [
+        {
+          productPresentationId: 'presentation-1',
+          lotId: null,
+          direction: 'IN' as const,
+          quantity: 2,
+          unitCost: 10,
+        },
+      ],
+    };
+    api.adjust(adjustment).subscribe();
+    expectPost('/api/v1/inventory/adjustments', adjustment, {});
+
+    const transfer = {
+      fromWarehouseId: 'warehouse-a',
+      toWarehouseId: 'warehouse-b',
+      reason: null,
+      items: [
+        { productPresentationId: 'presentation-1', lotId: null, quantity: 1, unitCost: null },
+      ],
+    };
+    api.transfer(transfer).subscribe();
+    expectPost('/api/v1/inventory/transfers', transfer, []);
+
+    const count = {
+      warehouseId: 'warehouse-a',
+      items: [{ productPresentationId: 'presentation-1', lotId: null, countedQuantity: 9 }],
+    };
+    api.createCount(count).subscribe();
+    expectPost('/api/v1/inventory/counts', count, { inventoryCountId: 'count-1' });
+
+    api.confirmCount('count-1').subscribe();
+    expectPost('/api/v1/inventory/counts/count-1/confirm', {}, { inventoryCountId: 'count-1' });
+  });
+
   function expectGet(url: string, warehouseId: string): void {
     const request = http.expectOne(
-      (candidate) =>
-        candidate.url === url && candidate.params.get('warehouseId') === warehouseId,
+      (candidate) => candidate.url === url && candidate.params.get('warehouseId') === warehouseId,
     );
     expect(request.request.method).toBe('GET');
     request.flush(response([]));
+  }
+
+  function expectPost<T>(url: string, body: unknown, data: T): void {
+    const request = http.expectOne(url);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(body);
+    request.flush(response(data));
   }
 
   function response<T>(data: T) {

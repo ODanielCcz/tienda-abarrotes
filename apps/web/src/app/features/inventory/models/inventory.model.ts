@@ -131,6 +131,90 @@ export interface InventoryReceipt {
   pallets: InventoryReceiptPallet[];
 }
 
+export interface InventoryAdjustmentRequest {
+  warehouseId: string;
+  reason: string | null;
+  items: Array<{
+    productPresentationId: string;
+    lotId: string | null;
+    direction: 'IN' | 'OUT';
+    quantity: number;
+    unitCost: number | null;
+  }>;
+}
+
+export interface InventoryTransferRequest {
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  reason: string | null;
+  items: Array<{
+    productPresentationId: string;
+    lotId: string | null;
+    quantity: number;
+    unitCost: number | null;
+  }>;
+}
+
+export interface InventoryCountRequest {
+  warehouseId: string;
+  items: Array<{
+    productPresentationId: string;
+    lotId: string | null;
+    countedQuantity: number;
+  }>;
+}
+
+export interface InventoryCount {
+  inventoryCountId: string;
+  warehouseId: string;
+  status: string;
+  startedBy: string;
+  confirmedBy: string | null;
+  startedAt: string;
+  confirmedAt: string | null;
+  items: Array<{
+    inventoryCountItemId: string;
+    productPresentationId: string;
+    lotId: string | null;
+    expectedQuantity: number;
+    countedQuantity: number;
+  }>;
+}
+
+export interface ReservationRequest {
+  customerId: string | null;
+  sourceType: string;
+  sourceId: string;
+  idempotencyKey: string;
+  expiresAt: string;
+  items: Array<{
+    warehouseId: string;
+    productPresentationId: string;
+    lotId: string | null;
+    quantity: number;
+  }>;
+}
+
+export interface InventoryReservation {
+  reservationId: string;
+  branchId: string;
+  customerId: string | null;
+  sourceType: string;
+  sourceId: string;
+  status: string;
+  idempotencyKey: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  items: Array<{
+    reservationItemId: string;
+    warehouseId: string;
+    productPresentationId: string;
+    lotId: string | null;
+    quantity: number;
+  }>;
+}
+
 export interface LotFilters {
   warehouseId: string;
   productPresentationId?: string;

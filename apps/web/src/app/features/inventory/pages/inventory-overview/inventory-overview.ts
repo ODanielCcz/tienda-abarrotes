@@ -54,6 +54,13 @@ export class InventoryOverview {
   protected readonly canReadPallets = this.sessionStore.hasPermission('INVENTORY_PALLET_READ');
   protected readonly canReadMovements = this.sessionStore.hasPermission('INVENTORY_MOVEMENT_READ');
   protected readonly canCreateReceipt = this.sessionStore.hasPermission('INVENTORY_RECEIPT_CREATE');
+  protected readonly canUseAdvancedInventory = this.sessionStore.hasAnyPermission([
+    'INVENTORY_ADJUSTMENT_CREATE',
+    'INVENTORY_TRANSFER_CREATE',
+    'INVENTORY_COUNT_CREATE',
+    'INVENTORY_RESERVATION_CREATE',
+    'INVENTORY_EXPIRING_LOT_READ',
+  ]);
 
   protected readonly stockColumns = [
     'product',

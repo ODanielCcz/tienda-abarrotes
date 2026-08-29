@@ -21,11 +21,12 @@ describe('InventoryOverview', () => {
     context: () => ({ branchId: 'branch-a', warehouseId: 'warehouse-a' }),
     selectedWarehouse: () => ({ warehouseId: 'warehouse-a', name: 'Almacén principal' }),
   };
-  const sessionStore = { hasPermission: vi.fn() };
+  const sessionStore = { hasPermission: vi.fn(), hasAnyPermission: vi.fn() };
 
   beforeEach(async () => {
     vi.clearAllMocks();
     sessionStore.hasPermission.mockReturnValue(true);
+    sessionStore.hasAnyPermission.mockReturnValue(true);
     api.listStock.mockReturnValue(
       of([
         {
