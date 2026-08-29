@@ -9,6 +9,8 @@ import { AuthSessionStore } from '../../../../../core/auth/auth-session-store';
 import { ConfirmationDialog } from '../../../../../shared/dialogs/confirmation-dialog/confirmation-dialog';
 import { BrandApi } from '../../../brands/data-access/brand-api';
 import { CategoryApi } from '../../../categories/data-access/category-api.service';
+import { PresentationFormDialog } from '../../components/presentation-form-dialog/presentation-form-dialog';
+import { CatalogReferenceApi } from '../../data-access/catalog-reference-api';
 import { ProductApi } from '../../data-access/product-api';
 import { ProductDetail } from './product-detail';
 
@@ -18,16 +20,24 @@ describe('ProductDetail', () => {
     getById: vi.fn(),
     listPresentations: vi.fn(),
     changeStatus: vi.fn(),
+    changePresentationStatus: vi.fn(),
   };
   const brandApi = { list: vi.fn() };
   const categoryApi = { list: vi.fn() };
   const sessionStore = { hasPermission: vi.fn() };
   const dialog = { open: vi.fn() };
+  const referenceApi = { listUnits: vi.fn(), listTaxes: vi.fn() };
 
   beforeEach(async () => {
     vi.clearAllMocks();
     sessionStore.hasPermission.mockReturnValue(true);
     dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+    referenceApi.listUnits.mockReturnValue(
+      of([{ id: 'unit-1', code: 'PZA', name: 'Pieza', symbol: 'pza', quantityScale: 0 }]),
+    );
+    referenceApi.listTaxes.mockReturnValue(
+      of([{ id: 'tax-1', code: 'IVA16', name: 'IVA 16%', rate: 0.16 }]),
+    );
     productApi.getById.mockReturnValue(
       of({
         id: 'product-1',
@@ -87,6 +97,7 @@ describe('ProductDetail', () => {
         { provide: CategoryApi, useValue: categoryApi },
         { provide: AuthSessionStore, useValue: sessionStore },
         { provide: MatDialog, useValue: dialog },
+        { provide: CatalogReferenceApi, useValue: referenceApi },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -112,8 +123,8 @@ describe('ProductDetail', () => {
     expect(fixture.nativeElement.textContent).toContain('Abarrotes');
     expect(fixture.nativeElement.textContent).toContain('Bolsa 1 kg');
     expect(fixture.nativeElement.textContent).toContain('ARROZ-1KG');
-    expect(fixture.nativeElement.textContent).toContain('unit-1');
-    expect(fixture.nativeElement.textContent).toContain('tax-1');
+    expect(fixture.nativeElement.textContent).toContain('Pieza (pza)');
+    expect(fixture.nativeElement.textContent).toContain('IVA 16%');
 
     const backLink = fixture.nativeElement.querySelector(
       'a[aria-label="Volver al listado de productos"]',
@@ -182,5 +193,61 @@ describe('ProductDetail', () => {
     expect(dialog.open).toHaveBeenCalledWith(ConfirmationDialog, expect.any(Object));
     expect(productApi.changeStatus).toHaveBeenCalledWith('product-1', 'INACTIVE');
     expect(productApi.getById).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens create and edit presentation forms when permissions are granted', () => {
+    dialog.open.mockReturnValue({ afterClosed: () => of(null) });
+
+    const createButton = fixture.nativeElement.querySelector(
+      '[data-testid="create-presentation"]',
+    ) as HTMLButtonElement;
+    const editButton = fixture.nativeElement.querySelector(
+      '[data-testid="edit-presentation-1"]',
+    ) as HTMLButtonElement;
+    createButton.click();
+    editButton.click();
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      PresentationFormDialog,
+      expect.objectContaining({ data: { productId: 'product-1', presentation: null } }),
+    );
+    expect(dialog.open).toHaveBeenCalledWith(
+      PresentationFormDialog,
+      expect.objectContaining({
+        data: { productId: 'product-1', presentation: expect.objectContaining({ id: 'presentation-1' }) },
+      }),
+    );
+  });
+
+  it('confirms a presentation status change and reloads the detail', () => {
+    dialog.open.mockReturnValueOnce({ afterClosed: () => of(true) });
+    productApi.changePresentationStatus.mockReturnValueOnce(
+      of({
+        id: 'presentation-1',
+        productId: 'product-1',
+        unitId: 'unit-1',
+        taxId: 'tax-1',
+        sku: 'ARROZ-1KG',
+        name: 'Bolsa 1 kg',
+        conversionFactor: 1,
+        netContent: 1000,
+        minimumStock: 10,
+        status: 'INACTIVE',
+        createdAt: '',
+        updatedAt: '',
+      }),
+    );
+
+    const button = fixture.nativeElement.querySelector(
+      '[data-testid="status-presentation-1"]',
+    ) as HTMLButtonElement;
+    button.click();
+
+    expect(dialog.open).toHaveBeenCalledWith(ConfirmationDialog, expect.any(Object));
+    expect(productApi.changePresentationStatus).toHaveBeenCalledWith(
+      'presentation-1',
+      'INACTIVE',
+    );
+    expect(productApi.listPresentations).toHaveBeenCalledTimes(2);
   });
 });

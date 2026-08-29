@@ -74,6 +74,13 @@
   gap: 1rem;
 }
 
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .presentations p {
   margin: 0.25rem 0 0;
   color: var(--mat-sys-on-surface-variant);
@@ -133,5 +140,9 @@ table {
 
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    flex-direction: column;
   }
 }

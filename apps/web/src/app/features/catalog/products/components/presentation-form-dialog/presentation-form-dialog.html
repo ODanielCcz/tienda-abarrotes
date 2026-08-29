@@ -1,0 +1,92 @@
+<h2 mat-dialog-title>
+  {{ data.presentation === null ? 'Nueva presentación' : 'Editar presentación' }}
+</h2>
+
+<mat-dialog-content>
+  @if (loading()) {
+    <div class="loading-state"><mat-spinner diameter="36" /></div>
+  } @else {
+    <form id="presentation-form" [formGroup]="form" (ngSubmit)="submit()">
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Unidad de medida</mat-label>
+          <mat-select formControlName="unitId">
+            @for (unit of units(); track unit.id) {
+              <mat-option [value]="unit.id">{{ unit.name }} ({{ unit.symbol }})</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.unitId.hasError('required')) {
+            <mat-error>La unidad es obligatoria.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Impuesto</mat-label>
+          <mat-select formControlName="taxId">
+            <mat-option [value]="null">Sin impuesto</mat-option>
+            @for (tax of taxes(); track tax.id) {
+              <mat-option [value]="tax.id">{{ tax.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>SKU</mat-label>
+          <input matInput formControlName="sku" maxlength="80" autocomplete="off" />
+          @if (form.controls.sku.hasError('required')) {
+            <mat-error>El SKU es obligatorio.</mat-error>
+          } @else if (form.controls.sku.hasError('pattern')) {
+            <mat-error>Usa letras, números, guiones o guion bajo.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input matInput formControlName="name" maxlength="200" autocomplete="off" />
+          @if (form.controls.name.hasError('required')) {
+            <mat-error>El nombre es obligatorio.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Factor de conversión</mat-label>
+          <input matInput type="number" min="0.000001" step="0.000001" formControlName="conversionFactor" />
+          <mat-error>Debe ser mayor a cero.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Contenido neto</mat-label>
+          <input matInput type="number" min="0.000001" step="0.000001" formControlName="netContent" />
+          <mat-hint>Opcional</mat-hint>
+          <mat-error>Debe ser mayor a cero.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Stock mínimo</mat-label>
+          <input matInput type="number" min="0" step="0.001" formControlName="minimumStock" />
+          <mat-error>No puede ser negativo.</mat-error>
+        </mat-form-field>
+      </div>
+    </form>
+  }
+
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" mat-dialog-close [disabled]="submitting()">Cancelar</button>
+  <button
+    mat-flat-button
+    type="submit"
+    form="presentation-form"
+    [disabled]="loading() || form.invalid || submitting()"
+  >
+    @if (submitting()) {
+      <mat-spinner diameter="20" />
+    } @else {
+      Guardar presentación
+    }
+  </button>
+</mat-dialog-actions>

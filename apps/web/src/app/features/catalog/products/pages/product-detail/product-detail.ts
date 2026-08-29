@@ -28,8 +28,15 @@ import { BrandApi } from '../../../brands/data-access/brand-api';
 import { Brand } from '../../../brands/models/brand.model';
 import { CategoryApi } from '../../../categories/data-access/category-api.service';
 import { Category } from '../../../categories/models/category.model';
+import { PresentationFormDialog } from '../../components/presentation-form-dialog/presentation-form-dialog';
+import { CatalogReferenceApi } from '../../data-access/catalog-reference-api';
 import { ProductApi } from '../../data-access/product-api';
-import { Product, ProductPresentation } from '../../models/product.model';
+import { CatalogTax, CatalogUnit } from '../../models/catalog-reference.model';
+import {
+  Product,
+  ProductPresentation,
+  ProductPresentationStatus,
+} from '../../models/product.model';
 
 @Component({
   selector: 'app-product-detail',
@@ -50,6 +57,7 @@ export class ProductDetail {
   private readonly productApi = inject(ProductApi);
   private readonly brandApi = inject(BrandApi);
   private readonly categoryApi = inject(CategoryApi);
+  private readonly referenceApi = inject(CatalogReferenceApi);
   private readonly sessionStore = inject(AuthSessionStore);
   private readonly dialog = inject(MatDialog);
   private readonly route = inject(ActivatedRoute);
@@ -62,11 +70,22 @@ export class ProductDetail {
   protected readonly presentations = signal<ProductPresentation[]>([]);
   protected readonly brands = signal<Brand[]>([]);
   protected readonly categories = signal<Category[]>([]);
+  protected readonly units = signal<CatalogUnit[]>([]);
+  protected readonly taxes = signal<CatalogTax[]>([]);
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly statusChanging = signal(false);
   protected readonly canUpdate = this.sessionStore.hasPermission('CATALOG_PRODUCT_UPDATE');
   protected readonly canChangeStatus = this.sessionStore.hasPermission('CATALOG_PRODUCT_STATUS');
+  protected readonly canCreatePresentation = this.sessionStore.hasPermission(
+    'CATALOG_PRESENTATION_CREATE',
+  );
+  protected readonly canUpdatePresentation = this.sessionStore.hasPermission(
+    'CATALOG_PRESENTATION_UPDATE',
+  );
+  protected readonly canChangePresentationStatus = this.sessionStore.hasPermission(
+    'CATALOG_PRESENTATION_STATUS',
+  );
   protected readonly displayedColumns = [
     'name',
     'sku',
@@ -77,6 +96,7 @@ export class ProductDetail {
     'minimumStock',
     'status',
     'updatedAt',
+    ...(this.canUpdatePresentation || this.canChangePresentationStatus ? ['actions'] : []),
   ];
 
   constructor() {
@@ -93,6 +113,8 @@ export class ProductDetail {
             presentations: this.productApi.listPresentations(this.productId),
             brands: this.brandApi.list(),
             categories: this.categoryApi.list(),
+            units: this.referenceApi.listUnits(),
+            taxes: this.referenceApi.listTaxes(),
           }).pipe(
             map((data) => ({ ok: true as const, data })),
             catchError((error: unknown) =>
@@ -121,6 +143,8 @@ export class ProductDetail {
         this.presentations.set(result.data.presentations);
         this.brands.set(result.data.brands);
         this.categories.set(result.data.categories);
+        this.units.set(result.data.units);
+        this.taxes.set(result.data.taxes);
       });
   }
 
@@ -139,6 +163,67 @@ export class ProductDetail {
       this.categories().find((category) => category.id === categoryId)?.name ??
       'Categoría no disponible'
     );
+  }
+
+  protected unitName(unitId: string): string {
+    const unit = this.units().find((candidate) => candidate.id === unitId);
+    return unit === undefined ? 'Unidad no disponible' : `${unit.name} (${unit.symbol})`;
+  }
+
+  protected taxName(taxId: string | null): string {
+    if (taxId === null) return 'Sin impuesto';
+    return this.taxes().find((tax) => tax.id === taxId)?.name ?? 'Impuesto no disponible';
+  }
+
+  protected openPresentationForm(presentation: ProductPresentation | null): void {
+    this.dialog
+      .open(PresentationFormDialog, {
+        width: '44rem',
+        maxWidth: '95vw',
+        disableClose: true,
+        data: { productId: this.productId, presentation },
+      })
+      .afterClosed()
+      .pipe(
+        filter(
+          (result): result is ProductPresentation => result !== null && result !== undefined,
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => this.reload.next());
+  }
+
+  protected changePresentationStatus(presentation: ProductPresentation): void {
+    const nextStatus: ProductPresentationStatus =
+      presentation.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const action = nextStatus === 'ACTIVE' ? 'activar' : 'desactivar';
+
+    this.dialog
+      .open(ConfirmationDialog, {
+        width: '28rem',
+        maxWidth: '95vw',
+        data: {
+          title: `${nextStatus === 'ACTIVE' ? 'Activar' : 'Desactivar'} presentación`,
+          message: `¿Deseas ${action} la presentación ${presentation.name}?`,
+          confirmLabel: nextStatus === 'ACTIVE' ? 'Activar' : 'Desactivar',
+        },
+      })
+      .afterClosed()
+      .pipe(
+        filter((confirmed) => confirmed === true),
+        switchMap(() => {
+          this.errorMessage.set(null);
+          return this.productApi.changePresentationStatus(presentation.id, nextStatus);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => this.reload.next(),
+        error: (error: unknown) =>
+          this.errorMessage.set(
+            apiErrorMessage(error, 'No fue posible cambiar el estado de la presentación.'),
+          ),
+      });
   }
 
   protected changeStatus(product: Product): void {

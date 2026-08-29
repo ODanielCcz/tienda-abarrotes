@@ -72,10 +72,23 @@
     </mat-card>
 
     <section class="presentations" aria-labelledby="presentations-title">
-      <div>
-        <p class="eyebrow">Venta e inventario</p>
-        <h2 id="presentations-title">Presentaciones</h2>
-        <p>Unidades vendibles asociadas al producto.</p>
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Venta e inventario</p>
+          <h2 id="presentations-title">Presentaciones</h2>
+          <p>Unidades vendibles asociadas al producto.</p>
+        </div>
+        @if (canCreatePresentation) {
+          <button
+            mat-flat-button
+            type="button"
+            data-testid="create-presentation"
+            (click)="openPresentationForm(null)"
+          >
+            <mat-icon>add</mat-icon>
+            Nueva presentación
+          </button>
+        }
       </div>
 
       @if (presentations().length === 0) {
@@ -95,12 +108,12 @@
 
             <ng-container matColumnDef="unit">
               <th mat-header-cell *matHeaderCellDef>Unidad</th>
-              <td mat-cell *matCellDef="let presentation">{{ presentation.unitId }}</td>
+              <td mat-cell *matCellDef="let presentation">{{ unitName(presentation.unitId) }}</td>
             </ng-container>
 
             <ng-container matColumnDef="tax">
               <th mat-header-cell *matHeaderCellDef>Impuesto</th>
-              <td mat-cell *matCellDef="let presentation">{{ presentation.taxId || 'Sin impuesto' }}</td>
+              <td mat-cell *matCellDef="let presentation">{{ taxName(presentation.taxId) }}</td>
             </ng-container>
 
             <ng-container matColumnDef="conversionFactor">
@@ -131,6 +144,34 @@
               <th mat-header-cell *matHeaderCellDef>Actualizada</th>
               <td mat-cell *matCellDef="let presentation">
                 {{ presentation.updatedAt | date: 'dd/MM/yyyy HH:mm' }}
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef aria-label="Acciones"></th>
+              <td mat-cell *matCellDef="let presentation">
+                @if (canUpdatePresentation) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [attr.aria-label]="'Editar ' + presentation.name"
+                    [attr.data-testid]="'edit-' + presentation.id"
+                    (click)="openPresentationForm(presentation)"
+                  >
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                }
+                @if (canChangePresentationStatus) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [attr.aria-label]="(presentation.status === 'ACTIVE' ? 'Desactivar ' : 'Activar ') + presentation.name"
+                    [attr.data-testid]="'status-' + presentation.id"
+                    (click)="changePresentationStatus(presentation)"
+                  >
+                    <mat-icon>{{ presentation.status === 'ACTIVE' ? 'block' : 'check_circle' }}</mat-icon>
+                  </button>
+                }
               </td>
             </ng-container>
 

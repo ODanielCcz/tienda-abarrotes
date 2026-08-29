@@ -6,6 +6,7 @@ import { API_CONFIG } from '../../../../core/config/api.config';
 import { ApiResponse } from '../../../../shared/models/api-response.model';
 import { PageResponse } from '../../../../shared/models/page-response.model';
 import { ProductUpsertRequest } from '../models/product-request.model';
+import { ProductPresentationUpsertRequest } from '../models/product-presentation-request.model';
 import {
   Product,
   ProductListFilters,
@@ -91,9 +92,54 @@ export class ProductApi {
       .pipe(map((response) => this.requireProduct(response)));
   }
 
+  createPresentation(
+    productId: string,
+    request: ProductPresentationUpsertRequest,
+  ): Observable<ProductPresentation> {
+    return this.http
+      .post<ApiResponse<ProductPresentation>>(
+        `${this.apiConfig.baseUrl}/catalog/products/${productId}/presentations`,
+        request,
+      )
+      .pipe(map((response) => this.requirePresentation(response)));
+  }
+
+  updatePresentation(
+    presentationId: string,
+    request: ProductPresentationUpsertRequest,
+  ): Observable<ProductPresentation> {
+    return this.http
+      .put<ApiResponse<ProductPresentation>>(
+        `${this.apiConfig.baseUrl}/catalog/product-presentations/${presentationId}`,
+        request,
+      )
+      .pipe(map((response) => this.requirePresentation(response)));
+  }
+
+  changePresentationStatus(
+    presentationId: string,
+    status: ProductStatus,
+  ): Observable<ProductPresentation> {
+    return this.http
+      .patch<ApiResponse<ProductPresentation>>(
+        `${this.apiConfig.baseUrl}/catalog/product-presentations/${presentationId}/status`,
+        { status },
+      )
+      .pipe(map((response) => this.requirePresentation(response)));
+  }
+
   private requireProduct(response: ApiResponse<Product>): Product {
     if (response.data === null) {
       throw new Error('La API respondió sin datos del producto.');
+    }
+    return response.data;
+  }
+
+  private requirePresentation(
+    response: ApiResponse<ProductPresentation>,
+  ): ProductPresentation {
+    if (response.data === null) {
+      throw new Error('La API respondió sin datos de la presentación.');
     }
     return response.data;
   }

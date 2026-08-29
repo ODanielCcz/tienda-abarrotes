@@ -204,6 +204,59 @@ describe('ProductApi', () => {
     request.flush(productResponse('PRODUCT_STATUS_UPDATED', { ...product, status: 'INACTIVE' }));
   });
 
+  it('creates, updates and changes a presentation status', () => {
+    const productId = page.content[0].id;
+    const payload = {
+      unitId: 'unit-1',
+      taxId: 'tax-1',
+      sku: 'ARROZ-1KG',
+      name: 'Bolsa 1 kg',
+      conversionFactor: 1,
+      netContent: 1000,
+      minimumStock: 10,
+    };
+    const presentation: ProductPresentation = {
+      id: 'presentation-1',
+      productId,
+      ...payload,
+      status: 'ACTIVE',
+      createdAt: '',
+      updatedAt: '',
+    };
+
+    service.createPresentation(productId, payload).subscribe((result) => {
+      expect(result).toEqual(presentation);
+    });
+    const create = httpTesting.expectOne(`/api/v1/catalog/products/${productId}/presentations`);
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body).toEqual(payload);
+    create.flush(presentationResponse('PRODUCT_PRESENTATION_CREATED', presentation));
+
+    service.updatePresentation(presentation.id, payload).subscribe((result) => {
+      expect(result.id).toBe(presentation.id);
+    });
+    const update = httpTesting.expectOne(
+      `/api/v1/catalog/product-presentations/${presentation.id}`,
+    );
+    expect(update.request.method).toBe('PUT');
+    update.flush(presentationResponse('PRODUCT_PRESENTATION_UPDATED', presentation));
+
+    service.changePresentationStatus(presentation.id, 'DISCONTINUED').subscribe((result) => {
+      expect(result.status).toBe('DISCONTINUED');
+    });
+    const status = httpTesting.expectOne(
+      `/api/v1/catalog/product-presentations/${presentation.id}/status`,
+    );
+    expect(status.request.method).toBe('PATCH');
+    expect(status.request.body).toEqual({ status: 'DISCONTINUED' });
+    status.flush(
+      presentationResponse('PRODUCT_PRESENTATION_STATUS_UPDATED', {
+        ...presentation,
+        status: 'DISCONTINUED',
+      }),
+    );
+  });
+
   function productResponse(code: string, data: Product) {
     return {
       timestamp: '2026-08-25T00:00:00Z',
@@ -215,6 +268,13 @@ describe('ProductApi', () => {
       errors: null,
       path: '/api/v1/catalog/products',
       correlationId: 'product-write-test',
+    };
+  }
+
+  function presentationResponse(code: string, data: ProductPresentation) {
+    return {
+      ...productResponse(code, page.content[0]),
+      data,
     };
   }
 });
