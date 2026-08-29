@@ -12,5 +12,10 @@ export const permissionGuard: CanActivateFn = (route) => {
     return true;
   }
 
-  return sessionStore.hasAllPermissions(permissions) ? true : router.createUrlTree(['/forbidden']);
+  const authorized =
+    route.data['permissionMatch'] === 'ANY'
+      ? sessionStore.hasAnyPermission(permissions)
+      : sessionStore.hasAllPermissions(permissions);
+
+  return authorized ? true : router.createUrlTree(['/forbidden']);
 };
