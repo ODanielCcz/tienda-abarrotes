@@ -1,0 +1,103 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <a mat-button routerLink="/catalog/products">
+        <mat-icon>arrow_back</mat-icon>
+        Productos
+      </a>
+      <p class="eyebrow">Catálogo</p>
+      <h1>Detalle del producto</h1>
+    </div>
+
+    <button mat-stroked-button type="button" (click)="refresh()">
+      <mat-icon>refresh</mat-icon>
+      Actualizar
+    </button>
+  </header>
+
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  } @else if (product(); as currentProduct) {
+    <mat-card appearance="outlined" class="summary-card">
+      <mat-card-header>
+        <mat-card-title>{{ currentProduct.name }}</mat-card-title>
+        <mat-card-subtitle>{{ currentProduct.description || 'Sin descripción' }}</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <dl class="summary-grid">
+          <div><dt>Marca</dt><dd>{{ brandName(currentProduct.brandId) }}</dd></div>
+          <div><dt>Categoría</dt><dd>{{ categoryName(currentProduct.categoryId) }}</dd></div>
+          <div><dt>Tipo</dt><dd>{{ currentProduct.productType === 'GOODS' ? 'Producto' : 'Servicio' }}</dd></div>
+          <div><dt>Estado</dt><dd>{{ currentProduct.status }}</dd></div>
+          <div><dt>Controla inventario</dt><dd>{{ currentProduct.tracksInventory ? 'Sí' : 'No' }}</dd></div>
+          <div><dt>Controla lotes</dt><dd>{{ currentProduct.tracksLots ? 'Sí' : 'No' }}</dd></div>
+          <div><dt>Controla caducidad</dt><dd>{{ currentProduct.tracksExpiration ? 'Sí' : 'No' }}</dd></div>
+          <div><dt>Actualizado</dt><dd>{{ currentProduct.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
+        </dl>
+      </mat-card-content>
+    </mat-card>
+
+    <section class="presentations" aria-labelledby="presentations-title">
+      <div>
+        <p class="eyebrow">Venta e inventario</p>
+        <h2 id="presentations-title">Presentaciones</h2>
+        <p>Unidades vendibles asociadas al producto.</p>
+      </div>
+
+      @if (presentations().length === 0) {
+        <p class="empty-state">Este producto todavía no tiene presentaciones.</p>
+      } @else {
+        <div class="table-shell">
+          <table mat-table [dataSource]="presentations()">
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef>Presentación</th>
+              <td mat-cell *matCellDef="let presentation"><strong>{{ presentation.name }}</strong></td>
+            </ng-container>
+
+            <ng-container matColumnDef="sku">
+              <th mat-header-cell *matHeaderCellDef>SKU</th>
+              <td mat-cell *matCellDef="let presentation">{{ presentation.sku }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="conversionFactor">
+              <th mat-header-cell *matHeaderCellDef>Conversión</th>
+              <td mat-cell *matCellDef="let presentation">{{ presentation.conversionFactor | number: '1.0-3' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="netContent">
+              <th mat-header-cell *matHeaderCellDef>Contenido neto</th>
+              <td mat-cell *matCellDef="let presentation">{{ presentation.netContent ?? 'No aplica' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="minimumStock">
+              <th mat-header-cell *matHeaderCellDef>Stock mínimo</th>
+              <td mat-cell *matCellDef="let presentation">{{ presentation.minimumStock | number: '1.0-3' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef>Estado</th>
+              <td mat-cell *matCellDef="let presentation">
+                <span class="status-pill" [class.inactive]="presentation.status !== 'ACTIVE'">
+                  {{ presentation.status }}
+                </span>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="updatedAt">
+              <th mat-header-cell *matHeaderCellDef>Actualizada</th>
+              <td mat-cell *matCellDef="let presentation">
+                {{ presentation.updatedAt | date: 'dd/MM/yyyy HH:mm' }}
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+          </table>
+        </div>
+      }
+    </section>
+  }
+</section>

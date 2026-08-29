@@ -5,7 +5,7 @@ import { map, Observable } from 'rxjs';
 import { API_CONFIG } from '../../../../core/config/api.config';
 import { ApiResponse } from '../../../../shared/models/api-response.model';
 import { PageResponse } from '../../../../shared/models/page-response.model';
-import { Product, ProductListFilters } from '../models/product.model';
+import { Product, ProductListFilters, ProductPresentation } from '../models/product.model';
 
 @Injectable({ providedIn: 'root' })
 export class ProductApi {
@@ -42,5 +42,26 @@ export class ProductApi {
             },
         ),
       );
+  }
+
+  getById(productId: string): Observable<Product> {
+    return this.http
+      .get<ApiResponse<Product>>(`${this.apiConfig.baseUrl}/catalog/products/${productId}`)
+      .pipe(
+        map((response) => {
+          if (response.data === null) {
+            throw new Error('La API respondió sin datos del producto.');
+          }
+          return response.data;
+        }),
+      );
+  }
+
+  listPresentations(productId: string): Observable<ProductPresentation[]> {
+    return this.http
+      .get<ApiResponse<ProductPresentation[]>>(
+        `${this.apiConfig.baseUrl}/catalog/products/${productId}/presentations`,
+      )
+      .pipe(map((response) => response.data ?? []));
   }
 }

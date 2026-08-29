@@ -1,5 +1,6 @@
 export type ProductType = 'GOODS' | 'SERVICE';
 export type ProductStatus = 'ACTIVE' | 'INACTIVE' | 'DISCONTINUED';
+export type ProductPresentationStatus = ProductStatus;
 export type ProductSortField = 'NAME' | 'CREATED_AT' | 'UPDATED_AT';
 export type SortDirection = 'ASC' | 'DESC';
 
@@ -27,4 +28,19 @@ export interface ProductListFilters {
   brandId?: string;
   sortBy?: ProductSortField;
   direction?: SortDirection;
+}
+
+export interface ProductPresentation {
+  id: string;
+  productId: string;
+  unitId: string;
+  taxId: string;
+  sku: string;
+  name: string;
+  conversionFactor: number;
+  netContent: number | null;
+  minimumStock: number;
+  status: ProductPresentationStatus;
+  createdAt: string;
+  updatedAt: string;
 }

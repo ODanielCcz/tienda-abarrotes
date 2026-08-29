@@ -39,6 +39,17 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'catalog/products/:productId',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: ['CATALOG_PRODUCT_READ', 'CATALOG_PRESENTATION_READ'],
+        },
+        loadComponent: () =>
+          import('./features/catalog/products/pages/product-detail/product-detail').then(
+            (module) => module.ProductDetail,
+          ),
+      },
+      {
         path: 'catalog/brands',
         canActivate: [permissionGuard],
         data: {

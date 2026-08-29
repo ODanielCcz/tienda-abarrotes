@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -61,6 +62,7 @@ describe('ProductList', () => {
     await TestBed.configureTestingModule({
       imports: [ProductList],
       providers: [
+        provideRouter([]),
         { provide: ProductApi, useValue: productApi },
         { provide: BrandApi, useValue: brandApi },
         { provide: CategoryApi, useValue: categoryApi },
@@ -79,6 +81,14 @@ describe('ProductList', () => {
     expect(fixture.nativeElement.textContent).toContain('Arroz 1 kg');
     expect(fixture.nativeElement.textContent).toContain('Marca');
     expect(fixture.nativeElement.textContent).toContain('Abarrotes');
+  });
+
+  it('links every product to its detail page', () => {
+    const link = fixture.nativeElement.querySelector(
+      'a[aria-label="Ver detalle de Arroz 1 kg"]',
+    ) as HTMLAnchorElement | null;
+
+    expect(link?.getAttribute('href')).toBe('/catalog/products/product-1');
   });
 
   it('shows the backend error reference', async () => {

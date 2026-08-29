@@ -1,0 +1,126 @@
+:host {
+  display: block;
+}
+
+.page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.page-header h1,
+.presentations h2 {
+  margin: 0;
+}
+
+.page-header a {
+  margin-left: -1rem;
+}
+
+.eyebrow {
+  margin: 0.5rem 0 0.25rem;
+  color: var(--mat-sys-primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.summary-card {
+  background: var(--mat-sys-surface-container-low);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(10rem, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0 0;
+}
+
+.summary-grid div {
+  padding: 0.85rem;
+  border-radius: 0.65rem;
+  background: var(--mat-sys-surface-container);
+}
+
+.summary-grid dt {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8rem;
+}
+
+.summary-grid dd {
+  margin: 0.3rem 0 0;
+  font-weight: 600;
+}
+
+.presentations {
+  display: grid;
+  gap: 1rem;
+}
+
+.presentations p {
+  margin: 0.25rem 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.table-shell {
+  overflow-x: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.75rem;
+}
+
+table {
+  width: 100%;
+  min-width: 64rem;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.55rem;
+  border-radius: 1rem;
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.status-pill.inactive {
+  background: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.state,
+.empty-state {
+  display: grid;
+  min-height: 10rem;
+  place-items: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.error-state {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+@media (max-width: 1050px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(10rem, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .page-header {
+    flex-direction: column;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+}

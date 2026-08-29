@@ -9,4 +9,18 @@ describe('application routes', () => {
     expect(productRoute?.data?.['permissions']).toEqual(['CATALOG_PRODUCT_READ']);
     expect(productRoute?.loadComponent).toBeDefined();
   });
+
+  it('protects product detail with product and presentation read permissions', () => {
+    const shell = routes.find((route) => route.path === '');
+    const detailRoute = shell?.children?.find(
+      (route) => route.path === 'catalog/products/:productId',
+    );
+
+    expect(detailRoute).toBeDefined();
+    expect(detailRoute?.data?.['permissions']).toEqual([
+      'CATALOG_PRODUCT_READ',
+      'CATALOG_PRESENTATION_READ',
+    ]);
+    expect(detailRoute?.loadComponent).toBeDefined();
+  });
 });
