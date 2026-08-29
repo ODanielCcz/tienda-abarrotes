@@ -68,6 +68,12 @@ export class AppShell {
         permissions: ['CATALOG_CATEGORY_READ'],
       },
       {
+        label: 'Productos',
+        icon: 'inventory_2',
+        route: '/catalog/products',
+        permissions: ['CATALOG_PRODUCT_READ'],
+      },
+      {
         label: 'Inventario',
         icon: 'warehouse',
         route: '/inventory',

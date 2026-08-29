@@ -24,8 +24,19 @@ export const routes: Routes = [
       },
       {
         path: 'catalog',
-        redirectTo: 'catalog/brands',
+        redirectTo: 'catalog/products',
         pathMatch: 'full',
+      },
+      {
+        path: 'catalog/products',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: ['CATALOG_PRODUCT_READ'],
+        },
+        loadComponent: () =>
+          import('./features/catalog/products/pages/product-list/product-list').then(
+            (module) => module.ProductList,
+          ),
       },
       {
         path: 'catalog/brands',
