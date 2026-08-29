@@ -1,0 +1,53 @@
+<h2 mat-dialog-title>{{ data.category ? 'Editar categoría' : 'Nueva categoría' }}</h2>
+
+<mat-dialog-content>
+  <form id="category-form" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline">
+      <mat-label>Código</mat-label>
+      <input matInput formControlName="code" maxlength="50" autocomplete="off" />
+      <mat-hint>Se guardará en mayúsculas.</mat-hint>
+      @if (form.controls.code.hasError('required')) {
+        <mat-error>El código es obligatorio.</mat-error>
+      } @else if (form.controls.code.hasError('maxlength')) {
+        <mat-error>El código admite hasta 50 caracteres.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre</mat-label>
+      <input matInput formControlName="name" maxlength="150" autocomplete="off" />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>El nombre es obligatorio.</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error>El nombre admite hasta 150 caracteres.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Categoría padre</mat-label>
+      <mat-select formControlName="parentCategoryId">
+        <mat-option [value]="null">Categoría raíz</mat-option>
+        @for (category of eligibleParents; track category.id) {
+          <mat-option [value]="category.id">{{ category.name }} ({{ category.code }})</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </form>
+
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="null" [disabled]="submitting()">
+    Cancelar
+  </button>
+  <button mat-flat-button type="submit" form="category-form" [disabled]="form.invalid || submitting()">
+    @if (submitting()) {
+      <mat-spinner diameter="20" />
+    } @else {
+      Guardar
+    }
+  </button>
+</mat-dialog-actions>

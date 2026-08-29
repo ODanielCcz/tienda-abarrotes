@@ -5,6 +5,7 @@ import { map, Observable } from 'rxjs';
 import { API_CONFIG } from '../../../../core/config/api.config';
 import { ApiResponse } from '../../../../shared/models/api-response.model';
 import { PageResponse } from '../../../../shared/models/page-response.model';
+import { CategoryUpsertRequest } from '../models/category-request.model';
 import { Category, CategoryStatus, CategoryTreeNode } from '../models/category.model';
 
 export interface CategoryListFilters {
@@ -49,5 +50,36 @@ export class CategoryApi {
         params,
       })
       .pipe(map((response) => response.data ?? []));
+  }
+
+  create(request: CategoryUpsertRequest): Observable<Category> {
+    return this.http
+      .post<ApiResponse<Category>>(`${this.apiConfig.baseUrl}/catalog/categories`, request)
+      .pipe(map((response) => this.requireCategory(response)));
+  }
+
+  update(categoryId: string, request: CategoryUpsertRequest): Observable<Category> {
+    return this.http
+      .put<ApiResponse<Category>>(
+        `${this.apiConfig.baseUrl}/catalog/categories/${categoryId}`,
+        request,
+      )
+      .pipe(map((response) => this.requireCategory(response)));
+  }
+
+  changeStatus(categoryId: string, status: CategoryStatus): Observable<Category> {
+    return this.http
+      .patch<ApiResponse<Category>>(
+        `${this.apiConfig.baseUrl}/catalog/categories/${categoryId}/status`,
+        { status },
+      )
+      .pipe(map((response) => this.requireCategory(response)));
+  }
+
+  private requireCategory(response: ApiResponse<Category>): Category {
+    if (response.data === null) {
+      throw new Error('La API respondió sin datos de la categoría.');
+    }
+    return response.data;
   }
 }
