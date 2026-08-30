@@ -1,3 +1,5 @@
+name: tienda-perf
+
 services:
   database:
     image: tienda-perf-postgres:18.6-pgaudit18.0
@@ -62,12 +64,16 @@ services:
     working_dir: /work
     environment:
       BASE_URL: http://backend:8080
-      PERF_USERNAME: ${E2E_USERNAME}
-      PERF_PASSWORD: ${E2E_PASSWORD}
+      PERF_USERNAME: ${PERF_USERNAME:?Define PERF_USERNAME in perf.env}
+      PERF_PASSWORD: ${PERF_PASSWORD:?Define PERF_PASSWORD in perf.env}
     volumes:
       - type: bind
         source: ./tests/performance/k6
         target: /work
+        read_only: true
+      - type: bind
+        source: ./tests/performance/fixtures
+        target: /fixtures
         read_only: true
       - type: bind
         source: ${PERF_ARTIFACTS_DIR}

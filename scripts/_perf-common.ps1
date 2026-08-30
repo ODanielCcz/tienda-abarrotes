@@ -40,6 +40,7 @@ function New-PerfEnvironmentFile {
     New-Item -ItemType Directory -Force -Path $PerfDirectory | Out-Null
     New-Item -ItemType Directory -Force -Path $PerfArtifactsDirectory | Out-Null
     $adminPassword = "Perf-$(New-PerfSecret -Bytes 18)!"
+    $perfOperatorPassword = "PerfOperator-$(New-PerfSecret -Bytes 18)!"
     $composeArtifactsPath = $PerfArtifactsDirectory.Replace('\', '/')
     $lines = @(
         'POSTGRES_DB=tienda_performance',
@@ -68,6 +69,9 @@ function New-PerfEnvironmentFile {
         'DB_POOL_MIN_IDLE=5',
         'E2E_USERNAME=perf_admin',
         "E2E_PASSWORD=$adminPassword",
+        'PERF_USERNAME=perf_operator',
+        "PERF_FIXTURE_USER_PASSWORD=$perfOperatorPassword",
+        "PERF_PASSWORD=$perfOperatorPassword",
         "PERF_ARTIFACTS_DIR=$composeArtifactsPath"
     )
     [IO.File]::WriteAllLines($PerfEnvFile, $lines, [Text.UTF8Encoding]::new($false))
@@ -87,13 +91,51 @@ function Assert-PerfPortsAvailable {
 }
 
 function Import-PerfEnvironment {
+    param([switch]$TeardownOnly)
+
     if (-not (Test-Path -LiteralPath $PerfEnvFile)) {
         throw "No existe $PerfEnvFile. Ejecuta primero scripts\perf-environment-up.ps1."
     }
 
+    $loadedNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     Get-Content -LiteralPath $PerfEnvFile | ForEach-Object {
         if ($_ -match '^\s*([^#][^=]*)=(.*)$') {
-            [Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim(), 'Process')
+            $name = $matches[1].Trim()
+            [Environment]::SetEnvironmentVariable($name, $matches[2].Trim(), 'Process')
+            [void]$loadedNames.Add($name)
+        }
+    }
+    $script:PerfEnvironmentLoadedNames = @($loadedNames)
+    if ($TeardownOnly) {
+        $placeholder = "teardown-$(New-PerfSecret -Bytes 16)"
+        $env:PERF_USERNAME = $placeholder
+        $env:PERF_FIXTURE_USER_PASSWORD = $placeholder
+        $env:PERF_PASSWORD = $placeholder
+        return
+    }
+    foreach ($requiredName in @('PERF_USERNAME', 'PERF_FIXTURE_USER_PASSWORD', 'PERF_PASSWORD')) {
+        if (-not $loadedNames.Contains($requiredName)) {
+            throw "$requiredName debe estar presente en $PerfEnvFile; las variables heredadas del proceso no son válidas."
+        }
+    }
+    if ($env:PERF_USERNAME -cne 'perf_operator') {
+        throw 'PERF_USERNAME debe ser exactamente perf_operator para las pruebas restringidas.'
+    }
+    if ([string]::IsNullOrWhiteSpace($env:PERF_FIXTURE_USER_PASSWORD)) {
+        throw 'PERF_FIXTURE_USER_PASSWORD es obligatorio; recrea el ambiente de rendimiento si falta.'
+    }
+    if ([string]::IsNullOrWhiteSpace($env:PERF_PASSWORD)) {
+        throw 'PERF_PASSWORD es obligatorio y debe coincidir con la contraseña del fixture.'
+    }
+    if ($env:PERF_PASSWORD -cne $env:PERF_FIXTURE_USER_PASSWORD) {
+        throw 'PERF_PASSWORD debe coincidir con PERF_FIXTURE_USER_PASSWORD.'
+    }
+    foreach ($privilegedPassword in @($env:E2E_PASSWORD, $env:BOOTSTRAP_ADMIN_PASSWORD)) {
+        if (-not [string]::IsNullOrWhiteSpace($privilegedPassword) -and (
+            $env:PERF_FIXTURE_USER_PASSWORD -ceq $privilegedPassword -or
+            $env:PERF_PASSWORD -ceq $privilegedPassword
+        )) {
+            throw 'Las credenciales de rendimiento no pueden reutilizar una contraseña privilegiada.'
         }
     }
 }
@@ -112,6 +154,21 @@ function Invoke-PerfCompose {
         @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Docker Compose terminó con código $LASTEXITCODE."
+    }
+}
+
+function Assert-PerfComposeDefaultProjectName {
+    $output = & docker compose `
+        --env-file $PerfEnvFile `
+        -f $PerfComposeFile `
+        -f $PerfComposeOverlay `
+        config --format json
+    if ($LASTEXITCODE -ne 0) {
+        throw "No fue posible evaluar la configuración Compose de rendimiento (código $LASTEXITCODE)."
+    }
+    $configuration = (($output | Out-String) | ConvertFrom-Json)
+    if ($configuration.name -ne $PerfProjectName) {
+        throw "El nombre Compose efectivo es '$($configuration.name)', se esperaba '$PerfProjectName'."
     }
 }
 

@@ -7,7 +7,11 @@ param(
 
 Assert-PerfDockerAvailable
 New-PerfEnvironmentFile
-Import-PerfEnvironment
+try {
+    Import-PerfEnvironment
+} catch {
+    throw "El perf.env existente no cumple el contrato restringido. Ejecuta primero scripts\perf-environment-down.ps1 y después scripts\perf-environment-up.ps1. Detalle: $($_.Exception.Message)"
+}
 New-Item -ItemType Directory -Force -Path $PerfArtifactsDirectory | Out-Null
 
 if (-not $ReuseExisting) {
@@ -37,6 +41,7 @@ if (-not $SkipBuild) {
 Invoke-PerfCompose -Arguments @('--profile', 'distributed-security', '--profile', 'performance', 'up', '-d', 'database', 'redis')
 Invoke-PerfCompose -Arguments @('--profile', 'migrate', 'run', '--rm', 'flyway', 'migrate')
 Invoke-PerfCompose -Arguments @('--profile', 'seed', 'run', '--rm', 'db-seed')
+& (Join-Path $PerfProjectRoot 'tests\performance\fixtures\load-performance-fixtures.ps1')
 $upArguments = @('--profile', 'distributed-security', '--profile', 'performance', 'up', '-d')
 if (-not $SkipBuild) {
     $upArguments += '--build'

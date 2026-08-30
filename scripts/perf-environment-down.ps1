@@ -6,7 +6,7 @@ param(
 
 Assert-PerfDockerAvailable
 New-PerfEnvironmentFile
-Import-PerfEnvironment
+Import-PerfEnvironment -TeardownOnly
 Invoke-PerfCompose -Arguments @('--profile', 'distributed-security', '--profile', 'performance', 'down', '-v', '--remove-orphans', '--timeout', '30')
 Assert-PerfResourcesAbsent
 

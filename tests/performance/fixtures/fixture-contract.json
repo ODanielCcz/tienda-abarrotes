@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "dataset": "tienda-performance-v1",
+  "maxVirtualUsers": 150,
+  "generalPriceListCode": "GENERAL",
+  "branch": {
+    "id": "90000000-0000-0000-0000-000000000001",
+    "code": "PERF",
+    "name": "Sucursal sintética de rendimiento"
+  },
+  "warehouses": [
+    {
+      "id": "90000000-0000-0000-0000-000000000011",
+      "code": "PERF-VENTA",
+      "name": "Almacén de venta sintético",
+      "initialAvailableQuantity": 10000
+    },
+    {
+      "id": "90000000-0000-0000-0000-000000000012",
+      "code": "PERF-RESPALDO",
+      "name": "Almacén de respaldo sintético"
+    }
+  ],
+  "restrictedUser": {
+    "id": "93000000-0000-0000-0000-000000000101",
+    "username": "perf_operator",
+    "roleId": "93000000-0000-0000-0000-000000000001",
+    "roleCode": "PERF_OPERATOR",
+    "permissionCodes": [
+      "CATALOG_BRAND_READ",
+      "CATALOG_CATEGORY_READ",
+      "CATALOG_PRESENTATION_READ",
+      "CATALOG_PRODUCT_READ",
+      "INVENTORY_LOT_READ",
+      "INVENTORY_MOVEMENT_READ",
+      "INVENTORY_STOCK_READ",
+      "ORGANIZATION_BRANCH_READ",
+      "ORGANIZATION_CASH_REGISTER_READ",
+      "ORGANIZATION_DEVICE_READ",
+      "ORGANIZATION_WAREHOUSE_READ",
+      "PURCHASING_PURCHASE_READ",
+      "PURCHASING_SUPPLIER_READ",
+      "REPORT_CASH_READ",
+      "REPORT_EXPIRING_PRODUCTS_READ",
+      "REPORT_GROSS_MARGIN_READ",
+      "REPORT_INVENTORY_READ",
+      "REPORT_RETURNS_READ",
+      "REPORT_SALES_BY_PERIOD_READ",
+      "REPORT_SALES_READ",
+      "REPORT_STOCK_VALUATION_READ",
+      "SALES_CUSTOMER_READ",
+      "SALES_ORDER_CREATE",
+      "SALES_ORDER_READ",
+      "SALES_PAYMENT_CREATE",
+      "SALES_PAYMENT_READ",
+      "SYNC_CHECKPOINT_ACK",
+      "SYNC_CHECKPOINT_READ",
+      "SYNC_CONFLICT_READ",
+      "SYNC_INBOX_WRITE",
+      "SYNC_OUTBOX_READ"
+    ]
+  },
+  "catalog": {
+    "unitId": "94000000-0000-0000-0000-000000000001",
+    "categoryId": "94000000-0000-0000-0000-000000000002",
+    "brandId": "94000000-0000-0000-0000-000000000003",
+    "taxId": "94000000-0000-0000-0000-000000000004"
+  },
+  "counts": {
+    "nonLotPresentations": 150,
+    "lotPresentations": 150,
+    "lotsPerLotPresentation": 2,
+    "customers": 200,
+    "suppliers": 20,
+    "mobileDevices": 150,
+    "cashRegisters": 16
+  }
+}
