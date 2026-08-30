@@ -149,6 +149,21 @@ class CustomerApiIntegrationTest {
     }
 
     @Test
+    void shouldListCustomersWithoutOptionalFilters() throws Exception {
+        insertUser("customer_unfiltered", "correct-password", "SYSTEM_ADMIN");
+        String token = login("customer_unfiltered", "correct-password");
+        UUID customerId = insertCustomer("ACTIVE");
+
+        mockMvc.perform(
+                get("/api/v1/sales/customers")
+                    .header("Authorization", "Bearer " + token)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("CUSTOMERS_FOUND"))
+            .andExpect(jsonPath("$.data[?(@.customerId == '%s')]".formatted(customerId)).exists());
+    }
+
+    @Test
     void shouldRejectInvalidCustomerAndProtectEndpoints() throws Exception {
         mockMvc.perform(post("/api/v1/sales/customers"))
             .andExpect(status().isUnauthorized())

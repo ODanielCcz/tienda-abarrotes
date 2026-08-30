@@ -76,19 +76,34 @@ public class JdbcCustomerRepositoryAdapter implements CustomerRepositoryPort {
 
     @Override
     public List<Customer> findAll(ListCustomersQuery query) {
-        return jdbc.query("""
+        String status = normalize(query == null ? null : query.status());
+        String customerType = normalize(query == null ? null : query.customerType());
+        String searchLike = searchLike(query == null ? null : query.search());
+        StringBuilder sql = new StringBuilder("""
             SELECT *
             FROM sales.customers
-            WHERE (:status IS NULL OR status = :status)
-              AND (:customerType IS NULL OR customer_type = :customerType)
-              AND (:search IS NULL OR customer_code ILIKE :searchLike OR display_name ILIKE :searchLike OR email ILIKE :searchLike OR phone ILIKE :searchLike)
-            ORDER BY display_name
-            LIMIT 200
-            """, new MapSqlParameterSource()
-            .addValue("status", normalize(query == null ? null : query.status()))
-            .addValue("customerType", normalize(query == null ? null : query.customerType()))
-            .addValue("search", normalizeSearch(query == null ? null : query.search()))
-            .addValue("searchLike", searchLike(query == null ? null : query.search())), this::mapCustomer);
+            WHERE 1 = 1
+            """);
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        if (status != null) {
+            sql.append(" AND status = :status\n");
+            parameters.addValue("status", status);
+        }
+        if (customerType != null) {
+            sql.append(" AND customer_type = :customerType\n");
+            parameters.addValue("customerType", customerType);
+        }
+        if (searchLike != null) {
+            sql.append("""
+                 AND (customer_code ILIKE :searchLike
+                      OR display_name ILIKE :searchLike
+                      OR email ILIKE :searchLike
+                      OR phone ILIKE :searchLike)
+                """);
+            parameters.addValue("searchLike", searchLike);
+        }
+        sql.append(" ORDER BY display_name LIMIT 200");
+        return jdbc.query(sql.toString(), parameters, this::mapCustomer);
     }
 
     private MapSqlParameterSource params(Customer customer) {
