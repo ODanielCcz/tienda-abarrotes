@@ -40,6 +40,8 @@ data/local-only/*
 *.dump
 *.backup
 database/logs/
+.performance/
+artifacts/quality/
 
 # Worktrees locales de Git
 .worktrees/

@@ -16,7 +16,7 @@
 | ------------- | --------------------- |
 | Proyecto      | Tienda de Abarrotes   |
 | Código        | TDA-QA-PLAN-001       |
-| Versión       | v1.0                  |
+| Versión       | v1.1                  |
 | Estado        | Aprobado en ejecución |
 | Responsable   | ODCC / Codex          |
 | Fecha         | 2026-08-30            |
@@ -28,6 +28,7 @@
 | ------- | ---------- | ------------ | -------------------------------------- | ------------------------ |
 | v0.1    | 2026-08-30 | ODCC / Codex | Diseño inicial de la campaña fullstack | Borrador para aprobación |
 | v1.0    | 2026-08-30 | ODCC / Codex | Aprobación e inicio de ejecución       | Aprobado                 |
+| v1.1    | 2026-08-30 | ODCC / Codex | Secretos y evidencia cruda fuera de OneDrive | En ejecución          |
 
 ## 1. Decisión Técnica
 
@@ -51,7 +52,7 @@ No se usará JMeter para simular el navegador: genera tráfico HTTP, pero no rep
 - Está prohibido apuntar k6, ZAP o scripts ofensivos a producción, repositorios de terceros o direcciones públicas.
 - La base de pruebas será efímera y se eliminará con `docker compose down -v` al terminar.
 - Se usarán usuarios, clientes, productos, lotes y ventas ficticios; nunca datos personales reales.
-- Las credenciales se generarán localmente en `.performance/perf.env`, archivo ignorado por Git.
+- Las credenciales se generarán localmente bajo `%LOCALAPPDATA%\TiendaAbarrotes\performance`, fuera de Git y de OneDrive.
 - El login se ejecutará solo en preparación; los escenarios normales reutilizarán tokens para no convertir el rate limiter en el cuello de botella equivocado.
 - El rate limiting tendrá escenarios propios y separados.
 - Toda prueba de escritura usará UUID e idempotency keys nuevos o deterministas según el caso.
@@ -61,8 +62,9 @@ No se usará JMeter para simular el navegador: genera tráfico HTTP, pero no rep
 ## 3. Archivos Previstos
 
 ```text
-.performance/
-└── perf.env                         # local, ignorado por Git
+%LOCALAPPDATA%/TiendaAbarrotes/performance/
+├── perf.env                         # secretos locales efímeros
+└── artifacts/                       # evidencia cruda no versionada
 
 tests/performance/
 ├── compose.performance.yaml         # servicios k6 y web estática
@@ -100,7 +102,7 @@ docs/reports/quality/
 └── 2026-08-30-fullstack-stress-security-analysis.md
 ```
 
-Los resultados pesados se escribirán bajo `artifacts/quality/<timestamp>/` y se agregarán a `.gitignore`. El Markdown consolidado solo contendrá cifras, tablas, gráficas pequeñas, evidencia sanitizada, conclusiones y enlaces relativos a los artefactos locales.
+Los resultados crudos se escribirán fuera de OneDrive bajo `%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts\<timestamp>`. El Markdown consolidado solo contendrá cifras, tablas, gráficas pequeñas, evidencia sanitizada y conclusiones. `artifacts/quality/` permanecerá ignorado como defensa ante copias accidentales.
 
 ## 4. Perfiles De Carga Iniciales
 
@@ -167,7 +169,7 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 - [ ] Verificar que el árbol esté limpio y registrar commit, Java, Node, npm, Docker, CPU y RAM.
 - [ ] Añadir `.performance/` y `artifacts/quality/` a `.gitignore`.
 - [ ] Crear el overlay Compose con puertos separados, volumen PostgreSQL exclusivo y servicios de herramientas fijados por versión/digest; nunca usar etiquetas `latest`.
-- [ ] Generar secretos aleatorios en `.performance/perf.env` sin imprimirlos en logs.
+- [ ] Generar secretos aleatorios fuera de OneDrive sin imprimirlos en logs ni entregarlos completos a k6.
 - [ ] Construir `bootJar`, aplicar Flyway desde cero, cargar fixtures sintéticos y comprobar readiness.
 - [ ] Ejecutar `docker compose --project-name tienda-perf ... down -v` y confirmar que el ambiente habitual no cambió.
 - [ ] Commit: `test(performance): add isolated load test environment`.
