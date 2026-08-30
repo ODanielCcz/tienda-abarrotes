@@ -24,6 +24,8 @@
 }
 
 .login-form {
+  --mat-form-field-error-text-color: var(--mat-sys-error);
+
   display: grid;
   gap: 1rem;
   margin-top: 1.5rem;

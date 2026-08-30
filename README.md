@@ -1,6 +1,6 @@
 # Tienda de Abarrotes
 
-Sistema modular para administrar una tienda de abarrotes. El repositorio está preparado como monorepo para backend, futura web Angular y futura app móvil.
+Sistema modular para administrar una tienda de abarrotes. El monorepo incluye backend Spring Boot y Angular Web MVP; la aplicación móvil permanece como evolución posterior.
 
 ## Stack
 
@@ -14,6 +14,7 @@ Sistema modular para administrar una tienda de abarrotes. El repositorio está p
 - JWT
 - Arquitectura hexagonal
 - Clean Architecture
+- Angular 22, Angular Material, TypeScript, SCSS, Vitest y Playwright
 
 ## Módulos actuales
 
@@ -26,15 +27,15 @@ Sistema modular para administrar una tienda de abarrotes. El repositorio está p
 - Organización: sucursales, almacenes, cajas y dispositivos
 - Reportes v2: ventas, margen, rentabilidad, inventario, caducidad y devoluciones
 - Facturación interna:
-  - perfiles emisores y receptores;
-  - clasificación SAT de productos y unidades;
-  - documentos `DRAFT` y `READY` con snapshots inmutables.
+    - perfiles emisores y receptores;
+    - clasificación SAT de productos y unidades;
+    - documentos `DRAFT` y `READY` con snapshots inmutables.
 - Sincronización offline v1:
-  - inbox idempotente;
-  - outbox por sucursal;
-  - checkpoints y conflictos;
-  - conteos físicos y carritos offline;
-  - vínculo obligatorio entre dispositivo y usuario responsable.
+    - inbox idempotente;
+    - outbox por sucursal;
+    - checkpoints y conflictos;
+    - conteos físicos y carritos offline;
+    - vínculo obligatorio entre dispositivo y usuario responsable.
 
 ## Componentes disponibles
 
@@ -46,6 +47,7 @@ Sistema modular para administrar una tienda de abarrotes. El repositorio está p
 - Scripts PowerShell para operación local.
 - Backend Spring Boot con arquitectura hexagonal modular.
 - OpenAPI/Swagger con modo oscuro.
+- Angular Web con operación por permisos, contexto de sucursal, flujos comerciales y consola administrativa.
 - CORS configurable.
 - Actuator, Prometheus y OpenTelemetry.
 - Rate limiting de login seleccionable: memoria local o Redis distribuido con claves HMAC opacas.
@@ -111,7 +113,7 @@ Redis es obligatorio para el login en producción, pero no para catálogo, inven
 ## Rutas principales
 
 - `apps/backend`: backend Spring Boot.
-- `apps/web`: futura aplicación Angular.
+- `apps/web`: aplicación Angular Web MVP.
 - `apps/mobile`: futura aplicación móvil.
 - `database/migrations`: fuente canónica del esquema.
 - `database/seeds`: datos ficticios y catálogos de desarrollo.
@@ -137,4 +139,4 @@ Redis es obligatorio para el login en producción, pero no para catálogo, inven
 - Los límites de login se comparten entre instancias mediante Redis, Lua y claves HMAC; producción falla cerrado si la protección no está disponible.
 - No se versionan secretos ni datos productivos. Usa `.env.example` como plantilla local.
 
-Estado objetivo actual: cierre operativo del candidato `backend-v1.0.0-rc1`. La validación repetible está en [`docs/operations/rc1-validation.md`](docs/operations/rc1-validation.md) y la automatización en [`docs/operations/ci-cd.md`](docs/operations/ci-cd.md).
+Estado actual: candidatos `backend-v1.0.0-rc1` y `web-v1.0.0-rc1` implementados y validados localmente. La validación backend está en [`docs/operations/rc1-validation.md`](docs/operations/rc1-validation.md), la web en [`docs/operations/angular-web-mvp.md`](docs/operations/angular-web-mvp.md) y la automatización en [`docs/operations/ci-cd.md`](docs/operations/ci-cd.md).

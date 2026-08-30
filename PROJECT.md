@@ -1,18 +1,18 @@
 # Ficha Del Proyecto
 
-| Campo | Valor |
-|---|---|
-| Proyecto | Tienda de Abarrotes |
-| Estado | Backend MVP implementado; en validación para RC1 |
-| Responsable | Por definir |
-| Tipo | Fullstack con cliente web y móvil |
-| Sensibilidad | Interno |
-| Fecha de inicio | 2026-07-12 |
-| Última revisión | 2026-08-23 |
+| Campo           | Valor                                                            |
+| --------------- | ---------------------------------------------------------------- |
+| Proyecto        | Tienda de Abarrotes                                              |
+| Estado          | Backend MVP y Angular Web MVP implementados y validados como RC1 |
+| Responsable     | Por definir                                                      |
+| Tipo            | Fullstack con cliente web y móvil                                |
+| Sensibilidad    | Interno                                                          |
+| Fecha de inicio | 2026-07-12                                                       |
+| Última revisión | 2026-08-30                                                       |
 
 ## Objetivo Actual
 
-Cerrar y validar el backend modular de la tienda: identidad, catálogo, organización, inventario, compras, ventas, caja, clientes, reportes, facturación interna, sincronización y auditoría.
+Cerrar y validar el backend modular y el Angular Web MVP de la tienda: identidad, catálogo, organización, inventario, compras, ventas, caja, clientes, reportes, facturación interna, sincronización y auditoría.
 
 ## Tecnologías Aprobadas
 
@@ -25,6 +25,7 @@ Cerrar y validar el backend modular de la tienda: identidad, catálogo, organiza
 - Spring Boot 4.1.0.
 - Gradle Kotlin DSL con Gradle Wrapper.
 - Redis 8.8.1 para protección distribuida del login en producción.
+- Angular 22.1, Angular Material, TypeScript 6, SCSS, Vitest y Playwright.
 
 ## Decisiones Vigentes
 
@@ -45,8 +46,8 @@ Cerrar y validar el backend modular de la tienda: identidad, catálogo, organiza
 
 ## Próximas Acciones
 
-1. Ejecutar la suite completa y la validación Docker en modos memoria y Redis distribuido.
-2. Comprobar la caída controlada: readiness `DOWN`, liveness `UP` y login `503`.
-3. Activar Gitleaks, Dependency Review, Dependency Graph, Dependabot alerts, Secret Scanning y Push Protection en GitHub.
-4. Provisionar y revisar los vínculos locales usuario-dispositivo de Sync antes de usar endpoints offline.
-5. Aprobar y etiquetar el candidato `backend-v1.0.0-rc1` cuando los checks remotos estén verdes.
+1. Publicar la rama y ejecutar los checks remotos de backend y web.
+2. Activar Gitleaks, Dependency Review, Dependency Graph, Dependabot alerts, Secret Scanning y Push Protection en GitHub.
+3. Provisionar y revisar los vínculos usuario-dispositivo antes de usar Sync fuera del entorno local.
+4. Ejecutar una ronda de aceptación funcional con perfiles reales de administrador, cajero y almacén.
+5. Aprobar y etiquetar los candidatos `backend-v1.0.0-rc1` y `web-v1.0.0-rc1` cuando los checks remotos estén verdes.

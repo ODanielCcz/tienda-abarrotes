@@ -80,14 +80,14 @@ describe('Login', () => {
 
     component.form.setValue({
       username: 'admin',
-      password: 'AdminLocal12345!',
+      password: 'test-password',
     });
 
     component.submit();
 
     expect(authApiMock.login).toHaveBeenCalledWith({
       username: 'admin',
-      password: 'AdminLocal12345!',
+      password: 'test-password',
     });
 
     expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/dashboard');

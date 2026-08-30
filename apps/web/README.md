@@ -1,59 +1,100 @@
-# TiendaWeb
+# Tienda Web
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.1.0.
+Aplicación Angular de administración y operación para Tienda de Abarrotes. Consume el backend mediante el proxy local `/api` y conserva en el servidor la autoridad sobre permisos, sucursales, precios, stock, impuestos, estados e idempotencia.
 
-## Development server
+## Requisitos
 
-To start a local development server, run:
+- Node.js `22.22.2`, `24.15.0` o una versión compatible posterior indicada en `package.json`.
+- npm `11.17.0`.
+- Backend disponible en `http://localhost:8080`.
+- Chromium de Playwright para las pruebas E2E.
 
-```bash
-ng serve
+Comprueba el entorno:
+
+```powershell
+node --version
+npm --version
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Instalación reproducible
 
-## Code scaffolding
+Desde `apps/web`:
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
+```powershell
+npm ci
+npm run e2e:install
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+`npm ci` utiliza `package-lock.json`; no es necesario instalar Angular CLI globalmente.
 
-```bash
-ng generate --help
+## Desarrollo local
+
+Levanta primero el backend. Después:
+
+```powershell
+npm start
 ```
 
-## Building
+Abre `http://localhost:4200`. El archivo `proxy.conf.json` reenvía `/api/**` hacia `http://localhost:8080`. Usa `localhost`, no `127.0.0.1`, para coincidir con el origen CORS local documentado.
 
-To build the project run:
+La aplicación no requiere secretos de frontend. No agregues JWT, contraseñas, credenciales de base de datos ni URLs privadas dentro de `src`, `public` o archivos de configuración versionados.
 
-```bash
-ng build
+## Comandos de calidad
+
+```powershell
+npm test -- --watch=false
+npm run build
+npm audit --omit=dev
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+El build de producción se genera en `dist/tienda-web`.
 
-## Running unit tests
+## Pruebas E2E
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+Los E2E cubren:
 
-```bash
-ng test
+- login y catálogo;
+- venta con precio resuelto por el backend y pago;
+- acceso restringido por permisos;
+- auditoría WCAG A/AA en login, dashboard y productos.
+
+Define las credenciales solo en la sesión de PowerShell:
+
+```powershell
+$env:E2E_USERNAME = '<usuario-local-con-permisos>'
+$env:E2E_PASSWORD = '<contraseña-local>'
+npm run e2e
+Remove-Item Env:E2E_USERNAME, Env:E2E_PASSWORD
 ```
 
-## Running end-to-end tests
+También puedes usar:
 
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
+```powershell
+npm run e2e:ui
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+La prueba de venta prepara su precondición mediante APIs públicas si no existe stock para una presentación con precio vigente. Por ello debe ejecutarse únicamente contra una base local o efímera, nunca contra producción.
 
-## Additional Resources
+Si las variables no existen, los flujos autenticados se omiten y la prueba determinista del guard de permisos permanece ejecutable.
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Estructura
+
+```text
+src/app/
+├── core/       sesión, configuración, contexto, guards e interceptores
+├── layout/     shell y selector operativo
+├── shared/     contratos, utilidades y diálogos reutilizables
+└── features/   módulos funcionales con modelos, APIs, componentes y páginas
+```
+
+La aplicación usa componentes standalone, rutas lazy, Signals, Reactive Forms, RxJS, Angular Material y SCSS. No duplica reglas críticas del backend.
+
+## Seguridad operativa
+
+- El token se conserva en `sessionStorage` y se elimina al cerrar sesión o recibir una revocación.
+- Las acciones y rutas se muestran según permisos del JWT; el backend vuelve a autorizar cada petición.
+- `X-Correlation-ID` se propaga y se muestra como referencia en errores.
+- El contexto de sucursal, almacén y caja se revalida con recursos activos del servidor.
+- No se admiten precios ni descuentos libres desde el POS.
+
+Consulta la guía completa en [`../../docs/operations/angular-web-mvp.md`](../../docs/operations/angular-web-mvp.md).

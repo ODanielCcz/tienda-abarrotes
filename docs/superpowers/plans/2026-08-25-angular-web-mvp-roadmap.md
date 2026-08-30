@@ -27,21 +27,22 @@
 
 ---
 
-| Campo | Valor |
-|---|---|
-| Proyecto | Tienda de Abarrotes |
-| Código | TDA-WEB-PLAN-001 |
-| Versión | v0.1 |
-| Estado | Aprobado para ejecución |
-| Responsable | Equipo de desarrollo ODCC |
-| Fecha | 2026-08-25 |
-| Clasificación | Interno |
+| Campo         | Valor                     |
+| ------------- | ------------------------- |
+| Proyecto      | Tienda de Abarrotes       |
+| Código        | TDA-WEB-PLAN-001          |
+| Versión       | v1.0                      |
+| Estado        | Ejecutado y verificado    |
+| Responsable   | Equipo de desarrollo ODCC |
+| Fecha         | 2026-08-25                |
+| Clasificación | Interno                   |
 
 ## Control de Versiones
 
-| Versión | Fecha | Autor | Cambio | Estado |
-|---|---|---|---|---|
-| v0.1 | 2026-08-25 | ODCC / Codex | Creación del roadmap maestro Angular | Aprobado para ejecución |
+| Versión | Fecha      | Autor        | Cambio                                                  | Estado                  |
+| ------- | ---------- | ------------ | ------------------------------------------------------- | ----------------------- |
+| v0.1    | 2026-08-25 | ODCC / Codex | Creación del roadmap maestro Angular                    | Aprobado para ejecución |
+| v1.0    | 2026-08-30 | ODCC / Codex | Implementación integral, E2E y cierre del candidato web | Ejecutado y verificado  |
 
 ## 1. Estado Actual Verificado
 
@@ -135,19 +136,23 @@ Los `401` cierran sesión; los `403` conducen a `/forbidden`; los `409` muestran
 
 ## 3. Orden Recomendado
 
-| Orden | Entrega | Dependencia | Resultado comprobable |
-|---:|---|---|---|
-| 0 | Cierre del árbol de categorías | Base actual | Categorías alternan lista y árbol con pruebas |
-| 1 | Catálogo de productos de solo lectura | Entrega 0 | Productos paginados, detalle y presentaciones |
-| 2 | Escrituras de catálogo | Entrega 1 | CRUD controlado de marcas, categorías, productos y presentaciones |
-| 3 | Contexto operativo | Catálogo estable | Sucursal y almacén activos disponibles en la sesión web |
-| 4 | Inventario y compras | Contexto operativo | Stock, lotes, movimientos, recepciones, proveedores y compras |
-| 5 | Clientes y punto de venta | Catálogo + inventario | Venta real con precios del backend y control de stock |
-| 6 | Caja, pagos y devoluciones | Punto de venta | Ciclo apertura → venta → pago → devolución → cierre |
-| 7 | Dashboard y reportes | Datos operativos | Indicadores y reportes v1/v2 consumidos por filtros |
-| 8 | Identidad y organización | Contexto operativo | Usuarios, roles, permisos y recursos organizacionales |
-| 9 | Facturación y sincronización | Ventas + administración | Gestión fiscal interna y consola de Sync |
-| 10 | Cierre de calidad | Todas las entregas | E2E crítico, accesibilidad, documentación y release web |
+| Orden | Entrega                               | Dependencia             | Resultado comprobable                                             |
+| ----: | ------------------------------------- | ----------------------- | ----------------------------------------------------------------- |
+|     0 | Cierre del árbol de categorías        | Base actual             | Categorías alternan lista y árbol con pruebas                     |
+|     1 | Catálogo de productos de solo lectura | Entrega 0               | Productos paginados, detalle y presentaciones                     |
+|     2 | Escrituras de catálogo                | Entrega 1               | CRUD controlado de marcas, categorías, productos y presentaciones |
+|     3 | Contexto operativo                    | Catálogo estable        | Sucursal y almacén activos disponibles en la sesión web           |
+|     4 | Inventario y compras                  | Contexto operativo      | Stock, lotes, movimientos, recepciones, proveedores y compras     |
+|     5 | Clientes y punto de venta             | Catálogo + inventario   | Venta real con precios del backend y control de stock             |
+|     6 | Caja, pagos y devoluciones            | Punto de venta          | Ciclo apertura → venta → pago → devolución → cierre               |
+|     7 | Dashboard y reportes                  | Datos operativos        | Indicadores y reportes v1/v2 consumidos por filtros               |
+|     8 | Identidad y organización              | Contexto operativo      | Usuarios, roles, permisos y recursos organizacionales             |
+|     9 | Facturación y sincronización          | Ventas + administración | Gestión fiscal interna y consola de Sync                          |
+|    10 | Cierre de calidad                     | Todas las entregas      | E2E crítico, accesibilidad, documentación y release web           |
+
+### Resultado de ejecución
+
+Las tareas 0 a 10 quedaron implementadas en entregas verticales y commits convencionales. La evidencia final del candidato se conserva en `docs/releases/web-v1.0.0-rc1.md`: 152 pruebas unitarias, cinco flujos E2E, build de producción, auditoría de dependencias, controles de accesibilidad y pruebas reales contra Docker local.
 
 ## 4. Plan de Ejecución
 
@@ -480,10 +485,10 @@ docs/operations/
 docs/releases/
 ```
 
-- [ ] Actualizar README con Node compatible, instalación, proxy, pruebas, build y variables no sensibles.
-- [ ] Agregar Playwright únicamente para los flujos críticos: login, catálogo, venta/pago y autorización 403.
-- [ ] Ejecutar auditoría de accesibilidad por teclado, labels, foco, contraste y tablas responsivas.
-- [ ] Validar que ningún bundle contenga secretos o URLs privadas.
+- [x] Actualizar README con Node compatible, instalación, proxy, pruebas, build y variables no sensibles.
+- [x] Agregar Playwright únicamente para los flujos críticos: login, catálogo, venta/pago y autorización 403.
+- [x] Ejecutar auditoría de accesibilidad por teclado, labels, foco, contraste y tablas responsivas.
+- [x] Validar que ningún bundle contenga secretos o URLs privadas.
 - [ ] Ejecutar:
 
 ```powershell
@@ -494,40 +499,40 @@ npm run build
 npm audit --omit=dev
 ```
 
-- [ ] Levantar backend Docker y ejecutar E2E contra `http://localhost:4200` mediante proxy local.
-- [ ] Documentar evidencia y versión en `docs/releases`.
-- [ ] Commit recomendado: `chore(web): prepare Angular MVP release candidate`.
+- [x] Levantar backend Docker y ejecutar E2E contra `http://localhost:4200` mediante proxy local.
+- [x] Documentar evidencia y versión en `docs/releases`.
+- [x] Commit recomendado: `chore(web): prepare Angular MVP release candidate`.
 
 **Aceptación:** suite unitaria, build y E2E críticos terminan correctamente; no hay errores de consola ni secretos versionados.
 
 ## 5. Estrategia de Pruebas
 
-| Nivel | Herramienta | Responsabilidad |
-|---|---|---|
-| Utilidades y stores | Vitest | Estado, permisos, contexto e idempotencia local |
-| API HTTP | `HttpTestingController` | Método, ruta, parámetros, payload y extracción de envelope |
-| Componentes/páginas | TestBed + Vitest | Carga, vacío, error, permisos y eventos |
-| Rutas | Vitest | Lazy loading, guards y `data.permissions` |
-| Build | Angular CLI | Templates, tipos, estilos y presupuestos |
-| E2E crítico | Playwright | Login, catálogo, venta/pago y acceso denegado |
-| Manual | Navegador | Modo oscuro, responsive, teclado y datos reales |
+| Nivel               | Herramienta             | Responsabilidad                                            |
+| ------------------- | ----------------------- | ---------------------------------------------------------- |
+| Utilidades y stores | Vitest                  | Estado, permisos, contexto e idempotencia local            |
+| API HTTP            | `HttpTestingController` | Método, ruta, parámetros, payload y extracción de envelope |
+| Componentes/páginas | TestBed + Vitest        | Carga, vacío, error, permisos y eventos                    |
+| Rutas               | Vitest                  | Lazy loading, guards y `data.permissions`                  |
+| Build               | Angular CLI             | Templates, tipos, estilos y presupuestos                   |
+| E2E crítico         | Playwright              | Login, catálogo, venta/pago y acceso denegado              |
+| Manual              | Navegador               | Modo oscuro, responsive, teclado y datos reales            |
 
 Cada bug corregido debe incorporar una prueba que reproduzca el fallo antes de modificar la implementación.
 
 ## 6. Riesgos y Mitigaciones
 
-| Código | Riesgo | Impacto | Mitigación |
-|---|---|---:|---|
-| RIE-001 | Intentar implementar todos los módulos en paralelo | Alto | Seguir el orden y cerrar una entrega vertical antes de abrir la siguiente |
-| RIE-002 | Sobrescribir cambios locales de categorías | Alto | Commit exclusivo de Tarea 0 y staging por ruta |
-| RIE-003 | Duplicar reglas del backend | Alto | Usar respuestas del servidor para precios, stock, estados y totales |
-| RIE-004 | Permisos visuales inconsistentes | Alto | Probar ruta, menú y acción para cada permiso |
-| RIE-005 | Formularios acoplados a responses | Medio | Separar modelos de request y response |
-| RIE-006 | Componentes gigantes de POS/inventario | Alto | Dividir búsqueda, carrito, resumen y formularios en unidades presentacionales |
-| RIE-007 | Dependencias frontend innecesarias | Medio | Angular Material + SCSS; justificar cualquier paquete nuevo |
-| RIE-008 | Reintentos que duplican operaciones | Alto | Mantener idempotency keys por intento lógico y deshabilitar doble envío |
-| RIE-009 | Contexto de sucursal obsoleto | Alto | Revalidar identificadores al iniciar y limpiar al cerrar sesión |
-| RIE-010 | Cobertura superficial | Medio | HTTP specs, page specs, build y E2E crítico antes del release |
+| Código  | Riesgo                                             | Impacto | Mitigación                                                                    |
+| ------- | -------------------------------------------------- | ------: | ----------------------------------------------------------------------------- |
+| RIE-001 | Intentar implementar todos los módulos en paralelo |    Alto | Seguir el orden y cerrar una entrega vertical antes de abrir la siguiente     |
+| RIE-002 | Sobrescribir cambios locales de categorías         |    Alto | Commit exclusivo de Tarea 0 y staging por ruta                                |
+| RIE-003 | Duplicar reglas del backend                        |    Alto | Usar respuestas del servidor para precios, stock, estados y totales           |
+| RIE-004 | Permisos visuales inconsistentes                   |    Alto | Probar ruta, menú y acción para cada permiso                                  |
+| RIE-005 | Formularios acoplados a responses                  |   Medio | Separar modelos de request y response                                         |
+| RIE-006 | Componentes gigantes de POS/inventario             |    Alto | Dividir búsqueda, carrito, resumen y formularios en unidades presentacionales |
+| RIE-007 | Dependencias frontend innecesarias                 |   Medio | Angular Material + SCSS; justificar cualquier paquete nuevo                   |
+| RIE-008 | Reintentos que duplican operaciones                |    Alto | Mantener idempotency keys por intento lógico y deshabilitar doble envío       |
+| RIE-009 | Contexto de sucursal obsoleto                      |    Alto | Revalidar identificadores al iniciar y limpiar al cerrar sesión               |
+| RIE-010 | Cobertura superficial                              |   Medio | HTTP specs, page specs, build y E2E crítico antes del release                 |
 
 ## 7. Definición de Terminado por Entrega
 
@@ -561,7 +566,7 @@ Para cada tarea se seguirá este ciclo:
 
 ## 9. Próxima Acción
 
-La ejecución comienza por la **Tarea 0: Cerrar el Árbol de Categorías**. Después se continúa con el plan detallado existente de catálogo de lectura. No se debe abrir inventario, POS ni administración hasta que catálogo tenga listado, detalle, presentaciones, pruebas y permisos estables.
+El roadmap del MVP web está cerrado. La siguiente acción es publicar la rama, ejecutar los checks remotos y realizar aceptación funcional con perfiles de administrador, cajero y almacén antes de etiquetar `web-v1.0.0-rc1`.
 
 ## 10. Fuera de Alcance del MVP Web
 
