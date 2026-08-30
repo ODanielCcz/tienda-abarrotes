@@ -16,6 +16,7 @@ import com.odcc.tienda.shared.application.transaction.TransactionRunner;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -45,6 +46,13 @@ public class SalesReturnService implements SalesReturnUseCases {
         SalesReturn salesReturn = findById(returnId);
         requireOrderAccess(salesReturn.salesOrderId(), actorUserId);
         return salesReturn;
+    }
+
+    @Override
+    public List<SalesReturn> listBySalesOrder(UUID salesOrderId, UUID actorUserId) {
+        if (salesOrderId == null) throw new SalesException("La venta es obligatoria");
+        requireOrderAccess(salesOrderId, actorUserId);
+        return repository.findAllBySalesOrderId(salesOrderId);
     }
 
     @Override

@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -47,6 +48,23 @@ public class SalesReturnController {
             mapper.toCreateCommand(salesOrderId, request, currentUserId(jwt))
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.success(HttpStatus.CREATED, "SALES_RETURN_CREATED", "Devolucion creada correctamente", salesReturn, servletRequest.getRequestURI()));
+    }
+
+    @GetMapping("/sales/orders/{salesOrderId}/returns")
+    @Operation(summary = "Listar devoluciones de una venta")
+    @PreAuthorize("hasAuthority('SALES_RETURN_READ')")
+    public ResponseEntity<ApiResponseDto<List<SalesReturn>>> listBySalesOrder(
+        @PathVariable UUID salesOrderId,
+        @AuthenticationPrincipal Jwt jwt,
+        HttpServletRequest servletRequest
+    ) {
+        return ResponseEntity.ok(ApiResponseDto.success(
+            HttpStatus.OK,
+            "SALES_RETURNS_FOUND",
+            "Devoluciones consultadas correctamente",
+            useCases.listBySalesOrder(salesOrderId, currentUserId(jwt)),
+            servletRequest.getRequestURI()
+        ));
     }
 
     @GetMapping("/sales/returns/{returnId}")

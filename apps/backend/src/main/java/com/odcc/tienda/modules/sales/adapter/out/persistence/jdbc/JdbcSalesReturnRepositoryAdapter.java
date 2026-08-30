@@ -80,6 +80,19 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
     }
 
     @Override
+    public List<SalesReturn> findAllBySalesOrderId(UUID salesOrderId) {
+        return jdbc.query("""
+            SELECT *
+            FROM sales.returns
+            WHERE sales_order_id = :salesOrderId
+            ORDER BY created_at DESC, return_id
+            """, new MapSqlParameterSource("salesOrderId", salesOrderId), this::mapReturnWithoutItems)
+            .stream()
+            .map(this::withItems)
+            .toList();
+    }
+
+    @Override
     public SalesReturn confirm(ConfirmSalesReturnCommand command) {
         SalesReturn salesReturn = findByIdForUpdate(command.returnId());
         if (!"DRAFT".equals(salesReturn.status())) throw new SalesReturnAlreadyProcessedException(command.returnId());

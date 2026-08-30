@@ -4,6 +4,7 @@ import com.odcc.tienda.modules.sales.application.command.ConfirmSalesReturnComma
 import com.odcc.tienda.modules.sales.application.command.CreateSalesReturnCommand;
 import com.odcc.tienda.modules.sales.application.model.SalesReturn;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface SalesReturnUseCases {
@@ -11,6 +12,8 @@ public interface SalesReturnUseCases {
     SalesReturn create(CreateSalesReturnCommand command);
 
     SalesReturn getById(UUID returnId, UUID actorUserId);
+
+    List<SalesReturn> listBySalesOrder(UUID salesOrderId, UUID actorUserId);
 
     SalesReturn confirm(ConfirmSalesReturnCommand command);
 
