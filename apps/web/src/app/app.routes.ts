@@ -253,14 +253,29 @@ export const routes: Routes = [
         path: 'identity',
         canActivate: [permissionGuard],
         data: {
-          permissions: ['IDENTITY_USER_READ'],
-          title: 'Usuarios',
-          description: 'Administra usuarios, roles, permisos y accesos por sucursal.',
-          icon: 'admin_panel_settings',
+          permissions: ['IDENTITY_USER_READ', 'IDENTITY_ROLE_READ'],
+          permissionMatch: 'ANY',
         },
         loadComponent: () =>
-          import('./shared/pages/module-placeholder/module-placeholder').then(
-            (module) => module.ModulePlaceholder,
+          import('./features/identity/pages/identity-overview/identity-overview').then(
+            (module) => module.IdentityOverview,
+          ),
+      },
+      {
+        path: 'organization',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: [
+            'ORGANIZATION_BRANCH_READ',
+            'ORGANIZATION_WAREHOUSE_READ',
+            'ORGANIZATION_CASH_REGISTER_READ',
+            'ORGANIZATION_DEVICE_READ',
+          ],
+          permissionMatch: 'ANY',
+        },
+        loadComponent: () =>
+          import('./features/organization/pages/organization-overview/organization-overview').then(
+            (module) => module.OrganizationOverview,
           ),
       },
       {

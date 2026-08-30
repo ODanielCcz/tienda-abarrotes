@@ -1,0 +1,9 @@
+form,
+mat-form-field {
+  display: block;
+  width: min(38rem, 80vw);
+}
+
+.error-state {
+  color: var(--mat-sys-error);
+}

@@ -117,6 +117,17 @@ export class AppShell {
         route: '/identity',
         permissions: ['IDENTITY_USER_READ', 'IDENTITY_ROLE_READ'],
       },
+      {
+        label: 'Organización',
+        icon: 'account_tree',
+        route: '/organization',
+        permissions: [
+          'ORGANIZATION_BRANCH_READ',
+          'ORGANIZATION_WAREHOUSE_READ',
+          'ORGANIZATION_CASH_REGISTER_READ',
+          'ORGANIZATION_DEVICE_READ',
+        ],
+      },
     ].filter((item) => this.sessionStore.hasAnyPermission(item.permissions)),
   );
 

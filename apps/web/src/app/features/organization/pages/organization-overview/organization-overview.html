@@ -1,0 +1,270 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Administración</p>
+      <h1>Organización operativa</h1>
+      <p>Administra sucursales, almacenes, cajas registradoras y dispositivos.</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="refresh()">
+      <mat-icon>refresh</mat-icon>Actualizar
+    </button>
+  </header>
+
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  }
+
+  <mat-tab-group animationDuration="0ms">
+    @if (canReadBranches) {
+      <mat-tab label="Sucursales">
+        <div class="tab-content">
+          <div class="toolbar">
+            @if (can('ORGANIZATION_BRANCH_CREATE')) {
+              <button mat-flat-button type="button" (click)="open('BRANCH', null)">
+                <mat-icon>add_business</mat-icon>Nueva sucursal
+              </button>
+            }
+          </div>
+          <div class="table-shell">
+            <table mat-table [dataSource]="branches()">
+              <ng-container matColumnDef="code"
+                ><th mat-header-cell *matHeaderCellDef>Código</th>
+                <td mat-cell *matCellDef="let item">
+                  <strong>{{ item.code }}</strong>
+                </td></ng-container
+              >
+              <ng-container matColumnDef="name"
+                ><th mat-header-cell *matHeaderCellDef>Nombre</th>
+                <td mat-cell *matCellDef="let item">{{ item.name }}</td></ng-container
+              >
+              <ng-container matColumnDef="timezone"
+                ><th mat-header-cell *matHeaderCellDef>Zona horaria</th>
+                <td mat-cell *matCellDef="let item">{{ item.timezone }}</td></ng-container
+              >
+              <ng-container matColumnDef="currency"
+                ><th mat-header-cell *matHeaderCellDef>Moneda</th>
+                <td mat-cell *matCellDef="let item">{{ item.currencyCode }}</td></ng-container
+              >
+              <ng-container matColumnDef="status"
+                ><th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let item">{{ item.status }}</td></ng-container
+              >
+              <ng-container matColumnDef="actions"
+                ><th mat-header-cell *matHeaderCellDef>Acciones</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="row-actions">
+                    @if (can('ORGANIZATION_BRANCH_UPDATE')) {
+                      <button mat-icon-button title="Editar" (click)="open('BRANCH', item)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                    }
+                    @if (can('ORGANIZATION_BRANCH_STATUS')) {
+                      <button mat-icon-button title="Estado" (click)="changeBranchStatus(item)">
+                        <mat-icon>toggle_on</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="branchColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: branchColumns"></tr>
+            </table>
+          </div>
+        </div>
+      </mat-tab>
+    }
+
+    @if (canReadWarehouses) {
+      <mat-tab label="Almacenes"
+        ><div class="tab-content">
+          <div class="toolbar">
+            @if (can('ORGANIZATION_WAREHOUSE_CREATE')) {
+              <button mat-flat-button (click)="open('WAREHOUSE', null)">
+                <mat-icon>add</mat-icon>Nuevo almacén
+              </button>
+            }
+          </div>
+          <div class="table-shell">
+            <table mat-table [dataSource]="warehouses()">
+              <ng-container matColumnDef="code"
+                ><th mat-header-cell *matHeaderCellDef>Código</th>
+                <td mat-cell *matCellDef="let item">
+                  <strong>{{ item.code }}</strong>
+                </td></ng-container
+              >
+              <ng-container matColumnDef="name"
+                ><th mat-header-cell *matHeaderCellDef>Nombre</th>
+                <td mat-cell *matCellDef="let item">{{ item.name }}</td></ng-container
+              >
+              <ng-container matColumnDef="branch"
+                ><th mat-header-cell *matHeaderCellDef>Sucursal</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ branchName(item.branchId) }}
+                </td></ng-container
+              >
+              <ng-container matColumnDef="type"
+                ><th mat-header-cell *matHeaderCellDef>Tipo</th>
+                <td mat-cell *matCellDef="let item">{{ item.warehouseType }}</td></ng-container
+              >
+              <ng-container matColumnDef="status"
+                ><th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let item">{{ item.status }}</td></ng-container
+              >
+              <ng-container matColumnDef="actions"
+                ><th mat-header-cell *matHeaderCellDef>Acciones</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="row-actions">
+                    @if (can('ORGANIZATION_WAREHOUSE_UPDATE')) {
+                      <button mat-icon-button title="Editar" (click)="open('WAREHOUSE', item)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                    }
+                    @if (can('ORGANIZATION_WAREHOUSE_STATUS')) {
+                      <button mat-icon-button title="Estado" (click)="changeWarehouseStatus(item)">
+                        <mat-icon>toggle_on</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="warehouseColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: warehouseColumns"></tr>
+            </table>
+          </div></div
+      ></mat-tab>
+    }
+
+    @if (canReadRegisters) {
+      <mat-tab label="Cajas"
+        ><div class="tab-content">
+          <div class="toolbar">
+            @if (can('ORGANIZATION_CASH_REGISTER_CREATE')) {
+              <button mat-flat-button (click)="open('CASH_REGISTER', null)">
+                <mat-icon>point_of_sale</mat-icon>Nueva caja
+              </button>
+            }
+          </div>
+          <div class="table-shell">
+            <table mat-table [dataSource]="registers()">
+              <ng-container matColumnDef="code"
+                ><th mat-header-cell *matHeaderCellDef>Código</th>
+                <td mat-cell *matCellDef="let item">
+                  <strong>{{ item.code }}</strong>
+                </td></ng-container
+              >
+              <ng-container matColumnDef="name"
+                ><th mat-header-cell *matHeaderCellDef>Nombre</th>
+                <td mat-cell *matCellDef="let item">{{ item.name }}</td></ng-container
+              >
+              <ng-container matColumnDef="branch"
+                ><th mat-header-cell *matHeaderCellDef>Sucursal</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ branchName(item.branchId) }}
+                </td></ng-container
+              >
+              <ng-container matColumnDef="device"
+                ><th mat-header-cell *matHeaderCellDef>Dispositivo</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ deviceCode(item.deviceId) }}
+                </td></ng-container
+              >
+              <ng-container matColumnDef="status"
+                ><th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let item">{{ item.status }}</td></ng-container
+              >
+              <ng-container matColumnDef="actions"
+                ><th mat-header-cell *matHeaderCellDef>Acciones</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="row-actions">
+                    @if (can('ORGANIZATION_CASH_REGISTER_UPDATE')) {
+                      <button mat-icon-button title="Editar" (click)="open('CASH_REGISTER', item)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                    }
+                    @if (can('ORGANIZATION_CASH_REGISTER_STATUS')) {
+                      <button mat-icon-button title="Estado" (click)="changeRegisterStatus(item)">
+                        <mat-icon>toggle_on</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="registerColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: registerColumns"></tr>
+            </table>
+          </div></div
+      ></mat-tab>
+    }
+
+    @if (canReadDevices) {
+      <mat-tab label="Dispositivos"
+        ><div class="tab-content">
+          <div class="toolbar">
+            @if (can('ORGANIZATION_DEVICE_CREATE')) {
+              <button mat-flat-button (click)="open('DEVICE', null)">
+                <mat-icon>devices</mat-icon>Nuevo dispositivo
+              </button>
+            }
+          </div>
+          <div class="table-shell">
+            <table mat-table [dataSource]="devices()">
+              <ng-container matColumnDef="code"
+                ><th mat-header-cell *matHeaderCellDef>Código</th>
+                <td mat-cell *matCellDef="let item">
+                  <strong>{{ item.deviceCode }}</strong>
+                </td></ng-container
+              >
+              <ng-container matColumnDef="type"
+                ><th mat-header-cell *matHeaderCellDef>Tipo</th>
+                <td mat-cell *matCellDef="let item">{{ item.deviceType }}</td></ng-container
+              >
+              <ng-container matColumnDef="branch"
+                ><th mat-header-cell *matHeaderCellDef>Sucursal</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ branchName(item.branchId) }}
+                </td></ng-container
+              >
+              <ng-container matColumnDef="warehouse"
+                ><th mat-header-cell *matHeaderCellDef>Almacén</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ warehouseName(item.warehouseId) }}
+                </td></ng-container
+              >
+              <ng-container matColumnDef="version"
+                ><th mat-header-cell *matHeaderCellDef>Plataforma</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ item.platform || '—' }} {{ item.appVersion || '' }}
+                </td></ng-container
+              >
+              <ng-container matColumnDef="status"
+                ><th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let item">{{ item.status }}</td></ng-container
+              >
+              <ng-container matColumnDef="actions"
+                ><th mat-header-cell *matHeaderCellDef>Acciones</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="row-actions">
+                    @if (can('ORGANIZATION_DEVICE_UPDATE')) {
+                      <button mat-icon-button title="Editar" (click)="open('DEVICE', item)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                    }
+                    @if (can('ORGANIZATION_DEVICE_STATUS')) {
+                      <button mat-icon-button title="Estado" (click)="changeDeviceStatus(item)">
+                        <mat-icon>toggle_on</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="deviceColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: deviceColumns"></tr>
+            </table>
+          </div></div
+      ></mat-tab>
+    }
+  </mat-tab-group>
+</section>

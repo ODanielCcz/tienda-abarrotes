@@ -1,0 +1,43 @@
+<h2 mat-dialog-title>{{ data.user ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
+<mat-dialog-content>
+  <form id="user-form" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline">
+      <mat-label>Usuario</mat-label>
+      <input matInput formControlName="username" maxlength="80" autocomplete="off" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre visible</mat-label>
+      <input matInput formControlName="displayName" maxlength="200" />
+    </mat-form-field>
+    @if (!data.user) {
+      <mat-form-field appearance="outline">
+        <mat-label>Contraseña temporal</mat-label>
+        <input
+          matInput
+          type="password"
+          formControlName="password"
+          maxlength="255"
+          autocomplete="new-password"
+        />
+        <mat-hint>Mínimo 12 caracteres.</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Roles iniciales</mat-label>
+        <mat-select formControlName="roleCodes" multiple>
+          @for (role of activeRoles; track role.roleId) {
+            <mat-option [value]="role.code">{{ role.name }} ({{ role.code }})</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+  </form>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="null">Cancelar</button>
+  <button mat-flat-button type="submit" form="user-form" [disabled]="form.invalid || submitting()">
+    Guardar
+  </button>
+</mat-dialog-actions>

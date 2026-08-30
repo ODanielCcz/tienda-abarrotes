@@ -1,0 +1,51 @@
+<h2 mat-dialog-title>{{ title() }}</h2>
+<mat-dialog-content>
+  <p>
+    <strong>{{ data.user.displayName }}</strong> · {{ data.user.username }}
+  </p>
+  <form id="user-access-form" [formGroup]="form" (ngSubmit)="submit()">
+    @if (data.mode === 'ROLES') {
+      <mat-form-field appearance="outline">
+        <mat-label>Roles</mat-label>
+        <mat-select formControlName="roleCodes" multiple>
+          @for (role of data.roles; track role.roleId) {
+            <mat-option [value]="role.code" [disabled]="role.status !== 'ACTIVE'">
+              {{ role.name }} ({{ role.code }})
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    } @else if (data.mode === 'BRANCHES') {
+      <mat-form-field appearance="outline">
+        <mat-label>Sucursales activas</mat-label>
+        <mat-select formControlName="branchIds" multiple>
+          @for (branch of data.branches; track branch.branchId) {
+            <mat-option [value]="branch.branchId">{{ branch.name }} ({{ branch.code }})</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    } @else {
+      <mat-form-field appearance="outline">
+        <mat-label>Nueva contraseña</mat-label>
+        <input
+          matInput
+          type="password"
+          formControlName="password"
+          minlength="12"
+          maxlength="255"
+          autocomplete="new-password"
+        />
+        <mat-hint>Mínimo 12 caracteres; revocará los tokens vigentes.</mat-hint>
+      </mat-form-field>
+    }
+  </form>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="null">Cancelar</button>
+  <button mat-flat-button type="submit" form="user-access-form" [disabled]="submitting()">
+    Aplicar
+  </button>
+</mat-dialog-actions>

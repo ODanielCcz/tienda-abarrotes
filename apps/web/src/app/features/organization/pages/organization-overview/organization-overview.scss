@@ -1,0 +1,57 @@
+:host,
+.page {
+  display: block;
+}
+.page {
+  display: grid;
+  gap: 1rem;
+}
+.page-header,
+.toolbar,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.page-header {
+  justify-content: space-between;
+}
+.eyebrow {
+  margin: 0;
+  color: var(--mat-sys-primary);
+  font-weight: 700;
+}
+h1 {
+  margin: 0.25rem 0;
+}
+.tab-content {
+  display: grid;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+.toolbar {
+  justify-content: flex-end;
+  min-height: 2.5rem;
+}
+.table-shell {
+  overflow: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+}
+table {
+  width: 100%;
+}
+.state {
+  display: grid;
+  min-height: 8rem;
+  place-items: center;
+}
+.error-state {
+  color: var(--mat-sys-error);
+}
+@media (max-width: 800px) {
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

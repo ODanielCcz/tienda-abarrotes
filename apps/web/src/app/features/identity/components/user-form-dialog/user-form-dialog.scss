@@ -1,0 +1,9 @@
+form {
+  display: grid;
+  min-width: min(38rem, 80vw);
+  gap: 0.75rem;
+}
+
+.error-state {
+  color: var(--mat-sys-error);
+}

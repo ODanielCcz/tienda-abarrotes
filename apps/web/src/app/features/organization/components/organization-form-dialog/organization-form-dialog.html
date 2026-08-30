@@ -1,0 +1,107 @@
+<h2 mat-dialog-title>{{ title() }}</h2>
+<mat-dialog-content>
+  <form id="organization-form" [formGroup]="form" (ngSubmit)="submit()">
+    @if (data.type !== 'BRANCH') {
+      <mat-form-field appearance="outline">
+        <mat-label>Sucursal</mat-label>
+        <mat-select formControlName="branchId">
+          @for (branch of data.branches; track branch.branchId) {
+            <mat-option [value]="branch.branchId" [disabled]="branch.status !== 'ACTIVE'">
+              {{ branch.name }} ({{ branch.code }})
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline">
+      <mat-label>{{ data.type === 'DEVICE' ? 'Código de dispositivo' : 'Código' }}</mat-label>
+      <input matInput formControlName="code" maxlength="80" />
+    </mat-form-field>
+
+    @if (data.type !== 'DEVICE') {
+      <mat-form-field appearance="outline">
+        <mat-label>Nombre</mat-label>
+        <input matInput formControlName="name" maxlength="150" />
+      </mat-form-field>
+    }
+
+    @if (data.type === 'BRANCH') {
+      <mat-form-field appearance="outline">
+        <mat-label>Razón social</mat-label>
+        <input matInput formControlName="legalName" maxlength="200" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Zona horaria</mat-label>
+        <input matInput formControlName="timezone" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Moneda</mat-label>
+        <input matInput formControlName="currencyCode" maxlength="3" />
+      </mat-form-field>
+    } @else if (data.type === 'WAREHOUSE') {
+      <mat-form-field appearance="outline">
+        <mat-label>Tipo de almacén</mat-label>
+        <mat-select formControlName="warehouseType">
+          @for (type of warehouseTypes; track type) {
+            <mat-option [value]="type">{{ type }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    } @else if (data.type === 'CASH_REGISTER') {
+      <mat-form-field appearance="outline">
+        <mat-label>Dispositivo asociado</mat-label>
+        <mat-select formControlName="deviceId">
+          <mat-option [value]="null">Sin dispositivo</mat-option>
+          @for (device of devicesForBranch(); track device.deviceId) {
+            <mat-option [value]="device.deviceId" [disabled]="device.status !== 'ACTIVE'">
+              {{ device.deviceCode }} · {{ device.deviceType }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    } @else {
+      <mat-form-field appearance="outline">
+        <mat-label>Tipo de dispositivo</mat-label>
+        <mat-select formControlName="deviceType">
+          @for (type of deviceTypes; track type) {
+            <mat-option [value]="type">{{ type }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Almacén</mat-label>
+        <mat-select formControlName="warehouseId">
+          <mat-option [value]="null">Sin almacén</mat-option>
+          @for (warehouse of warehousesForBranch(); track warehouse.warehouseId) {
+            <mat-option [value]="warehouse.warehouseId" [disabled]="warehouse.status !== 'ACTIVE'">
+              {{ warehouse.name }} ({{ warehouse.code }})
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Plataforma</mat-label>
+        <input matInput formControlName="platform" maxlength="50" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Versión de app</mat-label>
+        <input matInput formControlName="appVersion" maxlength="50" />
+      </mat-form-field>
+    }
+  </form>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="null">Cancelar</button>
+  <button
+    mat-flat-button
+    type="submit"
+    form="organization-form"
+    [disabled]="form.invalid || submitting()"
+  >
+    Guardar
+  </button>
+</mat-dialog-actions>
