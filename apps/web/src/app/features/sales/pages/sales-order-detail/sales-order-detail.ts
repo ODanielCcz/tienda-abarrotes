@@ -16,6 +16,7 @@ import { apiErrorMessage } from '../../../../shared/utilities/api-error-message'
 import { SalesApi } from '../../data-access/sales-api';
 import { SalesOrder } from '../../models/sales.model';
 import { SalesPaymentPanel } from '../../payments/components/sales-payment-panel/sales-payment-panel';
+import { SalesReturnPanel } from '../../returns/components/sales-return-panel/sales-return-panel';
 
 @Component({
   selector: 'app-sales-order-detail',
@@ -29,6 +30,7 @@ import { SalesPaymentPanel } from '../../payments/components/sales-payment-panel
     MatProgressSpinnerModule,
     MatTableModule,
     SalesPaymentPanel,
+    SalesReturnPanel,
   ],
   templateUrl: './sales-order-detail.html',
   styleUrl: './sales-order-detail.scss',
@@ -48,6 +50,7 @@ export class SalesOrderDetail {
   protected readonly columns = ['product', 'lot', 'quantity', 'price', 'tax', 'total'];
   protected readonly canCancel = this.sessionStore.hasPermission('SALES_ORDER_CANCEL');
   protected readonly canReadPayments = this.sessionStore.hasPermission('SALES_PAYMENT_READ');
+  protected readonly canReadReturns = this.sessionStore.hasPermission('SALES_RETURN_READ');
 
   constructor() {
     this.load();
@@ -84,6 +87,10 @@ export class SalesOrderDetail {
   }
 
   protected paymentsChanged(): void {
+    this.load();
+  }
+
+  protected returnsChanged(): void {
     this.load();
   }
 

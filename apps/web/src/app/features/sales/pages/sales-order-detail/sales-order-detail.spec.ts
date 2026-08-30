@@ -9,6 +9,7 @@ import { OperationalContextStore } from '../../../../core/context/operational-co
 import { CashApi } from '../../../cash/data-access/cash-api';
 import { SalesApi } from '../../data-access/sales-api';
 import { SalesPaymentApi } from '../../payments/data-access/sales-payment-api';
+import { SalesReturnApi } from '../../returns/data-access/sales-return-api';
 import { SalesOrderDetail } from './sales-order-detail';
 
 describe('SalesOrderDetail', () => {
@@ -17,6 +18,7 @@ describe('SalesOrderDetail', () => {
   const dialog = { open: vi.fn() };
   const session = { hasPermission: vi.fn(() => true) };
   const paymentApi = { list: vi.fn(() => of([])) };
+  const returnApi = { listByOrder: vi.fn(() => of([])) };
   const cashApi = { listSessions: vi.fn(() => of([])) };
   const context = { context: vi.fn(() => ({})) };
 
@@ -32,6 +34,7 @@ describe('SalesOrderDetail', () => {
         { provide: SalesApi, useValue: api },
         { provide: AuthSessionStore, useValue: session },
         { provide: SalesPaymentApi, useValue: paymentApi },
+        { provide: SalesReturnApi, useValue: returnApi },
         { provide: CashApi, useValue: cashApi },
         { provide: OperationalContextStore, useValue: context },
         { provide: MatDialog, useValue: dialog },
