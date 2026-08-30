@@ -5,7 +5,10 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AuthSessionStore } from '../../../../core/auth/auth-session-store';
+import { OperationalContextStore } from '../../../../core/context/operational-context.store';
+import { CashApi } from '../../../cash/data-access/cash-api';
 import { SalesApi } from '../../data-access/sales-api';
+import { SalesPaymentApi } from '../../payments/data-access/sales-payment-api';
 import { SalesOrderDetail } from './sales-order-detail';
 
 describe('SalesOrderDetail', () => {
@@ -13,6 +16,9 @@ describe('SalesOrderDetail', () => {
   const api = { get: vi.fn(), cancel: vi.fn() };
   const dialog = { open: vi.fn() };
   const session = { hasPermission: vi.fn(() => true) };
+  const paymentApi = { list: vi.fn(() => of([])) };
+  const cashApi = { listSessions: vi.fn(() => of([])) };
+  const context = { context: vi.fn(() => ({})) };
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -25,6 +31,9 @@ describe('SalesOrderDetail', () => {
         provideRouter([]),
         { provide: SalesApi, useValue: api },
         { provide: AuthSessionStore, useValue: session },
+        { provide: SalesPaymentApi, useValue: paymentApi },
+        { provide: CashApi, useValue: cashApi },
+        { provide: OperationalContextStore, useValue: context },
         { provide: MatDialog, useValue: dialog },
         {
           provide: ActivatedRoute,

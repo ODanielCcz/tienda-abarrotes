@@ -15,6 +15,7 @@ import { ConfirmationDialog } from '../../../../shared/dialogs/confirmation-dial
 import { apiErrorMessage } from '../../../../shared/utilities/api-error-message';
 import { SalesApi } from '../../data-access/sales-api';
 import { SalesOrder } from '../../models/sales.model';
+import { SalesPaymentPanel } from '../../payments/components/sales-payment-panel/sales-payment-panel';
 
 @Component({
   selector: 'app-sales-order-detail',
@@ -27,6 +28,7 @@ import { SalesOrder } from '../../models/sales.model';
     MatIconModule,
     MatProgressSpinnerModule,
     MatTableModule,
+    SalesPaymentPanel,
   ],
   templateUrl: './sales-order-detail.html',
   styleUrl: './sales-order-detail.scss',
@@ -45,6 +47,7 @@ export class SalesOrderDetail {
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly columns = ['product', 'lot', 'quantity', 'price', 'tax', 'total'];
   protected readonly canCancel = this.sessionStore.hasPermission('SALES_ORDER_CANCEL');
+  protected readonly canReadPayments = this.sessionStore.hasPermission('SALES_PAYMENT_READ');
 
   constructor() {
     this.load();
@@ -78,6 +81,10 @@ export class SalesOrderDetail {
         error: (error: unknown) =>
           this.errorMessage.set(apiErrorMessage(error, 'No fue posible cancelar la venta.')),
       });
+  }
+
+  protected paymentsChanged(): void {
+    this.load();
   }
 
   private load(): void {

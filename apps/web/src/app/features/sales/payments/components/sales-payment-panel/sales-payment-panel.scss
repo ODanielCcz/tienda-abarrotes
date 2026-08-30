@@ -1,0 +1,41 @@
+.payment-card,
+.payment-card mat-card-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.payment-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.table-shell {
+  overflow: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.75rem;
+}
+
+table {
+  width: 100%;
+}
+
+.state {
+  padding: 1rem;
+  text-align: center;
+}
+
+.error-state {
+  color: var(--mat-sys-error);
+}
+
+.warning-state {
+  color: var(--mat-sys-tertiary);
+}
+
+@media (max-width: 900px) {
+  .payment-form {
+    grid-template-columns: 1fr;
+  }
+}

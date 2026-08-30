@@ -1,0 +1,100 @@
+<mat-card appearance="outlined" class="payment-card">
+  <mat-card-header>
+    <mat-card-title>Pagos</mat-card-title>
+    <mat-card-subtitle>
+      Capturado: {{ capturedTotal() | number: '1.2-2' }} · Saldo:
+      {{ remainingBalance() | number: '1.2-2' }} {{ order().currencyCode }}
+    </mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    @if (errorMessage()) {
+      <p class="error-state" role="alert">{{ errorMessage() }}</p>
+    }
+    @if (loading()) {
+      <div class="state"><mat-spinner diameter="36" /></div>
+    } @else {
+      @if (canCreate && order().status === 'CONFIRMED' && remainingBalance() > 0) {
+        <form [formGroup]="paymentForm" (ngSubmit)="createPayment()" class="payment-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Método</mat-label>
+            <mat-select formControlName="paymentMethod">
+              <mat-option value="CASH">Efectivo</mat-option>
+              <mat-option value="CARD">Tarjeta</mat-option>
+              <mat-option value="TRANSFER">Transferencia</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Monto</mat-label>
+            <input
+              matInput
+              type="number"
+              min="0.01"
+              [max]="remainingBalance()"
+              step="0.01"
+              formControlName="amount"
+            />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Referencia</mat-label>
+            <input matInput formControlName="reference" />
+          </mat-form-field>
+          <button mat-flat-button type="submit" [disabled]="paymentForm.invalid || processing()">
+            <mat-icon>payments</mat-icon>Registrar pago
+          </button>
+        </form>
+        @if (paymentForm.controls.paymentMethod.value === 'CASH' && !openCashSession()) {
+          <p class="warning-state">No hay una sesión abierta en la caja operativa.</p>
+        }
+      }
+
+      <div class="table-shell">
+        <table mat-table [dataSource]="payments()">
+          <ng-container matColumnDef="paidAt"
+            ><th mat-header-cell *matHeaderCellDef>Fecha</th>
+            <td mat-cell *matCellDef="let payment">
+              {{ payment.paidAt | date: 'dd/MM/yyyy HH:mm' }}
+            </td></ng-container
+          >
+          <ng-container matColumnDef="method"
+            ><th mat-header-cell *matHeaderCellDef>Método</th>
+            <td mat-cell *matCellDef="let payment">{{ payment.paymentMethod }}</td></ng-container
+          >
+          <ng-container matColumnDef="status"
+            ><th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let payment">{{ payment.status }}</td></ng-container
+          >
+          <ng-container matColumnDef="amount"
+            ><th mat-header-cell *matHeaderCellDef>Monto</th>
+            <td mat-cell *matCellDef="let payment">
+              {{ payment.amount | number: '1.2-2' }} {{ payment.currencyCode }}
+            </td></ng-container
+          >
+          <ng-container matColumnDef="reference"
+            ><th mat-header-cell *matHeaderCellDef>Referencia</th>
+            <td mat-cell *matCellDef="let payment">{{ payment.reference || '—' }}</td></ng-container
+          >
+          <ng-container matColumnDef="actions"
+            ><th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let payment">
+              @if (canCancel && payment.status === 'CAPTURED') {
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="cancelPayment(payment)"
+                  aria-label="Cancelar pago"
+                >
+                  <mat-icon>cancel</mat-icon>
+                </button>
+              }
+            </td></ng-container
+          >
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns"></tr>
+          <tr *matNoDataRow>
+            <td [attr.colspan]="columns.length">No hay pagos registrados.</td>
+          </tr>
+        </table>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>
