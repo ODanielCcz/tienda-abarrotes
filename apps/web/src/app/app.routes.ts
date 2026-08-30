@@ -180,13 +180,31 @@ export const routes: Routes = [
         data: {
           permissions: ['SALES_ORDER_READ'],
           operationalContext: 'WAREHOUSE',
-          title: 'Ventas',
-          description: 'Gestiona ventas, devoluciones y pagos asociados.',
-          icon: 'point_of_sale',
         },
         loadComponent: () =>
-          import('./shared/pages/module-placeholder/module-placeholder').then(
-            (module) => module.ModulePlaceholder,
+          import('./features/sales/pages/sales-overview/sales-overview').then(
+            (module) => module.SalesOverview,
+          ),
+      },
+      {
+        path: 'sales/new',
+        canActivate: [permissionGuard, operationalContextGuard],
+        data: {
+          permissions: ['SALES_ORDER_CREATE'],
+          operationalContext: 'WAREHOUSE',
+        },
+        loadComponent: () =>
+          import('./features/sales/pages/point-of-sale/point-of-sale').then(
+            (module) => module.PointOfSale,
+          ),
+      },
+      {
+        path: 'sales/:salesOrderId',
+        canActivate: [permissionGuard],
+        data: { permissions: ['SALES_ORDER_READ'] },
+        loadComponent: () =>
+          import('./features/sales/pages/sales-order-detail/sales-order-detail').then(
+            (module) => module.SalesOrderDetail,
           ),
       },
       {

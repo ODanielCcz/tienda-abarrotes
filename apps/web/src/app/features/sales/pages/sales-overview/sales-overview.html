@@ -1,0 +1,66 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Operación comercial</p>
+      <h1>Ventas</h1>
+      <p>{{ selectedWarehouse()?.name || 'Almacén no seleccionado' }}</p>
+    </div>
+    <div class="actions">
+      <button mat-stroked-button type="button" (click)="refresh()">
+        <mat-icon>refresh</mat-icon>Actualizar
+      </button>
+      @if (canCreate) {
+        <a mat-flat-button routerLink="/sales/new"><mat-icon>add</mat-icon>Nueva venta</a>
+      }
+    </div>
+  </header>
+
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else {
+    <div class="table-shell">
+      <table mat-table [dataSource]="orders()">
+        <ng-container matColumnDef="number">
+          <th mat-header-cell *matHeaderCellDef>Venta</th>
+          <td mat-cell *matCellDef="let order">
+            <strong>{{ order.orderNumber }}</strong>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="createdAt">
+          <th mat-header-cell *matHeaderCellDef>Fecha</th>
+          <td mat-cell *matCellDef="let order">{{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let order">{{ order.status }}</td>
+        </ng-container>
+        <ng-container matColumnDef="payment">
+          <th mat-header-cell *matHeaderCellDef>Pago</th>
+          <td mat-cell *matCellDef="let order">{{ order.paymentStatus }}</td>
+        </ng-container>
+        <ng-container matColumnDef="total">
+          <th mat-header-cell *matHeaderCellDef>Total</th>
+          <td mat-cell *matCellDef="let order">
+            {{ order.total | number: '1.2-2' }} {{ order.currencyCode }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let order">
+            <a mat-icon-button [routerLink]="['/sales', order.salesOrderId]" aria-label="Ver venta">
+              <mat-icon>visibility</mat-icon>
+            </a>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns"></tr>
+        <tr *matNoDataRow>
+          <td [attr.colspan]="columns.length">No hay ventas para mostrar.</td>
+        </tr>
+      </table>
+    </div>
+  }
+</section>

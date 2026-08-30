@@ -1,0 +1,108 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Punto de venta</p>
+      <h1>Nueva venta</h1>
+      <p>{{ selectedWarehouse()?.name || 'Almacén operativo no seleccionado' }}</p>
+    </div>
+    <a mat-stroked-button routerLink="/sales"><mat-icon>arrow_back</mat-icon>Volver</a>
+  </header>
+
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else {
+    <div class="pos-grid">
+      <mat-card appearance="outlined" class="catalog-panel">
+        <mat-card-header><mat-card-title>Productos disponibles</mat-card-title></mat-card-header>
+        <mat-card-content>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Buscar por producto o SKU</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input matInput (input)="search.set(searchInput.value)" #searchInput />
+          </mat-form-field>
+          <div class="catalog-grid">
+            @for (item of filteredCatalog(); track item.productPresentationId) {
+              <button class="product-card" type="button" (click)="addToCart(item)">
+                <span class="sku">{{ item.sku }}</span>
+                <strong>{{ item.productName }}</strong>
+                <span>{{ item.presentationName }}</span>
+                <span>{{ item.unitPrice | number: '1.2-2' }} {{ item.currencyCode }}</span>
+                <small>Disponible: {{ item.availableQuantity | number: '1.0-3' }}</small>
+              </button>
+            } @empty {
+              <p class="empty-state">No hay presentaciones con stock y precio vigente.</p>
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="cart-panel">
+        <mat-card-header><mat-card-title>Ticket actual</mat-card-title></mat-card-header>
+        <mat-card-content>
+          @if (canReadCustomers) {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Cliente (opcional)</mat-label>
+              <mat-select [formControl]="customerId">
+                <mat-option [value]="null">Venta de mostrador</mat-option>
+                @for (customer of customers(); track customer.customerId) {
+                  <mat-option [value]="customer.customerId">{{ customer.displayName }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+
+          <div class="cart-items">
+            @for (item of cart(); track item.productPresentationId) {
+              <article class="cart-item">
+                <div>
+                  <strong>{{ item.productName }}</strong>
+                  <span>{{ item.presentationName }} · {{ item.sku }}</span>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  [max]="item.availableQuantity"
+                  [value]="item.quantity"
+                  (input)="changeQuantity(item.productPresentationId, quantityInput.valueAsNumber)"
+                  #quantityInput
+                  [attr.aria-label]="'Cantidad de ' + item.productName"
+                />
+                <span>{{ item.quantity * item.unitPrice | number: '1.2-2' }}</span>
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="removeFromCart(item.productPresentationId)"
+                  aria-label="Quitar producto"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </article>
+            } @empty {
+              <p class="empty-state">Agrega productos para comenzar la venta.</p>
+            }
+          </div>
+        </mat-card-content>
+        <mat-card-actions class="checkout">
+          <div>
+            <small>Total estimado</small>
+            <strong>{{ estimatedTotal() | number: '1.2-2' }} MXN</strong>
+            <span>El backend confirma impuestos y total final.</span>
+          </div>
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="cart().length === 0 || processing()"
+            (click)="submit()"
+          >
+            <mat-icon>point_of_sale</mat-icon>
+            {{ processing() ? 'Procesando…' : 'Confirmar venta' }}
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+  }
+</section>
