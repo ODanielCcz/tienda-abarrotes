@@ -12,3 +12,11 @@ export interface CatalogTax {
   name: string;
   rate: number;
 }
+
+export interface CatalogPrice {
+  priceId: string;
+  productPresentationId: string;
+  branchId: string | null;
+  amount: number;
+  currencyCode: string;
+}

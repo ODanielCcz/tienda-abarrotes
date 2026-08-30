@@ -34,6 +34,26 @@ describe('CatalogReferenceApi', () => {
     http.expectOne('/api/v1/catalog/taxes').flush(apiResponse([tax]));
   });
 
+  it('lists effective general prices for a branch', () => {
+    const price = {
+      priceId: 'price-1',
+      productPresentationId: 'presentation-1',
+      branchId: 'branch-1',
+      amount: 18.5,
+      currencyCode: 'MXN',
+    };
+
+    api.listPrices('branch-1').subscribe((result) => expect(result).toEqual([price]));
+
+    const request = http.expectOne(
+      (candidate) =>
+        candidate.url === '/api/v1/catalog/prices' &&
+        candidate.params.get('branchId') === 'branch-1',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush(apiResponse([price]));
+  });
+
   function apiResponse<T>(data: T) {
     return {
       timestamp: '2026-08-29T00:00:00Z',

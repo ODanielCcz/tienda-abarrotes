@@ -1,10 +1,10 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 
 import { API_CONFIG } from '../../../../core/config/api.config';
 import { ApiResponse } from '../../../../shared/models/api-response.model';
-import { CatalogTax, CatalogUnit } from '../models/catalog-reference.model';
+import { CatalogPrice, CatalogTax, CatalogUnit } from '../models/catalog-reference.model';
 
 @Injectable({ providedIn: 'root' })
 export class CatalogReferenceApi {
@@ -20,6 +20,13 @@ export class CatalogReferenceApi {
   listTaxes(): Observable<CatalogTax[]> {
     return this.http
       .get<ApiResponse<CatalogTax[]>>(`${this.apiConfig.baseUrl}/catalog/taxes`)
+      .pipe(map((response) => response.data ?? []));
+  }
+
+  listPrices(branchId: string): Observable<CatalogPrice[]> {
+    const params = new HttpParams().set('branchId', branchId);
+    return this.http
+      .get<ApiResponse<CatalogPrice[]>>(`${this.apiConfig.baseUrl}/catalog/prices`, { params })
       .pipe(map((response) => response.data ?? []));
   }
 }

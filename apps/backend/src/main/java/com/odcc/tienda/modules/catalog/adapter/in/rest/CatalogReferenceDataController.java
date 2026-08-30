@@ -3,6 +3,8 @@ package com.odcc.tienda.modules.catalog.adapter.in.rest;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.mapper.CatalogReferenceDataRestMapper;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.CatalogTaxResponse;
 import com.odcc.tienda.modules.catalog.adapter.in.rest.response.CatalogUnitResponse;
+import com.odcc.tienda.modules.catalog.adapter.in.rest.response.CatalogPriceResponse;
+import com.odcc.tienda.modules.catalog.application.port.in.ListCatalogPricesUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.ListCatalogTaxesUseCase;
 import com.odcc.tienda.modules.catalog.application.port.in.ListCatalogUnitsUseCase;
 import com.odcc.tienda.shared.web.response.ApiResponseDto;
@@ -16,8 +18,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/catalog")
@@ -26,7 +32,30 @@ import java.util.List;
 public class CatalogReferenceDataController {
     private final ListCatalogUnitsUseCase listCatalogUnitsUseCase;
     private final ListCatalogTaxesUseCase listCatalogTaxesUseCase;
+    private final ListCatalogPricesUseCase listCatalogPricesUseCase;
     private final CatalogReferenceDataRestMapper mapper;
+
+    @GetMapping("/prices")
+    @Operation(summary = "Listar precios generales vigentes para una sucursal")
+    @PreAuthorize("hasAuthority('CATALOG_PRESENTATION_READ')")
+    public ResponseEntity<ApiResponseDto<List<CatalogPriceResponse>>> listPrices(
+        @RequestParam UUID branchId,
+        @AuthenticationPrincipal Jwt jwt,
+        HttpServletRequest request
+    ) {
+        List<CatalogPriceResponse> data = listCatalogPricesUseCase
+            .execute(branchId, currentUserId(jwt))
+            .stream()
+            .map(mapper::toResponse)
+            .toList();
+        return ResponseEntity.ok(ApiResponseDto.success(
+            HttpStatus.OK,
+            "CATALOG_PRICES_FOUND",
+            "Precios vigentes consultados correctamente",
+            data,
+            request.getRequestURI()
+        ));
+    }
 
     @GetMapping("/units")
     @Operation(summary = "Listar unidades de medida")
@@ -58,5 +87,12 @@ public class CatalogReferenceDataController {
             data,
             request.getRequestURI()
         ));
+    }
+
+    private static UUID currentUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null) {
+            throw new IllegalArgumentException("No se pudo identificar al usuario autenticado");
+        }
+        return UUID.fromString(jwt.getSubject());
     }
 }
