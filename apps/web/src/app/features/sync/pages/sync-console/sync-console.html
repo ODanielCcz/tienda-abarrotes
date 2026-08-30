@@ -1,0 +1,149 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Operación técnica</p>
+      <h1>Consola de sincronización</h1>
+      <p>Supervisa dispositivos, secuencias, outbox y conflictos sin exponer payloads sensibles.</p>
+    </div>
+    <div class="actions">
+      <button mat-stroked-button (click)="refresh()" [disabled]="!deviceId.value">
+        <mat-icon>refresh</mat-icon>Actualizar
+      </button>
+      @if (canInbox && checkpoint()) {
+        <button mat-flat-button (click)="ingest()">
+          <mat-icon>cloud_upload</mat-icon>Probar operación
+        </button>
+      }
+    </div>
+  </header>
+  <div class="selector">
+    <mat-form-field appearance="outline"
+      ><mat-label>Dispositivo MOBILE_EMPLOYEE activo</mat-label
+      ><mat-select [formControl]="deviceId">
+        @for (device of devices(); track device.deviceId) {
+          <mat-option [value]="device.deviceId"
+            >{{ device.deviceCode }} · {{ device.platform || device.deviceType }}</mat-option
+          >
+        }
+      </mat-select></mat-form-field
+    >
+  </div>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  }
+  @if (checkpoint(); as point) {
+    <div class="metrics">
+      <mat-card appearance="outlined"
+        ><mat-card-header><mat-card-title>Secuencia recibida</mat-card-title></mat-card-header
+        ><mat-card-content>{{ point.lastReceivedSequence }}</mat-card-content></mat-card
+      ><mat-card appearance="outlined"
+        ><mat-card-header><mat-card-title>Procesada</mat-card-title></mat-card-header
+        ><mat-card-content>{{ point.lastProcessedSequence }}</mat-card-content></mat-card
+      ><mat-card appearance="outlined"
+        ><mat-card-header><mat-card-title>Outbox confirmado</mat-card-title></mat-card-header
+        ><mat-card-content>{{ point.lastAcknowledgedOutboxSequence }}</mat-card-content></mat-card
+      ><mat-card appearance="outlined"
+        ><mat-card-header><mat-card-title>Último sync</mat-card-title></mat-card-header
+        ><mat-card-content>{{
+          point.lastSyncAt ? (point.lastSyncAt | date: 'short') : 'Sin sincronizar'
+        }}</mat-card-content></mat-card
+      >
+    </div>
+  }
+  @if (outbox(); as batch) {
+    <section class="panel">
+      <header>
+        <div>
+          <h2>Outbox</h2>
+          <p>Se muestran metadatos; el payload queda oculto.</p>
+        </div>
+        @if (
+          canAcknowledge && batch.nextSequence > (checkpoint()?.lastAcknowledgedOutboxSequence ?? 0)
+        ) {
+          <button mat-flat-button (click)="acknowledge()">
+            <mat-icon>done_all</mat-icon>Confirmar hasta {{ batch.nextSequence }}
+          </button>
+        }
+      </header>
+      <div class="table-shell">
+        <table mat-table [dataSource]="batch.events">
+          <ng-container matColumnDef="sequence"
+            ><th mat-header-cell *matHeaderCellDef>Secuencia</th>
+            <td mat-cell *matCellDef="let item">{{ item.globalSequence }}</td></ng-container
+          ><ng-container matColumnDef="event"
+            ><th mat-header-cell *matHeaderCellDef>Evento</th>
+            <td mat-cell *matCellDef="let item">
+              <strong>{{ item.eventType }}</strong>
+            </td></ng-container
+          ><ng-container matColumnDef="aggregate"
+            ><th mat-header-cell *matHeaderCellDef>Agregado</th>
+            <td mat-cell *matCellDef="let item">
+              {{ item.aggregateType }} · {{ item.aggregateId }}
+            </td></ng-container
+          ><ng-container matColumnDef="scope"
+            ><th mat-header-cell *matHeaderCellDef>Alcance</th>
+            <td mat-cell *matCellDef="let item">{{ item.branchId || 'GLOBAL' }}</td></ng-container
+          ><ng-container matColumnDef="createdAt"
+            ><th mat-header-cell *matHeaderCellDef>Creado</th>
+            <td mat-cell *matCellDef="let item">
+              {{ item.createdAt | date: 'short' }}
+            </td></ng-container
+          >
+          <tr mat-header-row *matHeaderRowDef="outboxColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: outboxColumns"></tr>
+          <tr *matNoDataRow>
+            <td [attr.colspan]="outboxColumns.length">No hay eventos pendientes.</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+  }
+  @if (deviceId.value && canReadConflicts) {
+    <section class="panel">
+      <header>
+        <div>
+          <h2>Conflictos pendientes</h2>
+          <p>Las opciones dependen del tipo de operación.</p>
+        </div>
+      </header>
+      <div class="table-shell">
+        <table mat-table [dataSource]="conflicts()">
+          <ng-container matColumnDef="sequence"
+            ><th mat-header-cell *matHeaderCellDef>Secuencia</th>
+            <td mat-cell *matCellDef="let item">{{ item.deviceSequence }}</td></ng-container
+          ><ng-container matColumnDef="type"
+            ><th mat-header-cell *matHeaderCellDef>Conflicto</th>
+            <td mat-cell *matCellDef="let item">
+              <strong>{{ item.conflictType }}</strong>
+            </td></ng-container
+          ><ng-container matColumnDef="operation"
+            ><th mat-header-cell *matHeaderCellDef>Operación</th>
+            <td mat-cell *matCellDef="let item">{{ item.operationType }}</td></ng-container
+          ><ng-container matColumnDef="createdAt"
+            ><th mat-header-cell *matHeaderCellDef>Creado</th>
+            <td mat-cell *matCellDef="let item">
+              {{ item.createdAt | date: 'short' }}
+            </td></ng-container
+          ><ng-container matColumnDef="actions"
+            ><th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let item">
+              @if (canResolve) {
+                <button mat-icon-button title="Resolver" (click)="resolve(item)">
+                  <mat-icon>rule</mat-icon>
+                </button>
+              }
+            </td></ng-container
+          >
+          <tr mat-header-row *matHeaderRowDef="conflictColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: conflictColumns"></tr>
+          <tr *matNoDataRow>
+            <td [attr.colspan]="conflictColumns.length">No hay conflictos pendientes.</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+  }
+</section>

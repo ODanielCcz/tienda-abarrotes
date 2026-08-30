@@ -1,0 +1,40 @@
+<h2 mat-dialog-title>Enviar operación offline controlada</h2>
+<mat-dialog-content>
+  <p>
+    Secuencia esperada: <strong>{{ data.checkpoint.lastReceivedSequence + 1 }}</strong
+    >. La clave y el operationId se conservan si el servidor rechaza el intento.
+  </p>
+  <form id="sync-operation-form" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline"
+      ><mat-label>Operación</mat-label
+      ><mat-select
+        formControlName="operationType"
+        (selectionChange)="operationChanged($event.value)"
+        ><mat-option value="CART_UPSERT">CART_UPSERT</mat-option
+        ><mat-option value="INVENTORY_COUNT_CREATE" [disabled]="!data.device.warehouseId"
+          >INVENTORY_COUNT_CREATE</mat-option
+        ></mat-select
+      ></mat-form-field
+    >
+    <mat-form-field appearance="outline"
+      ><mat-label>Aggregate ID opcional</mat-label><input matInput formControlName="aggregateId"
+    /></mat-form-field>
+    <mat-form-field appearance="outline" class="wide"
+      ><mat-label>Payload JSON</mat-label
+      ><textarea matInput formControlName="payload" rows="14" spellcheck="false"></textarea>
+    </mat-form-field>
+  </form>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }</mat-dialog-content
+><mat-dialog-actions align="end"
+  ><button mat-button [mat-dialog-close]="null">Cancelar</button
+  ><button
+    mat-flat-button
+    type="submit"
+    form="sync-operation-form"
+    [disabled]="form.invalid || submitting()"
+  >
+    Procesar
+  </button></mat-dialog-actions
+>

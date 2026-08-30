@@ -128,6 +128,22 @@ export class AppShell {
           'ORGANIZATION_DEVICE_READ',
         ],
       },
+      {
+        label: 'Facturación',
+        icon: 'receipt_long',
+        route: '/billing',
+        permissions: [
+          'BILLING_ISSUER_PROFILE_READ',
+          'BILLING_FISCAL_PROFILE_READ',
+          'BILLING_FISCAL_DOCUMENT_READ',
+        ],
+      },
+      {
+        label: 'Sincronización',
+        icon: 'sync',
+        route: '/sync',
+        permissions: ['SYNC_OUTBOX_READ', 'SYNC_CHECKPOINT_READ', 'SYNC_CONFLICT_READ'],
+      },
     ].filter((item) => this.sessionStore.hasAnyPermission(item.permissions)),
   );
 

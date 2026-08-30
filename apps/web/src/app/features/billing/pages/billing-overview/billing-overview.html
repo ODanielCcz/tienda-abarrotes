@@ -1,0 +1,206 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Administración fiscal</p>
+      <h1>Facturación interna</h1>
+      <p>Prepara snapshots fiscales CFDI 4.0 sin timbrado ni conexión PAC.</p>
+    </div>
+    <button mat-stroked-button (click)="refresh()"><mat-icon>refresh</mat-icon>Actualizar</button>
+  </header>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  }
+  <div class="notice">
+    <mat-icon>info</mat-icon
+    ><span
+      >Los documentos READY son registros internos. No son comprobantes fiscales timbrados.</span
+    >
+  </div>
+  <mat-tab-group animationDuration="0ms">
+    @if (canReadIssuers) {
+      <mat-tab label="Emisores"
+        ><div class="tab-content">
+          <div class="toolbar">
+            @if (can('BILLING_ISSUER_PROFILE_CREATE')) {
+              <button mat-flat-button (click)="openIssuer(null)">
+                <mat-icon>add_business</mat-icon>Nuevo emisor
+              </button>
+            }
+          </div>
+          <div class="table-shell">
+            <table mat-table [dataSource]="issuers()">
+              <ng-container matColumnDef="rfc"
+                ><th mat-header-cell *matHeaderCellDef>RFC</th>
+                <td mat-cell *matCellDef="let item">
+                  <strong>{{ item.rfc }}</strong>
+                </td></ng-container
+              ><ng-container matColumnDef="name"
+                ><th mat-header-cell *matHeaderCellDef>Razón social</th>
+                <td mat-cell *matCellDef="let item">{{ item.legalName }}</td></ng-container
+              ><ng-container matColumnDef="owner"
+                ><th mat-header-cell *matHeaderCellDef>Sucursal</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ branchName(item.branchId) }}
+                </td></ng-container
+              ><ng-container matColumnDef="regime"
+                ><th mat-header-cell *matHeaderCellDef>Régimen</th>
+                <td mat-cell *matCellDef="let item">{{ item.fiscalRegimeCode }}</td></ng-container
+              ><ng-container matColumnDef="status"
+                ><th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let item">{{ item.status }}</td></ng-container
+              ><ng-container matColumnDef="actions"
+                ><th mat-header-cell *matHeaderCellDef>Acciones</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="actions">
+                    @if (can('BILLING_ISSUER_PROFILE_UPDATE')) {
+                      <button mat-icon-button title="Editar" (click)="openIssuer(item)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                    }
+                    @if (can('BILLING_ISSUER_PROFILE_STATUS')) {
+                      <button mat-icon-button title="Cambiar estado" (click)="toggleIssuer(item)">
+                        <mat-icon>toggle_on</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="profileColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: profileColumns"></tr>
+            </table>
+          </div></div
+      ></mat-tab>
+    }
+    @if (canReadProfiles) {
+      <mat-tab label="Receptores"
+        ><div class="tab-content">
+          <div class="toolbar">
+            @if (can('BILLING_FISCAL_PROFILE_CREATE')) {
+              <button mat-flat-button (click)="openProfile(null)">
+                <mat-icon>person_add</mat-icon>Nuevo receptor
+              </button>
+            }
+          </div>
+          <div class="table-shell">
+            <table mat-table [dataSource]="profiles()">
+              <ng-container matColumnDef="rfc"
+                ><th mat-header-cell *matHeaderCellDef>RFC</th>
+                <td mat-cell *matCellDef="let item">
+                  <strong>{{ item.rfc }}</strong>
+                </td></ng-container
+              ><ng-container matColumnDef="name"
+                ><th mat-header-cell *matHeaderCellDef>Razón social</th>
+                <td mat-cell *matCellDef="let item">{{ item.legalName }}</td></ng-container
+              ><ng-container matColumnDef="owner"
+                ><th mat-header-cell *matHeaderCellDef>Cliente</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ customerName(item.customerId) }}
+                </td></ng-container
+              ><ng-container matColumnDef="regime"
+                ><th mat-header-cell *matHeaderCellDef>Régimen / Uso</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ item.fiscalRegimeCode }} / {{ item.cfdiUseCode || '—' }}
+                </td></ng-container
+              ><ng-container matColumnDef="status"
+                ><th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let item">{{ item.status }}</td></ng-container
+              ><ng-container matColumnDef="actions"
+                ><th mat-header-cell *matHeaderCellDef>Acciones</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="actions">
+                    @if (can('BILLING_FISCAL_PROFILE_UPDATE')) {
+                      <button mat-icon-button title="Editar" (click)="openProfile(item)">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                    }
+                    @if (can('BILLING_FISCAL_PROFILE_STATUS')) {
+                      <button mat-icon-button title="Cambiar estado" (click)="toggleProfile(item)">
+                        <mat-icon>toggle_on</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="profileColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: profileColumns"></tr>
+            </table>
+          </div></div
+      ></mat-tab>
+    }
+    @if (canReadDocuments) {
+      <mat-tab label="Documentos"
+        ><div class="tab-content">
+          <div class="toolbar">
+            @if (can('BILLING_FISCAL_DOCUMENT_CREATE')) {
+              <button mat-flat-button (click)="openDocument()">
+                <mat-icon>post_add</mat-icon>Nuevo borrador
+              </button>
+            }
+          </div>
+          <div class="table-shell">
+            <table mat-table [dataSource]="documents()">
+              <ng-container matColumnDef="folio"
+                ><th mat-header-cell *matHeaderCellDef>Serie / Folio</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ item.series || '—' }}-{{ item.folio || '—' }}
+                </td></ng-container
+              ><ng-container matColumnDef="sale"
+                ><th mat-header-cell *matHeaderCellDef>Venta</th>
+                <td mat-cell *matCellDef="let item">{{ item.salesOrderId }}</td></ng-container
+              ><ng-container matColumnDef="issuer"
+                ><th mat-header-cell *matHeaderCellDef>Emisor</th>
+                <td mat-cell *matCellDef="let item">{{ item.issuerRfc }}</td></ng-container
+              ><ng-container matColumnDef="receiver"
+                ><th mat-header-cell *matHeaderCellDef>Receptor</th>
+                <td mat-cell *matCellDef="let item">{{ item.receiverRfc }}</td></ng-container
+              ><ng-container matColumnDef="total"
+                ><th mat-header-cell *matHeaderCellDef>Total</th>
+                <td mat-cell *matCellDef="let item">
+                  {{ item.total | currency: item.currencyCode }}
+                </td></ng-container
+              ><ng-container matColumnDef="status"
+                ><th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let item">{{ item.status }}</td></ng-container
+              ><ng-container matColumnDef="actions"
+                ><th mat-header-cell *matHeaderCellDef>Acciones</th>
+                <td mat-cell *matCellDef="let item">
+                  <div class="actions">
+                    <button mat-icon-button title="Ver snapshot" (click)="viewDocument(item)">
+                      <mat-icon>visibility</mat-icon>
+                    </button>
+                    @if (can('BILLING_FISCAL_DOCUMENT_READY') && item.status === 'DRAFT') {
+                      <button mat-icon-button title="Marcar READY" (click)="markReady(item)">
+                        <mat-icon>verified</mat-icon>
+                      </button>
+                    }
+                  </div>
+                </td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="documentColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: documentColumns"></tr>
+            </table>
+          </div></div
+      ></mat-tab>
+    }
+    @if (can('CATALOG_FISCAL_CLASSIFICATION_UPDATE')) {
+      <mat-tab label="Clasificación SAT"
+        ><div class="classification">
+          <p>
+            Los códigos se toman del catálogo al crear el snapshot fiscal; no se capturan
+            manualmente dentro del documento.
+          </p>
+          <div class="actions">
+            <button mat-flat-button (click)="classify('PRODUCT')">
+              <mat-icon>inventory_2</mat-icon>Clasificar producto</button
+            ><button mat-stroked-button (click)="classify('UNIT')">
+              <mat-icon>straighten</mat-icon>Clasificar unidad
+            </button>
+          </div>
+        </div></mat-tab
+      >
+    }
+  </mat-tab-group>
+</section>

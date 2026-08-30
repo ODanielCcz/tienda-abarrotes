@@ -1,0 +1,51 @@
+<h2 mat-dialog-title>{{ data.profile ? 'Editar receptor fiscal' : 'Nuevo receptor fiscal' }}</h2>
+<mat-dialog-content
+  ><form id="fiscal-profile-form" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline" class="wide"
+      ><mat-label>Cliente</mat-label
+      ><mat-select formControlName="customerId">
+        @for (customer of data.customers; track customer.customerId) {
+          <mat-option [value]="customer.customerId" [disabled]="customer.status !== 'ACTIVE'">{{
+            customer.displayName
+          }}</mat-option>
+        }
+      </mat-select></mat-form-field
+    >
+    <mat-form-field appearance="outline"
+      ><mat-label>RFC</mat-label><input matInput formControlName="rfc" maxlength="13"
+    /></mat-form-field>
+    <mat-form-field appearance="outline"
+      ><mat-label>Código postal</mat-label
+      ><input matInput formControlName="postalCode" maxlength="5" inputmode="numeric"
+    /></mat-form-field>
+    <mat-form-field appearance="outline" class="wide"
+      ><mat-label>Razón social</mat-label
+      ><input matInput formControlName="legalName" maxlength="300"
+    /></mat-form-field>
+    <mat-form-field appearance="outline"
+      ><mat-label>Régimen fiscal</mat-label
+      ><input matInput formControlName="fiscalRegimeCode" maxlength="5"
+    /></mat-form-field>
+    <mat-form-field appearance="outline"
+      ><mat-label>Uso CFDI</mat-label><input matInput formControlName="cfdiUseCode" maxlength="5"
+    /></mat-form-field>
+    <mat-form-field appearance="outline" class="wide"
+      ><mat-label>Correo</mat-label
+      ><input matInput type="email" formControlName="email" maxlength="254"
+    /></mat-form-field>
+  </form>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end"
+  ><button mat-button [mat-dialog-close]="null">Cancelar</button
+  ><button
+    mat-flat-button
+    type="submit"
+    form="fiscal-profile-form"
+    [disabled]="form.invalid || submitting()"
+  >
+    Guardar
+  </button></mat-dialog-actions
+>

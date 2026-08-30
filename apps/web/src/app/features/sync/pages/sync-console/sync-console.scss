@@ -1,0 +1,80 @@
+:host,
+.page {
+  display: block;
+}
+.page {
+  display: grid;
+  gap: 1rem;
+}
+.page-header,
+.actions,
+.panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.eyebrow {
+  margin: 0;
+  color: var(--mat-sys-primary);
+  font-weight: 700;
+}
+h1 {
+  margin: 0.25rem 0;
+}
+.selector {
+  padding: 1rem;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+}
+.selector mat-form-field {
+  width: min(34rem, 100%);
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.metrics mat-card-content {
+  font-size: 1.5rem;
+  font-weight: 700;
+  padding-top: 1rem;
+}
+.panel {
+  display: grid;
+  gap: 0.75rem;
+}
+.panel h2 {
+  margin: 0;
+}
+.table-shell {
+  overflow: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+}
+table {
+  width: 100%;
+}
+.state {
+  display: grid;
+  min-height: 8rem;
+  place-items: center;
+}
+.error-state {
+  color: var(--mat-sys-error);
+}
+@media (max-width: 900px) {
+  .metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 650px) {
+  .page-header,
+  .panel > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}

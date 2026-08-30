@@ -279,6 +279,41 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'billing',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: [
+            'BILLING_ISSUER_PROFILE_READ',
+            'BILLING_FISCAL_PROFILE_READ',
+            'BILLING_FISCAL_DOCUMENT_READ',
+            'CATALOG_FISCAL_CLASSIFICATION_UPDATE',
+          ],
+          permissionMatch: 'ANY',
+        },
+        loadComponent: () =>
+          import('./features/billing/pages/billing-overview/billing-overview').then(
+            (module) => module.BillingOverview,
+          ),
+      },
+      {
+        path: 'sync',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: [
+            'SYNC_INBOX_WRITE',
+            'SYNC_OUTBOX_READ',
+            'SYNC_CHECKPOINT_READ',
+            'SYNC_CONFLICT_READ',
+            'SYNC_CONFLICT_RESOLVE',
+          ],
+          permissionMatch: 'ANY',
+        },
+        loadComponent: () =>
+          import('./features/sync/pages/sync-console/sync-console').then(
+            (module) => module.SyncConsole,
+          ),
+      },
+      {
         path: 'forbidden',
         loadComponent: () =>
           import('./shared/pages/forbidden/forbidden').then((module) => module.Forbidden),

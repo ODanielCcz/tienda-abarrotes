@@ -1,0 +1,37 @@
+<h2 mat-dialog-title>Clasificación SAT de {{ data.mode === 'PRODUCT' ? 'producto' : 'unidad' }}</h2>
+<mat-dialog-content
+  ><form id="classification-form" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline"
+      ><mat-label>{{ data.mode === 'PRODUCT' ? 'Producto' : 'Unidad' }}</mat-label
+      ><mat-select formControlName="targetId">
+        @if (data.mode === 'PRODUCT') {
+          @for (product of data.products; track product.id) {
+            <mat-option [value]="product.id">{{ product.name }}</mat-option>
+          }
+        } @else {
+          @for (unit of data.units; track unit.id) {
+            <mat-option [value]="unit.id">{{ unit.name }} ({{ unit.symbol }})</mat-option>
+          }
+        }
+      </mat-select></mat-form-field
+    >
+    <mat-form-field appearance="outline"
+      ><mat-label>Código SAT</mat-label
+      ><input matInput formControlName="code" [maxlength]="data.mode === 'PRODUCT' ? 8 : 5"
+    /></mat-form-field>
+  </form>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end"
+  ><button mat-button [mat-dialog-close]="false">Cancelar</button
+  ><button
+    mat-flat-button
+    type="submit"
+    form="classification-form"
+    [disabled]="form.invalid || submitting()"
+  >
+    Guardar
+  </button></mat-dialog-actions
+>
