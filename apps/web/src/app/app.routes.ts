@@ -213,13 +213,10 @@ export const routes: Routes = [
         data: {
           permissions: ['CASH_SESSION_READ'],
           operationalContext: 'CASH_REGISTER',
-          title: 'Caja',
-          description: 'Administra sesiones, movimientos y cortes de caja.',
-          icon: 'payments',
         },
         loadComponent: () =>
-          import('./shared/pages/module-placeholder/module-placeholder').then(
-            (module) => module.ModulePlaceholder,
+          import('./features/cash/pages/cash-overview/cash-overview').then(
+            (module) => module.CashOverview,
           ),
       },
       {
