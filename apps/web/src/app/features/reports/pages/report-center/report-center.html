@@ -1,0 +1,380 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Análisis operativo</p>
+      <h1>Reportes</h1>
+      <p>Las cifras y netos se muestran exactamente como los calcula el backend.</p>
+    </div>
+    <div class="actions">
+      <app-period-filter [from]="from()" [to]="to()" (applied)="applyPeriod($event)" />
+      <button mat-stroked-button type="button" (click)="refresh()">
+        <mat-icon>refresh</mat-icon>Consultar
+      </button>
+    </div>
+  </header>
+
+  <form [formGroup]="filtersForm" class="secondary-filters">
+    @if (canReadCustomers) {
+      <mat-form-field appearance="outline">
+        <mat-label>Cliente</mat-label>
+        <mat-select formControlName="customerId">
+          <mat-option value="">Todos</mat-option>
+          @for (customer of data().customers; track customer.customerId) {
+            <mat-option [value]="customer.customerId">{{ customer.displayName }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+    <mat-form-field appearance="outline">
+      <mat-label>Agrupación</mat-label>
+      <mat-select formControlName="groupBy">
+        <mat-option value="DAY">Día</mat-option>
+        <mat-option value="WEEK">Semana</mat-option>
+        <mat-option value="MONTH">Mes</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Límite</mat-label>
+      <mat-select formControlName="limit">
+        <mat-option [value]="10">10</mat-option>
+        <mat-option [value]="25">25</mat-option>
+        <mat-option [value]="50">50</mat-option>
+        <mat-option [value]="100">100</mat-option>
+      </mat-select>
+    </mat-form-field>
+    @if (canExpiring) {
+      <mat-form-field appearance="outline">
+        <mat-label>Caduca en</mat-label>
+        <mat-select formControlName="days">
+          <mat-option [value]="7">7 días</mat-option>
+          <mat-option [value]="30">30 días</mat-option>
+          <mat-option [value]="90">90 días</mat-option>
+          <mat-option [value]="365">365 días</mat-option>
+        </mat-select>
+      </mat-form-field>
+    }
+  </form>
+
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else {
+    <mat-tab-group animationDuration="0ms">
+      @if (canSales || canPeriod) {
+        <mat-tab label="Ventas">
+          <div class="tab-content">
+            @if (data().salesSummary; as sales) {
+              <div class="metric-grid">
+                <app-metric-card
+                  label="Venta total"
+                  [value]="(sales.total | number: '1.2-2') + ' MXN'"
+                  [hint]="sales.ticketCount + ' tickets'"
+                  icon="point_of_sale"
+                />
+                <app-metric-card
+                  label="Ticket promedio"
+                  [value]="(sales.averageTicket | number: '1.2-2') + ' MXN'"
+                  icon="receipt_long"
+                />
+                <app-metric-card
+                  label="Impuestos"
+                  [value]="(sales.taxTotal | number: '1.2-2') + ' MXN'"
+                  icon="account_balance"
+                />
+              </div>
+            }
+            @if (data().salesByPeriod.length) {
+              <h2>Ventas por periodo</h2>
+              <div class="table-shell">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Periodo</th>
+                      <th>Tickets</th>
+                      <th>Bruto</th>
+                      <th>Devoluciones</th>
+                      <th>Neto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of data().salesByPeriod; track row.periodStart) {
+                      <tr>
+                        <td>{{ row.periodStart }} — {{ row.periodEnd }}</td>
+                        <td>{{ row.ticketCount }}</td>
+                        <td>{{ row.grossSales | number: '1.2-2' }}</td>
+                        <td>{{ row.returnsAmount | number: '1.2-2' }}</td>
+                        <td>{{ row.netSales | number: '1.2-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+            <h2>Productos más vendidos</h2>
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Importe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of data().topProducts; track row.productPresentationId) {
+                    <tr>
+                      <td>{{ row.sku }}</td>
+                      <td>{{ row.productName }}</td>
+                      <td>{{ row.quantitySold | number: '1.0-3' }}</td>
+                      <td>{{ row.grossAmount | number: '1.2-2' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="4">Sin datos para el periodo.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </mat-tab>
+      }
+
+      @if (canMargin) {
+        <mat-tab label="Rentabilidad">
+          <div class="tab-content">
+            @if (data().grossMargin; as margin) {
+              <div class="metric-grid">
+                <app-metric-card
+                  label="Ingreso neto sin impuestos"
+                  [value]="(margin.netRevenueExcludingTax | number: '1.2-2') + ' MXN'"
+                  icon="payments"
+                />
+                <app-metric-card
+                  label="Costo neto"
+                  [value]="(margin.netCost | number: '1.2-2') + ' MXN'"
+                  icon="inventory"
+                />
+                <app-metric-card
+                  label="Utilidad bruta"
+                  [value]="(margin.grossProfit | number: '1.2-2') + ' MXN'"
+                  [hint]="(margin.grossMarginPercent | number: '1.2-2') + '%'"
+                  icon="trending_up"
+                />
+              </div>
+            }
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Producto</th>
+                    <th>Cantidad neta</th>
+                    <th>Ingreso neto</th>
+                    <th>Utilidad</th>
+                    <th>Margen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of data().profitability; track row.productPresentationId) {
+                    <tr>
+                      <td>{{ row.sku }}</td>
+                      <td>{{ row.productName }}</td>
+                      <td>{{ row.netQuantity | number: '1.0-3' }}</td>
+                      <td>{{ row.netRevenueExcludingTax | number: '1.2-2' }}</td>
+                      <td>{{ row.grossProfit | number: '1.2-2' }}</td>
+                      <td>{{ row.grossMarginPercent | number: '1.2-2' }}%</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="6">Sin datos para el periodo.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </mat-tab>
+      }
+
+      @if (canInventory || canValuation || canExpiring) {
+        <mat-tab label="Inventario">
+          <div class="tab-content">
+            @if (data().stockValuation; as valuation) {
+              <div class="metric-grid">
+                <app-metric-card
+                  label="Existencia física"
+                  [value]="(valuation.totalOnHandQuantity | number: '1.0-3') + ''"
+                  icon="inventory_2"
+                />
+                <app-metric-card
+                  label="Valor del inventario"
+                  [value]="(valuation.totalStockValue | number: '1.2-2') + ' MXN'"
+                  icon="paid"
+                />
+                <app-metric-card
+                  label="Stock bajo"
+                  [value]="data().lowStock.length.toString()"
+                  icon="warning"
+                />
+              </div>
+            }
+            <h2>Próximos a caducar</h2>
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Lote</th>
+                    <th>Producto</th>
+                    <th>Almacén</th>
+                    <th>Caduca</th>
+                    <th>Días</th>
+                    <th>Existencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of data().expiringProducts; track row.lotId + row.warehouseId) {
+                    <tr>
+                      <td>{{ row.lotNumber }}</td>
+                      <td>{{ row.productName }} · {{ row.presentationName }}</td>
+                      <td>{{ row.warehouseName }}</td>
+                      <td>{{ row.expiresAt }}</td>
+                      <td>{{ row.daysRemaining }}</td>
+                      <td>{{ row.onHandQuantity | number: '1.0-3' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="6">No hay lotes dentro del rango.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <h2>Movimientos</h2>
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Almacén</th>
+                    <th>Tipo</th>
+                    <th>Movimientos</th>
+                    <th>Cantidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (
+                    row of data().inventoryMovements;
+                    track row.warehouseId + row.movementType
+                  ) {
+                    <tr>
+                      <td>{{ row.warehouseName }}</td>
+                      <td>{{ row.movementType }}</td>
+                      <td>{{ row.movementCount }}</td>
+                      <td>{{ row.totalQuantity | number: '1.0-3' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="4">Sin movimientos para el periodo.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </mat-tab>
+      }
+
+      @if (canReturns) {
+        <mat-tab label="Devoluciones">
+          <div class="tab-content">
+            @if (data().returnsSummary; as returns) {
+              <div class="metric-grid">
+                <app-metric-card
+                  label="Devoluciones"
+                  [value]="returns.returnCount.toString()"
+                  icon="assignment_return"
+                />
+                <app-metric-card
+                  label="Cantidad devuelta"
+                  [value]="(returns.returnedQuantity | number: '1.0-3') + ''"
+                  icon="inventory"
+                />
+                <app-metric-card
+                  label="Importe devuelto"
+                  [value]="(returns.returnedAmount | number: '1.2-2') + ' MXN'"
+                  icon="currency_exchange"
+                />
+              </div>
+              <div class="table-shell">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Periodo</th>
+                      <th>Devoluciones</th>
+                      <th>Cantidad</th>
+                      <th>Importe</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of returns.periods; track row.periodStart) {
+                      <tr>
+                        <td>{{ row.periodStart }} — {{ row.periodEnd }}</td>
+                        <td>{{ row.returnCount }}</td>
+                        <td>{{ row.returnedQuantity | number: '1.0-3' }}</td>
+                        <td>{{ row.returnedAmount | number: '1.2-2' }}</td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="4">Sin devoluciones confirmadas.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </mat-tab>
+      }
+
+      @if (canCash) {
+        <mat-tab label="Caja">
+          <div class="tab-content">
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Caja</th>
+                    <th>Estado</th>
+                    <th>Apertura</th>
+                    <th>Esperado</th>
+                    <th>Contado</th>
+                    <th>Diferencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of data().cashSummary; track row.cashSessionId) {
+                    <tr>
+                      <td>{{ row.cashRegisterCode }}</td>
+                      <td>{{ row.status }}</td>
+                      <td>{{ row.openingAmount | number: '1.2-2' }}</td>
+                      <td>{{ row.expectedAmount | number: '1.2-2' }}</td>
+                      <td>{{ row.countedAmount | number: '1.2-2' }}</td>
+                      <td>{{ row.differenceAmount | number: '1.2-2' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="6">Sin sesiones en el periodo.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </mat-tab>
+      }
+    </mat-tab-group>
+  }
+</section>

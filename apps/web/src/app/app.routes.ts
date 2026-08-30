@@ -232,14 +232,21 @@ export const routes: Routes = [
         path: 'reports',
         canActivate: [permissionGuard],
         data: {
-          permissions: ['REPORT_SALES_READ'],
-          title: 'Reportes',
-          description: 'Visualiza ventas, inventario, caja, devoluciones y rentabilidad.',
-          icon: 'monitoring',
+          permissions: [
+            'REPORT_SALES_READ',
+            'REPORT_INVENTORY_READ',
+            'REPORT_CASH_READ',
+            'REPORT_SALES_BY_PERIOD_READ',
+            'REPORT_GROSS_MARGIN_READ',
+            'REPORT_STOCK_VALUATION_READ',
+            'REPORT_EXPIRING_PRODUCTS_READ',
+            'REPORT_RETURNS_READ',
+          ],
+          permissionMatch: 'ANY',
         },
         loadComponent: () =>
-          import('./shared/pages/module-placeholder/module-placeholder').then(
-            (module) => module.ModulePlaceholder,
+          import('./features/reports/pages/report-center/report-center').then(
+            (module) => module.ReportCenter,
           ),
       },
       {

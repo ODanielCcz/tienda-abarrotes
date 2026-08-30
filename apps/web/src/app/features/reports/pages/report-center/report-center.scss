@@ -1,0 +1,79 @@
+.page,
+.tab-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.page-header,
+.actions,
+.secondary-filters {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.page-header h1,
+.page-header p {
+  margin: 0;
+}
+
+.eyebrow {
+  color: var(--mat-sys-primary);
+  font-weight: 700;
+}
+
+.secondary-filters {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+
+.tab-content {
+  padding: 1rem 0;
+}
+
+.tab-content h2 {
+  margin-bottom: 0;
+}
+
+.table-shell {
+  overflow: auto;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.75rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.state {
+  padding: 2rem;
+  text-align: center;
+}
+
+.error-state {
+  color: var(--mat-sys-error);
+}
+
+@media (max-width: 900px) {
+  .page-header,
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

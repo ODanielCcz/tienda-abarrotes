@@ -1,0 +1,13 @@
+<div class="period-filter">
+  <mat-form-field appearance="outline">
+    <mat-label>Desde</mat-label>
+    <input matInput type="date" [value]="from()" #fromInput />
+  </mat-form-field>
+  <mat-form-field appearance="outline">
+    <mat-label>Hasta</mat-label>
+    <input matInput type="date" [value]="to()" #toInput />
+  </mat-form-field>
+  <button mat-stroked-button type="button" (click)="apply(fromInput.value, toInput.value)">
+    Aplicar
+  </button>
+</div>

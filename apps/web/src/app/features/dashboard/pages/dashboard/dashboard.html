@@ -1,27 +1,79 @@
 <section class="dashboard-content">
-  <header>
-    <p class="eyebrow">Resumen general</p>
-    <h1>Dashboard</h1>
-    <p>Desde aqui iremos conectando ventas, inventario, caja, clientes y reportes.</p>
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Resumen operativo</p>
+      <h1>Dashboard</h1>
+      <p>
+        {{ selectedBranch()?.name || 'Todas las sucursales autorizadas' }} ·
+        {{ selectedWarehouse()?.name || 'Todos los almacenes autorizados' }}
+      </p>
+    </div>
+    <div class="actions">
+      <app-period-filter [from]="from()" [to]="to()" (applied)="applyPeriod($event)" />
+      <button mat-stroked-button type="button" (click)="refresh()">Actualizar</button>
+      <a mat-flat-button routerLink="/reports">Ver reportes</a>
+    </div>
   </header>
 
-  <div class="dashboard-grid">
-    <article>
-      <span>Ventas</span>
-      <strong>$0.00</strong>
-      <small>Pendiente de conectar a reportes</small>
-    </article>
+  @if (errorMessage()) {
+    <p class="error-state" role="alert">{{ errorMessage() }}</p>
+  }
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="42" /></div>
+  } @else if (snapshot(); as data) {
+    <div class="dashboard-grid">
+      @if (data.sales) {
+        <app-metric-card
+          label="Ventas confirmadas"
+          [value]="(data.sales.total | number: '1.2-2') + ' MXN'"
+          [hint]="data.sales.ticketCount + ' tickets'"
+          icon="point_of_sale"
+        />
+        <app-metric-card
+          label="Ticket promedio"
+          [value]="(data.sales.averageTicket | number: '1.2-2') + ' MXN'"
+          hint="Calculado por el backend"
+          icon="receipt_long"
+        />
+      }
+      @if (data.margin) {
+        <app-metric-card
+          label="Utilidad bruta"
+          [value]="(data.margin.grossProfit | number: '1.2-2') + ' MXN'"
+          [hint]="(data.margin.grossMarginPercent | number: '1.2-2') + '% de margen'"
+          icon="trending_up"
+        />
+      }
+      <app-metric-card
+        label="Stock bajo"
+        [value]="data.lowStock.length.toString()"
+        hint="Presentaciones dentro del límite consultado"
+        icon="inventory_2"
+      />
+      <app-metric-card
+        label="Sesiones abiertas"
+        [value]="openCashSessionCount(data.cashSessions).toString()"
+        hint="Cajas del periodo y sucursal"
+        icon="payments"
+      />
+    </div>
 
-    <article>
-      <span>Inventario</span>
-      <strong>0</strong>
-      <small>Productos por revisar</small>
-    </article>
-
-    <article>
-      <span>Caja</span>
-      <strong>Cerrada</strong>
-      <small>Sin sesion activa detectada</small>
-    </article>
-  </div>
+    @if (data.lowStock.length > 0) {
+      <section class="attention-list">
+        <h2>Requieren atención</h2>
+        @for (item of data.lowStock; track item.productPresentationId + item.warehouseId) {
+          <article>
+            <div>
+              <strong>{{ item.sku }}</strong
+              ><span>{{ item.presentationName }} · {{ item.warehouseName }}</span>
+            </div>
+            <span
+              >{{ item.availableQuantity | number: '1.0-3' }} / mínimo
+              {{ item.minimumStock | number: '1.0-3' }}</span
+            >
+          </article>
+        }
+      </section>
+    }
+  }
 </section>
