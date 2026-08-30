@@ -47,5 +47,7 @@ public interface UserManagementUseCases {
 
     List<RoleSummary> listRoles();
 
+    RoleDetail getRoleById(UUID roleId);
+
     List<PermissionSummary> listPermissions();
 }

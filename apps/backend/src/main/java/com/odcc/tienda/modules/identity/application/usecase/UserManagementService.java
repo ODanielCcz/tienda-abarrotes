@@ -270,6 +270,11 @@ public class UserManagementService implements UserManagementUseCases {
     }
 
     @Override
+    public RoleDetail getRoleById(UUID roleId) {
+        return getRole(roleId);
+    }
+
+    @Override
     public List<PermissionSummary> listPermissions() {
         return repository.findPermissions();
     }

@@ -246,6 +246,19 @@ class UserManagementApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("IDENTITY_ROLES_FOUND"));
 
+        UUID systemAdminRoleId = jdbcTemplate.queryForObject(
+            "SELECT role_id FROM iam.roles WHERE code = 'SYSTEM_ADMIN'",
+            UUID.class
+        );
+        mockMvc.perform(
+                get("/api/v1/identity/roles/{roleId}", systemAdminRoleId)
+                    .header("Authorization", "Bearer " + adminToken)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("IDENTITY_ROLE_FOUND"))
+            .andExpect(jsonPath("$.data.code").value("SYSTEM_ADMIN"))
+            .andExpect(jsonPath("$.data.permissions").isArray());
+
         mockMvc.perform(
                 get("/api/v1/identity/permissions")
                     .header("Authorization", "Bearer " + adminToken)
@@ -264,6 +277,7 @@ class UserManagementApiIntegrationTest {
             .andExpect(jsonPath("$.paths['/api/v1/identity/users/{userId}/password']").exists())
             .andExpect(jsonPath("$.paths['/api/v1/identity/users/{userId}/roles']").exists())
             .andExpect(jsonPath("$.paths['/api/v1/identity/roles']").exists())
+            .andExpect(jsonPath("$.paths['/api/v1/identity/roles/{roleId}']").exists())
             .andExpect(jsonPath("$.paths['/api/v1/identity/permissions']").exists());
     }
 

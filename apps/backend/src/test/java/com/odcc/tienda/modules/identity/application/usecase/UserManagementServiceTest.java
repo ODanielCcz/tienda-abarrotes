@@ -6,6 +6,7 @@ import com.odcc.tienda.modules.identity.application.command.AssignRolePermission
 import com.odcc.tienda.modules.identity.application.command.CreateUserCommand;
 import com.odcc.tienda.modules.identity.application.command.ChangeUserPasswordCommand;
 import com.odcc.tienda.modules.identity.application.model.ManagedUser;
+import com.odcc.tienda.modules.identity.application.model.RoleDetail;
 import com.odcc.tienda.modules.identity.application.port.out.UserManagementRepositoryPort;
 import com.odcc.tienda.modules.identity.domain.model.UserAccountStatus;
 import com.odcc.tienda.shared.application.authorization.BranchAccessDeniedException;
@@ -193,6 +194,23 @@ class UserManagementServiceTest {
 
         assertEquals(rawPassword, passwordPassedToPolicy.get());
         assertEquals(rawPassword, passwordPassedToHasher.get());
+    }
+
+    @Test
+    void shouldReturnRoleDetailWithAssignedPermissions() {
+        RoleDetail role = new RoleDetail(
+            ROLE_ID,
+            "CASHIER",
+            "Cajero",
+            "Opera ventas",
+            false,
+            "ACTIVE",
+            Set.of("SALES_ORDER_READ"),
+            Instant.parse("2026-08-11T12:00:00Z")
+        );
+        when(repository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role));
+
+        assertEquals(role, service.getRoleById(ROLE_ID));
     }
 
     private static ManagedUser managedUser(UUID userId, Set<String> roles, Set<UUID> branchIds) {

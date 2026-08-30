@@ -132,6 +132,14 @@ public class UserManagementController {
         return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_ROLES_FOUND", "Roles consultados correctamente", useCases.listRoles(), servletRequest.getRequestURI()));
     }
 
+    @GetMapping("/roles/{roleId}")
+    @Operation(summary = "Consultar rol por id")
+    @PreAuthorize("hasAuthority('IDENTITY_ROLE_READ')")
+    public ResponseEntity<ApiResponseDto<RoleDetail>> getRoleById(@PathVariable UUID roleId, HttpServletRequest servletRequest) {
+        RoleDetail role = useCases.getRoleById(roleId);
+        return ResponseEntity.ok(ApiResponseDto.success(HttpStatus.OK, "IDENTITY_ROLE_FOUND", "Rol consultado correctamente", role, servletRequest.getRequestURI()));
+    }
+
     @PostMapping("/roles")
     @Operation(summary = "Crear rol")
     @PreAuthorize("hasAuthority('IDENTITY_ROLE_CREATE')")
