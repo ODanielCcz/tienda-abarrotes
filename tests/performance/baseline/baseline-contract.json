@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "dataset": "tienda-performance-v1",
+  "composeProjectName": "tienda-perf",
+  "artifacts": {
+    "relativeDirectory": "baseline"
+  },
+  "ports": {
+    "backend": 58081,
+    "database": 55434,
+    "web": 54201
+  },
+  "database": {
+    "name": "tienda_performance",
+    "owner": "tienda_owner"
+  },
+  "requiredInitialState": {
+    "salesOrders": 0,
+    "payments": 0,
+    "syncOperations": 0,
+    "carts": 0
+  },
+  "timeouts": {
+    "httpSeconds": 15,
+    "loginSeconds": 15,
+    "dockerSeconds": 30,
+    "psqlSeconds": 30,
+    "backendTestSeconds": 900,
+    "webTestSeconds": 600,
+    "webBuildSeconds": 600
+  },
+  "timing": {
+    "maximumJitterMilliseconds": 1500,
+    "maximumWindowOverrunSeconds": 10
+  },
+  "sampling": {
+    "preWarm": {
+      "durationSeconds": 300,
+      "intervalSeconds": 5,
+      "expectedSamples": 61
+    },
+    "postWarm": {
+      "durationSeconds": 300,
+      "intervalSeconds": 5,
+      "expectedSamples": 61
+    }
+  },
+  "officialBaselineWindow": "postWarm",
+  "warmup": {
+    "requestsPerEndpoint": 20,
+    "endpoints": [
+      {
+        "name": "readiness",
+        "method": "GET",
+        "path": "/actuator/health/readiness",
+        "authenticated": false,
+        "apiEnvelope": false
+      },
+      {
+        "name": "catalog-presentation",
+        "method": "GET",
+        "path": "/api/v1/catalog/product-presentations/{productPresentationId}",
+        "authenticated": true,
+        "apiEnvelope": true
+      },
+      {
+        "name": "inventory-stock",
+        "method": "GET",
+        "path": "/api/v1/inventory/stock/{productPresentationId}?warehouseId={warehouseId}",
+        "authenticated": true,
+        "apiEnvelope": true
+      },
+      {
+        "name": "organization-warehouses",
+        "method": "GET",
+        "path": "/api/v1/organization/warehouses?branchId={branchId}",
+        "authenticated": true,
+        "apiEnvelope": true
+      },
+      {
+        "name": "sales-orders",
+        "method": "GET",
+        "path": "/api/v1/sales/orders?warehouseId={warehouseId}",
+        "authenticated": true,
+        "apiEnvelope": true
+      },
+      {
+        "name": "sales-report",
+        "method": "GET",
+        "path": "/api/v1/reports/sales-by-period?branchId={branchId}",
+        "authenticated": true,
+        "apiEnvelope": true
+      }
+    ]
+  },
+  "prometheusMetrics": {
+    "critical": [
+      "process_cpu_usage",
+      "jvm_memory_used_bytes",
+      "jvm_threads_live_threads",
+      "hikaricp_connections_active",
+      "hikaricp_connections_idle",
+      "hikaricp_connections_pending",
+      "hikaricp_connections_max"
+    ],
+    "optional": [
+      "system_cpu_usage",
+      "http_server_requests_seconds_count"
+    ]
+  },
+  "requiredServices": [
+    "database",
+    "redis",
+    "backend",
+    "web-performance"
+  ]
+}

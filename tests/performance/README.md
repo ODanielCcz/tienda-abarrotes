@@ -64,3 +64,71 @@ La readiness del actuator no usa `ApiResponseDto`: el smoke valida explícitamen
 El inicio es fail-closed: las tres claves `PERF_*` deben estar presentes dentro de `perf.env`; variables heredadas del proceso no son válidas. Si un `perf.env` legado no cumple el contrato, ejecuta primero `./scripts/perf-environment-down.ps1` y después `./scripts/perf-environment-up.ps1`; `up` no elimina volúmenes ni credenciales automáticamente.
 
 Un `SMOKE_RUN_ID` nuevo no aísla por sí solo un ambiente ya usado: recrea `tienda-perf` o selecciona un dispositivo garantizado como no usado antes de investigar. La evidencia oficial siempre debe usar un ambiente recreado y el mismo ID en sus tres repeticiones.
+
+## Línea base técnica
+
+El baseline se captura sin k6 activo, con 61 muestras cada cinco segundos durante
+cinco minutos antes y después del calentamiento. Entre ambas ventanas ejecuta 20
+peticiones seriales por cada endpoint crítico. La única ventana declarada como
+oficial es `postWarm`; las muestras previas sirven para distinguir el arranque en
+frío del estado estabilizado.
+
+```powershell
+# Preflight rápido: valida tienda-perf, loopback, salud, fixtures y PostgreSQL.
+.\scripts\run-perf-baseline.ps1 -ValidateOnly
+
+# Corrida oficial: suites backend/web, build Angular, 5 min pre-warm,
+# calentamiento serial y 5 min post-warm.
+.\scripts\run-perf-baseline.ps1
+```
+
+`-SkipProjectVerification` existe solo para diagnóstico y queda marcado en el
+resumen como `DIAGNOSTIC`, `official=false` y `diagnosticBaseline`; nunca crea el
+campo `officialBaseline` ni sustituye la corrida oficial. La ejecución exige un
+árbol Git limpio.
+Actuator/Prometheus se consulta con el usuario restringido `perf_operator`; el JWT
+permanece únicamente en memoria y nunca se escribe ni imprime.
+
+El preflight exige el estado inicial exacto del fixture: stock `10000` en la
+presentación/almacén conocidos y cero ventas, pagos, operaciones Sync y carritos.
+Si falla, no intentes reutilizar el volumen: ejecuta `perf-environment-down.ps1`
+y `perf-environment-up.ps1` para recrear `tienda-perf`. También se validan el
+proyecto y labels Compose, `POSTGRES_DB=tienda_performance`,
+`POSTGRES_USER=tienda_owner`, `current_database()` y `current_user` antes de SQL.
+
+La extensión `pg_stat_statements` se habilita de forma idempotente únicamente en
+el PostgreSQL de rendimiento. Se capturan readiness, Prometheus, `docker stats`,
+`pg_stat_database`, `pg_stat_activity`, locks y las 20 consultas con más tiempo
+acumulado, sin almacenar texto SQL.
+`pg_stat_statements` se reinicia justo antes de `postWarm`, de modo que sus datos
+no incluyen el pre-warm ni las 120 solicitudes del calentamiento.
+
+Las métricas Prometheus críticas deben existir y ser finitas en cada muestra;
+las opcionales pueden faltar, pero nunca contener valores no finitos. Cada
+muestra exige una fila única por servicio Docker y una instantánea PostgreSQL
+válida. En cada muestra PostgreSQL, Redis y backend deben seguir `healthy`, nginx
+debe continuar `running` y ningún servicio puede cambiar su contador de reinicios
+respecto del preflight. Las muestras usan tiempos objetivo derivados del inicio de la ventana,
+registran tiempo programado/real, jitter y duración total, y fallan si superan
+`1500 ms` de jitter o `10 s` de sobretiempo. HTTP/login, Docker/psql y cada etapa
+Gradle/npm tienen timeouts explícitos con terminación controlada.
+
+Un lock exclusivo impide dos campañas simultáneas. Gradle/npm reciben un entorno
+heredado mínimo y, antes de marcar una corrida `COMPLETED` o `DIAGNOSTIC`, todos
+los JSON, JSONL, logs, Markdown y scrapes Prometheus se recorren para redactar
+secretos exactos y JWT; una credencial residual hace fallar la captura.
+Si esa protección falla en la ruta de error, la corrida falla cerrada: el
+directorio autorizado se elimina o se mueve a la cuarentena externa. El error
+combinado nunca incluye el secreto ni la causa interna del sanitizador.
+Delete/quarantine solo aceptan la forma canónica
+`artifacts\baseline\<yyyyMMddTHHmmssfffZ>` y exigen el marker de propiedad que
+crea el runner. Antes de operar se inspeccionan `artifacts`, `baseline`, la
+corrida y cada componente de cuarentena; cualquier symlink, junction o reparse
+point cancela la operación. La ruta y el marker se comprueban nuevamente justo
+antes de borrar o mover y el destino de cuarentena se valida también después.
+
+Toda la evidencia cruda se conserva fuera de OneDrive, bajo
+`%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts\baseline\<timestamp>`.
+El resumen `baseline-summary.md` y su equivalente JSON contienen las medianas
+`postWarm`, la revisión Git, SO, CPU, RAM, versiones Java/Node/npm/Docker/Compose
+y el manifiesto del build.

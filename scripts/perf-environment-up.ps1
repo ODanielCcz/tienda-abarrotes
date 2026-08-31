@@ -4,6 +4,7 @@ param(
 )
 
 . (Join-Path $PSScriptRoot '_perf-common.ps1')
+. (Join-Path $PSScriptRoot '_perf-baseline.ps1')
 
 Assert-PerfDockerAvailable
 New-PerfEnvironmentFile
@@ -42,6 +43,7 @@ Invoke-PerfCompose -Arguments @('--profile', 'distributed-security', '--profile'
 Invoke-PerfCompose -Arguments @('--profile', 'migrate', 'run', '--rm', 'flyway', 'migrate')
 Invoke-PerfCompose -Arguments @('--profile', 'seed', 'run', '--rm', 'db-seed')
 & (Join-Path $PerfProjectRoot 'tests\performance\fixtures\load-performance-fixtures.ps1')
+Initialize-PerfPostgresObservability
 $upArguments = @('--profile', 'distributed-security', '--profile', 'performance', 'up', '-d')
 if (-not $SkipBuild) {
     $upArguments += '--build'
