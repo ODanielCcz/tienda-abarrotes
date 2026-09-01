@@ -8,6 +8,9 @@ export const options = {
   stages: loadProfile.stages,
   thresholds: loadProfile.thresholds,
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
+  // Exclude the automatic `url` tag: order/payment UUIDs would otherwise create
+  // one time series per resource and distort the generator before the SUT fails.
+  systemTags: ['status', 'method', 'name', 'group', 'check', 'error', 'error_code', 'expected_response', 'scenario'],
 };
 
 export function setup() {

@@ -27,10 +27,13 @@ if ($failures.Count -eq 0) {
     $runner = Get-Content -LiteralPath (Join-Path $performanceRoot 'scripts/run-perf-load.ps1') -Raw
     $invariants = Get-Content -LiteralPath (Join-Path $performanceRoot 'sql/performance-invariants.sql') -Raw
 
-    foreach ($requiredText in @('stages', 'handleSummary', 'executeWorkloadIteration', 'summaryTrendStats')) {
+    foreach ($requiredText in @('stages', 'handleSummary', 'executeWorkloadIteration', 'summaryTrendStats', 'systemTags')) {
         if ($load -notmatch [regex]::Escape($requiredText)) {
             $failures.Add("backend-load.js no contiene $requiredText")
         }
+    }
+    if ($load -match "systemTags:\s*\[[^\]]*'url'") {
+        $failures.Add('backend-load.js no debe habilitar el tag url de alta cardinalidad.')
     }
     foreach ($requiredText in @('read_p95', 'write_p95', 'business_p99', 'p(99)<1500', 'unexpected_5xx')) {
         if ($profile -notmatch [regex]::Escape($requiredText)) {

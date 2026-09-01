@@ -40,6 +40,7 @@ $campaign = [ordered]@{
     runs = @()
 }
 $manifestPath = Join-Path $loadArtifactDirectory "$campaignId-campaign.json"
+[IO.File]::WriteAllText($manifestPath, ($campaign | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
 
 try {
     for ($runNumber = 1; $runNumber -le $RunCount; $runNumber++) {
