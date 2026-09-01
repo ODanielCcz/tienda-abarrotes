@@ -132,3 +132,38 @@ Toda la evidencia cruda se conserva fuera de OneDrive, bajo
 El resumen `baseline-summary.md` y su equivalente JSON contienen las medianas
 `postWarm`, la revisión Git, SO, CPU, RAM, versiones Java/Node/npm/Docker/Compose
 y el manifiesto del build.
+
+## Carga backend reproducible
+
+La carga usa un ciclo determinista de 20 operaciones con 55 % lecturas, 20 %
+catálogo/contexto, 15 % ventas, 5 % pagos y 5 % Sync. Cada VU recibe su propia
+presentación, cliente y dispositivo; las claves de idempotencia se derivan del
+`RunId`, VU e iteración. El usuario sigue siendo `perf_operator`: no se amplía su
+alcance global y todas las lecturas respetan la sucursal PERF.
+
+```powershell
+# Validador estructural y k6 inspect, sin tráfico.
+.\tests\performance\k6\validate-load.ps1
+.\tests\performance\scripts\run-perf-load.ps1 -ValidateOnly
+
+# Diagnóstico de 10 segundos; nunca sustituye una corrida oficial.
+$runId = [guid]::NewGuid().ToString()
+.\scripts\run-perf-k6.ps1 -Script backend-load.js -RunId $runId -QuickLoad
+.\tests\performance\scripts\validate-performance-invariants.ps1
+
+# Campaña oficial: tres corridas independientes y 5 minutos de enfriamiento.
+.\tests\performance\scripts\run-perf-load.ps1
+```
+
+Cada corrida oficial recrea la base efímera, ejecuta preflight, escala de 10 a
+50 VU durante 12 minutos y exige cero `5xx`, cero errores funcionales, envelope
+y correlation id válidos. Los umbrales son p95 menor a 500 ms para lecturas,
+p95 menor a 900 ms para escrituras y p99 menor a 1500 ms para operaciones de
+negocio. Tras k6 se comprueban stock no negativo, conservación de existencias,
+un movimiento `SALE` por venta, ausencia de sobrepago y secuencias Sync sin
+huecos.
+
+Los summaries comparables, invariantes y manifiesto de campaña se guardan fuera
+del repositorio en `%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts\load`.
+`-SkipCooldown` y valores menores de `RunCount` existen solo para diagnóstico y
+no cumplen la aceptación oficial.

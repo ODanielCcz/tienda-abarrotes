@@ -3,9 +3,17 @@ const fixtureContract = JSON.parse(open('/fixtures/fixture-contract.json'));
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const smokeRunId = __ENV.SMOKE_RUN_ID || '70000000-0000-4000-8000-000000000001';
+const runId = __ENV.PERF_RUN_ID || smokeRunId;
 
 if (!UUID_PATTERN.test(smokeRunId)) {
   throw new Error('SMOKE_RUN_ID must be a UUID so writes remain deterministic.');
+}
+if (!UUID_PATTERN.test(runId)) {
+  throw new Error('PERF_RUN_ID must be a UUID so writes remain traceable and deterministic.');
+}
+const iterationSleepSeconds = Number(__ENV.PERF_ITERATION_SLEEP_SECONDS || 0.1);
+if (!Number.isFinite(iterationSleepSeconds) || iterationSleepSeconds < 0.05 || iterationSleepSeconds > 5) {
+  throw new Error('PERF_ITERATION_SLEEP_SECONDS must be between 0.05 and 5 seconds.');
 }
 
 export const contract = fixtureContract;
@@ -16,6 +24,8 @@ export const config = {
   username: __ENV.PERF_USERNAME || '',
   password: __ENV.PERF_PASSWORD || '',
   smokeRunId,
+  runId,
+  iterationSleepSeconds,
   maxReadLatencyMs: Number(__ENV.SMOKE_MAX_READ_LATENCY_MS || 1000),
   maxWriteLatencyMs: Number(__ENV.SMOKE_MAX_WRITE_LATENCY_MS || 2000),
 };

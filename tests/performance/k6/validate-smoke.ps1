@@ -113,7 +113,7 @@ if ($failures.Count -gt 0) {
 }
 
 & (Join-Path $PSScriptRoot 'test-perf-env-import.ps1')
-if ($LASTEXITCODE -ne 0) {
+if (-not $?) {
     throw 'Falló la prueba de procedencia y separación de credenciales de perf.env.'
 }
 

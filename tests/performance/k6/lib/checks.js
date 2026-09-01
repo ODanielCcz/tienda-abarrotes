@@ -15,10 +15,19 @@ export function apiRequest(method, path, token, expected) {
   const correlationId = nextCorrelationId(expected.name);
   const response = http.request(method, apiUrl(path), expected.body ? JSON.stringify(expected.body) : null, {
     headers: requestHeaders(token, correlationId),
-    tags: { endpoint: expected.name, operation: expected.operation || method },
+    tags: {
+      module: expected.module || moduleFromPath(path),
+      endpoint: expected.name,
+      operation: expected.operation || method,
+    },
   });
   validateApiResponse(response, correlationId, path, expected);
   return response;
+}
+
+function moduleFromPath(path) {
+  const match = path.match(/^\/api\/v1\/([^/?]+)/);
+  return match ? match[1] : 'platform';
 }
 
 export function readinessRequest() {

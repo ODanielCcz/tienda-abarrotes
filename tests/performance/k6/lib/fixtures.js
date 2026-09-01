@@ -22,6 +22,11 @@ export function deviceId(index) {
   return `91000000-0000-0000-0001-${padded(index, 12)}`;
 }
 
+export function customerId(index) {
+  assertFixtureIndex(index, contract.counts.customers, 'customer');
+  return `98000000-0000-0000-0001-${padded(index, 12)}`;
+}
+
 export function nonLotUnitPrice(index) {
   assertFixtureIndex(index, contract.counts.nonLotPresentations, 'non-lot presentation');
   // performance-fixtures.sql: 20 + (series_id % 25), valid on the GENERAL list.
