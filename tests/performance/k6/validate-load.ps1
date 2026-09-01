@@ -24,6 +24,7 @@ if ($failures.Count -eq 0) {
     $profile = Get-Content -LiteralPath (Join-Path $performanceRoot 'k6/lib/profile-config.js') -Raw
     $workload = Get-Content -LiteralPath (Join-Path $performanceRoot 'k6/lib/workload.js') -Raw
     $metrics = Get-Content -LiteralPath (Join-Path $performanceRoot 'k6/lib/workload-metrics.js') -Raw
+    $checks = Get-Content -LiteralPath (Join-Path $performanceRoot 'k6/lib/checks.js') -Raw
     $runner = Get-Content -LiteralPath (Join-Path $performanceRoot 'scripts/run-perf-load.ps1') -Raw
     $invariants = Get-Content -LiteralPath (Join-Path $performanceRoot 'sql/performance-invariants.sql') -Raw
 
@@ -34,6 +35,9 @@ if ($failures.Count -eq 0) {
     }
     if ($load -match "systemTags:\s*\[[^\]]*'url'") {
         $failures.Add('backend-load.js no debe habilitar el tag url de alta cardinalidad.')
+    }
+    if ($checks -notmatch 'name:\s*expected\.name') {
+        $failures.Add('checks.js debe agrupar la métrica HTTP con name=expected.name.')
     }
     foreach ($requiredText in @('read_p95', 'write_p95', 'business_p99', 'p(99)<1500', 'unexpected_5xx')) {
         if ($profile -notmatch [regex]::Escape($requiredText)) {

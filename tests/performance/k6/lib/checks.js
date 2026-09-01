@@ -16,6 +16,7 @@ export function apiRequest(method, path, token, expected) {
   const response = http.request(method, apiUrl(path), expected.body ? JSON.stringify(expected.body) : null, {
     headers: requestHeaders(token, correlationId),
     tags: {
+      name: expected.name,
       module: expected.module || moduleFromPath(path),
       endpoint: expected.name,
       operation: expected.operation || method,
@@ -34,7 +35,7 @@ export function readinessRequest() {
   const correlationId = nextCorrelationId('readiness');
   const response = http.get(apiUrl('/actuator/health'), {
     headers: { 'X-Correlation-ID': correlationId },
-    tags: { endpoint: 'readiness', operation: 'GET' },
+    tags: { name: 'readiness', module: 'platform', endpoint: 'readiness', operation: 'GET' },
   });
   // Actuator is not ApiResponseDto: it has no envelope correlation field, only the header.
   const body = parseEnvelope(response);
