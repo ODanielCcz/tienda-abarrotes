@@ -179,6 +179,9 @@ if ($null -ne $helperPath) {
     if ($helper -match '(?i)write-(host|output).*accessToken|write-(host|output).*password') {
         Add-Failure 'El helper no debe imprimir tokens ni contraseñas.'
     }
+    if ($helper -notmatch "Get-PerfCommandVersion\s+-Command\s+'npm\.cmd'") {
+        Add-Failure 'La metadata debe resolver npm.cmd explícitamente en Windows.'
+    }
     foreach ($requiredSafetyText in @(
         'TIENDA_PERF_BASELINE_RUN_V1',
         '.baseline-run-marker.json',

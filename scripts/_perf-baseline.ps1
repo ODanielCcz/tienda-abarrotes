@@ -1360,7 +1360,7 @@ function Get-PerfEnvironmentMetadata {
         powershell = $PSVersionTable.PSVersion.ToString()
         java = Get-PerfCommandVersion -Command java -Arguments @('-version')
         node = Get-PerfCommandVersion -Command node -Arguments @('--version')
-        npm = Get-PerfCommandVersion -Command npm -Arguments @('--version')
+        npm = Get-PerfCommandVersion -Command 'npm.cmd' -Arguments @('--version')
         docker = Get-PerfCommandVersion -Command docker -Arguments @('version', '--format', '{{.Server.Version}}')
         dockerCompose = Get-PerfCommandVersion -Command docker -Arguments @('compose', 'version', '--short')
         cpu = @($cpu)
