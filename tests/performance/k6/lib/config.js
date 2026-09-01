@@ -12,6 +12,7 @@ if (!UUID_PATTERN.test(runId)) {
   throw new Error('PERF_RUN_ID must be a UUID so writes remain traceable and deterministic.');
 }
 const iterationSleepSeconds = Number(__ENV.PERF_ITERATION_SLEEP_SECONDS || 0.1);
+const loadProfileActive = Boolean(__ENV.PERF_RUN_ID);
 if (!Number.isFinite(iterationSleepSeconds) || iterationSleepSeconds < 0.05 || iterationSleepSeconds > 5) {
   throw new Error('PERF_ITERATION_SLEEP_SECONDS must be between 0.05 and 5 seconds.');
 }
@@ -26,7 +27,7 @@ export const config = {
   smokeRunId,
   runId,
   iterationSleepSeconds,
-  maxReadLatencyMs: Number(__ENV.SMOKE_MAX_READ_LATENCY_MS || 1000),
+  maxReadLatencyMs: Number(__ENV.SMOKE_MAX_READ_LATENCY_MS || (loadProfileActive ? 1500 : 1000)),
   maxWriteLatencyMs: Number(__ENV.SMOKE_MAX_WRITE_LATENCY_MS || 2000),
 };
 

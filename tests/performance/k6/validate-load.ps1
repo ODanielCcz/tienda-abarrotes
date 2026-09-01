@@ -27,12 +27,12 @@ if ($failures.Count -eq 0) {
     $runner = Get-Content -LiteralPath (Join-Path $performanceRoot 'scripts/run-perf-load.ps1') -Raw
     $invariants = Get-Content -LiteralPath (Join-Path $performanceRoot 'sql/performance-invariants.sql') -Raw
 
-    foreach ($requiredText in @('stages', 'handleSummary', 'executeWorkloadIteration')) {
+    foreach ($requiredText in @('stages', 'handleSummary', 'executeWorkloadIteration', 'summaryTrendStats')) {
         if ($load -notmatch [regex]::Escape($requiredText)) {
             $failures.Add("backend-load.js no contiene $requiredText")
         }
     }
-    foreach ($requiredText in @('read_p95', 'write_p95', 'business_p99', 'unexpected_5xx')) {
+    foreach ($requiredText in @('read_p95', 'write_p95', 'business_p99', 'p(99)<1500', 'unexpected_5xx')) {
         if ($profile -notmatch [regex]::Escape($requiredText)) {
             $failures.Add("profile-config.js no contiene $requiredText")
         }

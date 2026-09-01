@@ -163,6 +163,10 @@ negocio. Tras k6 se comprueban stock no negativo, conservación de existencias,
 un movimiento `SALE` por venta, ausencia de sobrepago y secuencias Sync sin
 huecos.
 
+Además del p95 agregado, cada lectura tiene un techo duro de 1500 ms y cada
+escritura uno de 2000 ms. Un outlier que supere esos límites invalida checks;
+los summaries incluyen p90, p95 y p99 para distinguir colas de latencia.
+
 Los summaries comparables, invariantes y manifiesto de campaña se guardan fuera
 del repositorio en `%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts\load`.
 `-SkipCooldown` y valores menores de `RunCount` existen solo para diagnóstico y

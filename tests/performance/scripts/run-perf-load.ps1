@@ -54,7 +54,12 @@ try {
         $runId = [Guid]::NewGuid().ToString()
         $runStartedAt = [DateTimeOffset]::UtcNow
         Write-Host "Carga backend $runNumber/$RunCount. RunId: $runId"
-        & (Join-Path $repositoryRoot 'scripts\run-perf-k6.ps1') -Script backend-load.js -RunId $runId
+        $k6Failure = $null
+        try {
+            & (Join-Path $repositoryRoot 'scripts\run-perf-k6.ps1') -Script backend-load.js -RunId $runId
+        } catch {
+            $k6Failure = $_
+        }
 
         $containerSummaryPath = Join-Path $PerfArtifactsDirectory "$runId-load-summary.json"
         $summaryPath = Join-Path $loadArtifactDirectory "$runId-summary.json"
@@ -65,10 +70,15 @@ try {
             throw "k6 no produjo el summary comparable $summaryPath"
         }
         $invariantPath = Join-Path $loadArtifactDirectory "$runId-invariants.txt"
-        & (Join-Path $PSScriptRoot 'validate-performance-invariants.ps1') -OutputPath $invariantPath
+        $invariantFailure = $null
+        try {
+            & (Join-Path $PSScriptRoot 'validate-performance-invariants.ps1') -OutputPath $invariantPath
+        } catch {
+            $invariantFailure = $_
+        }
 
         $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
-        $campaign.runs += [ordered]@{
+        $runResult = [ordered]@{
             runNumber = $runNumber
             runId = $runId
             startedAt = $runStartedAt.ToString('o')
@@ -77,9 +87,17 @@ try {
             invariantPath = $invariantPath
             requestCount = $summary.metrics.http_reqs.count
             p95Milliseconds = $summary.metrics.http_req_duration.'p(95)'
-            status = 'PASSED'
+            p99Milliseconds = $summary.metrics.http_req_duration.'p(99)'
+            status = if ($null -eq $k6Failure -and $null -eq $invariantFailure) { 'PASSED' } else { 'FAILED' }
         }
+        $campaign.runs += $runResult
         [IO.File]::WriteAllText($manifestPath, ($campaign | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+        if ($null -ne $k6Failure) {
+            throw 'k6 rechazó la corrida; se conservaron summary e invariantes.'
+        }
+        if ($null -ne $invariantFailure) {
+            throw 'Las invariantes rechazaron la corrida; se conservaron summary e invariantes.'
+        }
     }
     $campaign.status = 'COMPLETED'
     $campaign.completedAt = [DateTimeOffset]::UtcNow.ToString('o')

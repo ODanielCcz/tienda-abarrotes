@@ -7,6 +7,7 @@ import { executeWorkloadIteration } from './lib/workload.js';
 export const options = {
   stages: loadProfile.stages,
   thresholds: loadProfile.thresholds,
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
 };
 
 export function setup() {
