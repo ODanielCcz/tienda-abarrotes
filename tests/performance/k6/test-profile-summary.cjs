@@ -4,6 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const context = vm.createContext({
   config: { runId: 'test-run' },
+  stableSystemTags: [],
   comparableSummary: () => ({ metrics: { http_reqs: { count: 20 } } }),
 });
 const source = fs.readFileSync(path.join(__dirname, 'lib/profile-runtime.js'), 'utf8')
@@ -33,4 +34,9 @@ assert.equal(summary(480, false).lastStableTarget, 75);
 assert.equal(summary(300, true).lastStableTarget, 50);
 assert.equal(summary(300, false).levels[1].status, 'INCOMPLETE');
 assert.equal(summary(300, true).levels[1].status, 'THRESHOLD_BREACHED');
+const options = context.optionsFor({ stages: [{ duration: '1s', target: 0 }], thresholds: {} });
+assert.equal(options.gracefulRampDown, undefined, 'gracefulRampDown is not a top-level k6 option');
+assert.equal(options.scenarios.default.executor, 'ramping-vus');
+assert.equal(options.scenarios.default.gracefulRampDown, '0s');
+assert.equal(options.scenarios.default.gracefulStop, '0s');
 console.log('PASS: only completed, passing stress levels count as stable.');

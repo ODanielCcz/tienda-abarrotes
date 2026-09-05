@@ -22,8 +22,15 @@ export function optionsFor(profile) {
     thresholds[`http_reqs{stress_level:${level.target}}`] = ['count>=0'];
   }
   return {
-    stages: profile.stages,
-    gracefulRampDown: '0s',
+    scenarios: {
+      default: {
+        executor: 'ramping-vus',
+        startVUs: 0,
+        stages: profile.stages,
+        gracefulRampDown: '0s',
+        gracefulStop: '0s',
+      },
+    },
     thresholds,
     summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
     systemTags: stableSystemTags,
