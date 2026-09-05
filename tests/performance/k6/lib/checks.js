@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, fail } from 'k6';
-import { Counter, Trend } from 'k6/metrics';
+import { Counter, Rate, Trend } from 'k6/metrics';
 import { apiUrl, config } from './config.js';
 
 export const readLatencyMs = new Trend('read_latency_ms', true);
@@ -8,6 +8,8 @@ export const writeLatencyMs = new Trend('write_latency_ms', true);
 export const unexpected5xx = new Counter('unexpected_5xx');
 export const unexpectedFunctionalError = new Counter('unexpected_functional_error');
 export const schemaError = new Counter('schema_error');
+export const unexpected5xxRate = new Rate('unexpected_5xx_rate');
+export const unexpectedFunctionalErrorRate = new Rate('unexpected_functional_error_rate');
 
 let requestCounter = 0;
 
@@ -41,7 +43,9 @@ export function readinessRequest() {
   const body = parseEnvelope(response);
   const readinessBodyValid = body && body.status === 'UP';
   readLatencyMs.add(response.timings.duration);
-  if (response.status >= 500) unexpected5xx.add(1);
+  const is5xx = response.status >= 500;
+  unexpected5xxRate.add(is5xx);
+  if (is5xx) unexpected5xx.add(1);
   if (!readinessBodyValid) schemaError.add(1);
   check(response, {
     'readiness has expected HTTP status': (res) => res.status === 200,
@@ -56,10 +60,14 @@ export function readinessRequest() {
 export function validateApiResponse(response, correlationId, path, expected) {
   const isWrite = expected.operation === 'write';
   (isWrite ? writeLatencyMs : readLatencyMs).add(response.timings.duration);
-  if (response.status >= 500) unexpected5xx.add(1);
+  const is5xx = response.status >= 500;
+  unexpected5xxRate.add(is5xx);
+  if (is5xx) unexpected5xx.add(1);
 
   const envelope = parseEnvelope(response);
-  const statusExpected = expected.statuses.includes(response.status);
+  const controlledError = response.status === 409 || response.status === 429;
+  const statusExpected = expected.statuses.includes(response.status)
+    && (!controlledError || (expected.allowedErrorCodes?.[response.status] || []).includes(envelope?.code));
   const envelopeValid = envelope
     && envelope.status === response.status
     && typeof envelope.code === 'string' && envelope.code.length > 0
@@ -72,7 +80,9 @@ export function validateApiResponse(response, correlationId, path, expected) {
     && envelope.correlationId === correlationId
     && headerValue(response, 'X-Correlation-ID') === correlationId;
   if (!envelopeValid) schemaError.add(1);
-  if (!statusExpected && response.status !== 409 && response.status !== 429) {
+  const unexpectedFunctional = !statusExpected;
+  unexpectedFunctionalErrorRate.add(unexpectedFunctional);
+  if (unexpectedFunctional) {
     unexpectedFunctionalError.add(1);
   }
 

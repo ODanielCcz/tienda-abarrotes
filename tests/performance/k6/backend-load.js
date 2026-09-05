@@ -1,7 +1,7 @@
 import { config } from './lib/config.js';
 import { loginInSetup, renewTokenInSetup, requireUsableSetupToken } from './lib/auth.js';
 import { readinessRequest } from './lib/checks.js';
-import { comparableSummary, loadProfile } from './lib/profile-config.js';
+import { comparableSummary, loadProfile, stableSystemTags } from './lib/profile-config.js';
 import { executeWorkloadIteration } from './lib/workload.js';
 
 export const options = {
@@ -10,7 +10,7 @@ export const options = {
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
   // Exclude the automatic `url` tag: order/payment UUIDs would otherwise create
   // one time series per resource and distort the generator before the SUT fails.
-  systemTags: ['status', 'method', 'name', 'group', 'check', 'error', 'error_code', 'expected_response', 'scenario'],
+  systemTags: stableSystemTags,
 };
 
 export function setup() {
@@ -33,8 +33,8 @@ export function handleSummary(data) {
     stdout: [
       `Backend load ${config.runId}: ${summary.metrics.http_reqs.count} requests completed.`,
       failures.length === 0 ? 'Checks: PASS' : `Failed checks: ${failures.join(', ')}`,
-      `Unexpected functional errors: ${summary.metrics.unexpected_functional_error.count || 0}`,
-      `Unexpected 5xx: ${summary.metrics.unexpected_5xx.count || 0}`,
+      `Unexpected functional errors: ${summary.metrics.unexpected_functional_error?.count || 0}`,
+      `Unexpected 5xx: ${summary.metrics.unexpected_5xx?.count || 0}`,
       '',
     ].join('\n'),
     [`/artifacts/${config.runId}-load-summary.json`]: JSON.stringify(summary, null, 2),

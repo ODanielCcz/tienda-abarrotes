@@ -8,6 +8,7 @@ param(
     [switch]$ExpectInvalidUrl,
     [switch]$ExpectAbortMidway,
     [switch]$QuickLoad,
+    [switch]$QuickProfile,
     [switch]$ValidateComposeProject
 )
 
@@ -56,6 +57,12 @@ if ($QuickLoad) {
         throw 'QuickLoad solo puede usarse con backend-load.js.'
     }
     $composeArguments += @('--env', 'PERF_LOAD_QUICK=true')
+}
+if ($QuickProfile) {
+    if ($Script -notin @('backend-stress.js', 'backend-spike.js', 'backend-soak.js')) {
+        throw 'QuickProfile solo puede usarse con stress, spike o soak.'
+    }
+    $composeArguments += @('--env', 'PERF_PROFILE_QUICK=true')
 }
 $composeArguments += @('k6', $Command, $Script)
 Invoke-PerfCompose -Arguments $composeArguments

@@ -171,3 +171,53 @@ Los summaries comparables, invariantes y manifiesto de campaña se guardan fuera
 del repositorio en `%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts\load`.
 `-SkipCooldown` y valores menores de `RunCount` existen solo para diagnóstico y
 no cumplen la aceptación oficial.
+
+## Stress, spike y soak
+
+Los tres perfiles reutilizan exactamente la mezcla e identidades deterministas
+de carga. Cada perfil recrea `tienda-perf`, captura Actuator/Prometheus,
+`docker stats`, PostgreSQL y readiness antes, durante y después del tráfico, y
+termina ejecutando las invariantes transaccionales.
+
+```powershell
+# Solo valida contratos y ejecuta k6 inspect para los tres scripts.
+.\tests\performance\scripts\run-fullstack-stress.ps1 -ValidateOnly
+
+# Diagnóstico corto de los tres perfiles; no constituye evidencia oficial.
+.\tests\performance\scripts\run-fullstack-stress.ps1 -Quick
+
+# Campaña oficial: stress 16 min, spike 152 s más recuperación y soak 30 minutos.
+.\tests\performance\scripts\run-fullstack-stress.ps1
+```
+
+Stress escala `50 → 75 → 100 → 150` VU y se aborta antes de subir más cuando
+supera el límite de errores inesperados o pierde el contrato JSON. Spike sube
+prácticamente de inmediato a 150 VU y registra cuántos segundos tarda readiness
+en recuperarse desde el fin del tráfico (marker UTC emitido por k6), con un
+máximo aceptable de 60 segundos. No hay una espera oculta a cero VU antes de
+iniciar esa medición. Soak mantiene 25 VU y
+compara memoria JVM, memoria del contenedor, threads, Hikari y sesiones de base
+al principio y al final.
+
+La evidencia cruda queda fuera de OneDrive en
+`%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts\stress\<timestamp>`.
+`campaign.json` distingue `PASSED`, `THRESHOLD_BREACHED` y `FAILED`; un punto de
+quiebre esperado no oculta ni omite las comprobaciones de integridad.
+
+La campaña oficial exige Git limpio y reconstruye los artefactos al comenzar.
+Cada perfil registra revisión, ID y fecha de imagen y hashes SHA-256 del JAR
+local y del contenedor; una diferencia detiene la ejecución. `Quick` permite
+diagnóstico con cambios locales y deja esa limitación registrada.
+
+Los escalones conservan métricas separadas y solo un escalón completado y con
+umbrales válidos puede figurar como estable. El código nativo `99` identifica
+un umbral incumplido; otros fallos de k6 son fallos de campaña. Un perfil
+`FAILED` detiene la secuencia y conserva el ambiente para diagnóstico.
+
+Pruebas del arnés sin tráfico:
+
+```powershell
+node tests/performance/k6/test-response-classification.cjs
+node tests/performance/k6/test-profile-summary.cjs
+.\tests\performance\scripts\test-stress-helpers.ps1
+```

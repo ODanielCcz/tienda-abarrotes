@@ -153,7 +153,9 @@ function Invoke-PerfCompose {
         -f $PerfComposeOverlay `
         @Arguments
     if ($LASTEXITCODE -ne 0) {
-        throw "Docker Compose terminó con código $LASTEXITCODE."
+        $failure = [InvalidOperationException]::new("Docker Compose terminó con código $LASTEXITCODE.")
+        $failure.Data['NativeExitCode'] = [int]$LASTEXITCODE
+        throw $failure
     }
 }
 

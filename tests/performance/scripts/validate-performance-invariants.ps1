@@ -39,19 +39,32 @@ if (-not $process.Start()) {
 }
 $process.StandardInput.Write($sql)
 $process.StandardInput.Close()
-$stdout = $process.StandardOutput.ReadToEnd()
-$stderr = $process.StandardError.ReadToEnd()
+$stdoutTask = $process.StandardOutput.ReadToEndAsync()
+$stderrTask = $process.StandardError.ReadToEndAsync()
 $process.WaitForExit()
-if ($process.ExitCode -ne 0) {
-    throw "Falló una invariante de rendimiento. $stderr`n$stdout"
-}
+$stdout = $stdoutTask.GetAwaiter().GetResult()
+$stderr = $stderrTask.GetAwaiter().GetResult()
+$exitCode = $process.ExitCode
+$process.Dispose()
 
 $sanitized = ($stdout -replace '(?i)(password|secret|token)\s*[=:]\s*\S+', '$1=[REDACTED]').Trim()
+if ($exitCode -ne 0) {
+    # Preserve only known invariant names and counts; never persist raw DB errors.
+    $violations = [regex]::Matches(($stderr + "`n" + $stdout),
+        '\b(negative_stock|negative_lot_stock|payment_overflow|orphan_sale_movement|sync_sequence_gap|sync_checkpoint_mismatch|stock_drift)=\d+\b')
+    $reason = if ($violations.Count -gt 0) {
+        ($violations | ForEach-Object Value) -join ', '
+    } else { 'INVARIANT_QUERY_FAILED' }
+    $sanitized = "FAIL: exitCode=$exitCode; $reason"
+}
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
     $parent = Split-Path -Parent $OutputPath
     if (-not [string]::IsNullOrWhiteSpace($parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null
     }
     [IO.File]::WriteAllText($OutputPath, $sanitized, [Text.UTF8Encoding]::new($false))
+}
+if ($exitCode -ne 0) {
+    throw $sanitized
 }
 Write-Output $sanitized

@@ -33,6 +33,11 @@ if ($failures.Count -eq 0) {
             $failures.Add("backend-load.js no contiene $requiredText")
         }
     }
+    foreach ($requiredPattern in @('unexpected_functional_error\?\.count', 'unexpected_5xx\?\.count')) {
+        if ($load -notmatch $requiredPattern) {
+            $failures.Add("backend-load.js no tolera métricas vacías en el summary: $requiredPattern")
+        }
+    }
     if ($load -match "systemTags:\s*\[[^\]]*'url'") {
         $failures.Add('backend-load.js no debe habilitar el tag url de alta cardinalidad.')
     }

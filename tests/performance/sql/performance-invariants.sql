@@ -111,6 +111,8 @@ END $$;
 SELECT json_build_object(
     'status', 'PASS',
     'negative_stock', 0,
+    'negative_lot_stock', 0,
+    'stock_drift', 0,
     'payment_overflow', 0,
     'orphan_sale_movement', 0,
     'sync_sequence_gap', 0,
