@@ -16,7 +16,7 @@
 | ------------- | --------------------- |
 | Proyecto      | Tienda de Abarrotes   |
 | Código        | TDA-QA-PLAN-001       |
-| Versión       | v1.1                  |
+| Versión       | v1.2                  |
 | Estado        | Aprobado en ejecución |
 | Responsable   | ODCC / Codex          |
 | Fecha         | 2026-08-30            |
@@ -29,6 +29,7 @@
 | v0.1    | 2026-08-30 | ODCC / Codex | Diseño inicial de la campaña fullstack | Borrador para aprobación |
 | v1.0    | 2026-08-30 | ODCC / Codex | Aprobación e inicio de ejecución       | Aprobado                 |
 | v1.1    | 2026-08-30 | ODCC / Codex | Secretos y evidencia cruda fuera de OneDrive | En ejecución          |
+| v1.2 | 2026-09-16 | Codex | Tarea 6 verificada y primer informe entregable; revisión pendiente | En ejecución |
 
 ## 1. Decisión Técnica
 
@@ -232,14 +233,14 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 **Archivos:** `tests/performance/web/frontend-performance.spec.ts`, `lighthouserc.json`, `apps/web/package.json`.
 
-- [ ] Servir `dist/tienda-web/browser` después de `npm run build`; no medir `ng serve` de desarrollo.
-- [ ] Añadir tres ejecuciones Lighthouse sobre login, dashboard y catálogo y usar la mediana.
-- [ ] Implementar Playwright para 50 ciclos de navegación, filtros, modo oscuro, tablas y apertura/cierre de diálogos.
-- [ ] Capturar heap, nodos DOM, long tasks, errores de consola y `pageerror` por ciclo.
-- [ ] Repetir en escritorio, tablet y móvil emulado.
-- [ ] Ejecutar el flujo Playwright mientras k6 mantiene 25 usuarios sobre backend.
-- [ ] Verificar que errores controlados siguen mostrando correlation id bajo carga.
-- [ ] Commit: `test(web): add browser performance scenarios`.
+- [x] Servir `dist/tienda-web/browser` después de `npm run build`; no medir `ng serve` de desarrollo.
+- [x] Añadir tres ejecuciones Lighthouse sobre login, dashboard y catálogo y usar la mediana.
+- [x] Implementar Playwright para 50 ciclos de navegación, filtros, modo oscuro, tablas y apertura/cierre de diálogos.
+- [x] Capturar heap, nodos DOM, long tasks, errores de consola y `pageerror` por ciclo.
+- [x] Repetir en escritorio, tablet y móvil emulado.
+- [x] Ejecutar el flujo Playwright mientras k6 mantiene 25 usuarios sobre backend.
+- [x] Verificar que errores controlados siguen mostrando correlation id bajo carga.
+- [x] Commit: `test(web): add browser performance scenarios` (`9ae76ae`).
 
 **Aceptación:** Angular cumple umbrales o el informe identifica ruta, interacción y métrica exacta que falla; no hay errores de consola.
 
@@ -247,11 +248,11 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 **Archivo:** `docs/reports/quality/2026-08-30-fullstack-stress-security-analysis.md`.
 
-- [ ] Consolidar línea base, Load, Stress, Spike, Soak, Lighthouse y Playwright.
-- [ ] Incluir percentiles, throughput, tasa de error, consumo, saturación, recuperación y condiciones del equipo.
-- [ ] Diferenciar cuello de botella del navegador, aplicación, JVM, pool, PostgreSQL y Redis.
-- [ ] Clasificar cada observación como confirmada, hipótesis o limitación de laboratorio.
-- [ ] Incluir evidencias reproducibles sin tokens, contraseñas ni datos sensibles.
+- [x] Consolidar línea base, Load, Stress, Spike, Soak, Lighthouse y Playwright.
+- [x] Incluir percentiles, throughput, tasa de error, consumo, saturación, recuperación y condiciones del equipo.
+- [x] Diferenciar cuello de botella del navegador, aplicación, JVM, pool, PostgreSQL y Redis.
+- [x] Clasificar cada observación como confirmada, hipótesis o limitación de laboratorio.
+- [x] Incluir evidencias reproducibles sin tokens, contraseñas ni datos sensibles.
 - [ ] Detenerse para revisión del usuario antes de iniciar pruebas ofensivas dinámicas.
 
 **Aceptación:** el usuario puede leer un único Markdown y entender capacidad estable, punto de degradación, punto de quiebre y riesgos sin abrir los JSON crudos.
@@ -364,7 +365,7 @@ npm run e2e
 npm audit --omit=dev
 
 Set-Location ..\..
-docker compose --project-name tienda-perf --env-file .performance\perf.env down -v --remove-orphans
+.\scripts\perf-environment-down.ps1
 ```
 
 Los comandos específicos de k6, Lighthouse y ZAP se incorporarán a los scripts versionados; el operador no tendrá que reconstruir parámetros manualmente.
@@ -398,3 +399,19 @@ docs(quality): add fullstack stress and security analysis
 ## 12. Siguiente Acción Tras La Aprobación
 
 Comenzar por la Tarea 1 y detenerse al finalizar la Tarea 7 para entregar el primer análisis de estrés. Solo después de que el usuario lo lea se ejecutarán las Tareas 8 a 11 de seguridad. Las correcciones pertenecen a una campaña posterior derivada de los hallazgos validados.
+
+## 13. Punto De Control Del 16 De Septiembre
+
+El primer informe de rendimiento está en
+`docs/reports/quality/2026-08-30-fullstack-stress-security-analysis.md`, versión v0.2.
+Consolida la evidencia de preparación, Smoke, baseline, tres Load, Stress, Spike,
+Soak y navegador. Documenta expresamente las adaptaciones de duración de Smoke y
+Spike, el descenso ignorado en Stress original y la ausencia del log causal del
+5xx. Las casillas históricas de las Tareas 1–5 no sustituyen esta evidencia ni
+suponen equivalencia exacta con todos los perfiles inicialmente propuestos.
+
+Verificación posterior: backend 341 tests y Angular 152 tests aprobados;
+build Angular reproducido con 59 archivos idénticos a la medición. Se cerró
+`tienda-perf` y se eliminaron sus credenciales; la evidencia queda fuera de Git.
+Las Tareas 8–12 no han comenzado. El siguiente paso depende de la revisión del
+usuario, no de una nueva ejecución automática de pruebas.
