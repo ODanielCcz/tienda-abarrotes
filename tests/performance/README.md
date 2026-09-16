@@ -20,7 +20,9 @@ El script genera secretos aleatorios bajo
 .\scripts\perf-environment-down.ps1
 ```
 
-El cierre elimina contenedores, red, volúmenes y credenciales efímeras. Los artefactos sanitizados permanecen bajo `artifacts/quality` para elaborar el informe.
+El cierre elimina contenedores, red, volúmenes y credenciales efímeras. La evidencia
+permanece bajo `%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts`, fuera de OneDrive;
+sólo el informe sanitizado se versiona.
 
 Los resultados crudos se guardan en
 `%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts`. Solo se copiarán al repositorio métricas y evidencias previamente sanitizadas. El contenedor k6 recibe exclusivamente sus credenciales de prueba; no recibe los secretos de PostgreSQL, Redis ni de firma JWT.
@@ -221,3 +223,9 @@ node tests/performance/k6/test-response-classification.cjs
 node tests/performance/k6/test-profile-summary.cjs
 .\tests\performance\scripts\test-stress-helpers.ps1
 ```
+
+## Navegador De Producción
+
+El procedimiento standalone, Lighthouse y combinado con 25 VU se encuentra en
+[web/README.md](web/README.md). Los recorridos completos usan 50 ciclos por
+viewport; las variantes `Quick` sólo validan el harness y no sustituyen esa evidencia.

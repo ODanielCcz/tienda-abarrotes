@@ -9,7 +9,9 @@
     "test": "ng test",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
-    "e2e:install": "playwright install chromium"
+    "e2e:install": "playwright install chromium",
+    "perf:web": "playwright test --config playwright.performance.config.ts",
+    "perf:lighthouse": "node ../../tests/performance/web/run-lighthouse.mjs"
   },
   "private": true,
   "engines": {
@@ -35,6 +37,8 @@
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "jsdom": "^28.0.0",
+    "lighthouse": "13.4.1",
+    "puppeteer-core": "25.10.0",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
     "vitest": "^4.0.8"
