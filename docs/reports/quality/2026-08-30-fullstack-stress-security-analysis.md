@@ -4,7 +4,7 @@
 |---|---|
 | Proyecto | Tienda de Abarrotes |
 | Código | TDA-QA-INF-001 |
-| Versión | v0.5 |
+| Versión | v0.6 |
 | Estado | Rendimiento revisado; SEC-001 y SEC-002 remediados y verificados; SEC-003–005 pendientes de decisión |
 | Responsable | ODCC / Codex |
 | Fecha de actualización | 2026-09-24 |
@@ -19,6 +19,7 @@
 | v0.3 | 2026-09-24 | Codex | Escaneo estático/SCA, ZAP pasivo, pruebas dirigidas y cinco hallazgos validados | Para priorización |
 | v0.4 | 2026-09-24 | Codex | ZAP autenticado, prueba fiscal sintética y remediación priorizada de SEC-001/002 | En verificación |
 | v0.5 | 2026-09-24 | Codex | Verificación del diff sin nuevos hallazgos, suite completa y cierre del laboratorio aislado | En revisión |
+| v0.6 | 2026-09-24 | Codex | Revalidación del setup k6 y nueva serie Load de tres corridas tras suites completas | En revisión |
 
 ## Resumen Ejecutivo De Rendimiento
 
@@ -627,14 +628,54 @@ corridas registró p95 210,57 / 98,13 / 92,53 ms y p99 373,36 / 187,78 /
 repetición, con otros contenedores del equipo activos y una imagen PostgreSQL
 reconstruida, no permite atribuir una mejora o regresión causal a los bloqueos.
 
+### Revalidación Posterior De La Campaña Load
+
+El login de preparación ahora consulta `/api/v1/organization/branches?status=ACTIVE`
+con el JWT de `perf_operator` y rechaza el escenario si no obtiene exactamente
+la sucursal PERF del contrato. La prueba `test-auth-context.cjs` falló antes de
+añadir la lectura y pasó después; Smoke real y una carga diagnóstica de 10 s
+(90 solicitudes, checks 100%, cero errores HTTP/funcionales/5xx e invariantes
+SQL `PASS`) comprobaron la integración. Esta revalidación cambió sólo el
+harness k6, no el backend.
+
+Antes de una nueva serie oficial se reejecutaron `gradlew test --rerun-tasks`
+(345 pruebas, cero fallos/errores/omitidas) y `npm test -- --watch=false`
+(152 pruebas, cero fallos). Angular requirió ejecutar esbuild fuera del sandbox
+local por `spawn EPERM`; la transformación mínima reprodujo el bloqueo sólo
+dentro de éste. La serie `load/20260925T043338635Z-campaign.json` ejecutó tres
+perfiles de 12 minutos, separados por cinco minutos de enfriamiento y con base
+efímera recreada en cada ocasión:
+
+| Corrida | Solicitudes | p95 HTTP | p99 HTTP | Checks | Errores HTTP/funcionales/5xx | Invariantes SQL |
+|---|---:|---:|---:|---:|---:|---|
+| 1 | 165 839 | 112,98 ms | 235,26 ms | 100 % | 0 | PASS |
+| 2 | 159 400 | 130,62 ms | 283,18 ms | 100 % | 0 | PASS |
+| 3 | 165 529 | 112,46 ms | 249,87 ms | 100 % | 0 | PASS |
+
+Las tres terminaron `PASSED` (490 768 solicitudes en total), sin errores de
+esquema; mediana p95 112,98 ms y mediana p99 249,87 ms. Es una serie nueva
+posterior a las suites, no una corrección retroactiva de la cronología de la
+primera línea base. Su comparación con las series anteriores sigue siendo
+orientativa por las condiciones del equipo local.
+
+Las métricas personalizadas de k6 ya llevan módulo, endpoint, operación y
+`functional_result=success|unexpected`; `test-workload-metrics.cjs` verificó
+la emisión de ambas clasificaciones. La etiqueta expresa si el estado HTTP
+está entre los esperados; checks y contadores separados vigilan la envoltura
+de la API y el resultado de negocio.
+
 ## Evidencia Y Pendientes
 
 Artefactos bajo `%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts`.
 El primer laboratorio se cerró el 16 de septiembre. El segundo laboratorio de
 seguridad se cerró el 24 de septiembre. El tercer laboratorio aislado
 se usó para ZAP autenticado, prueba fiscal y remediación y se cerró tras
-conservar la evidencia local para
-trazabilidad; no se publicó ni se incluyó en Git.
+conservar la evidencia local para trazabilidad; no se publicó ni se incluyó
+en Git.
+
+Se creó y retiró de nuevo `tienda-perf` para la revalidación del harness y la
+serie Load posterior a las suites; el `perf.env` efímero se eliminó.
+
 `stress/20260905T061951941Z` se interrumpió antes de Soak: su manifiesto conserva
 `RUNNING`, pero el proceso terminó. No confundirlo con ejecución activa.
 

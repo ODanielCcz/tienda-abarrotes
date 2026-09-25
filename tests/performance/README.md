@@ -141,11 +141,18 @@ La carga usa un ciclo determinista de 20 operaciones con 55 % lecturas, 20 %
 catálogo/contexto, 15 % ventas, 5 % pagos y 5 % Sync. Cada VU recibe su propia
 presentación, cliente y dispositivo; las claves de idempotencia se derivan del
 `RunId`, VU e iteración. El usuario sigue siendo `perf_operator`: no se amplía su
-alcance global y todas las lecturas respetan la sucursal PERF.
+alcance global y todas las lecturas respetan la sucursal PERF. En `setup()`,
+el JWT de ese usuario consulta las sucursales activas y valida que sólo sea
+accesible la sucursal sintética PERF. Las métricas de trabajo incluyen
+`module`, `endpoint`, `operation` y
+`functional_result=success|unexpected` según el estado HTTP esperado; checks y
+contadores adicionales verifican esquema y comportamiento de negocio.
 
 ```powershell
 # Validador estructural y k6 inspect, sin tráfico.
 .\tests\performance\k6\validate-load.ps1
+node .\tests\performance\k6\test-auth-context.cjs
+node .\tests\performance\k6\test-workload-metrics.cjs
 .\tests\performance\scripts\run-perf-load.ps1 -ValidateOnly
 
 # Diagnóstico de 10 segundos; nunca sustituye una corrida oficial.

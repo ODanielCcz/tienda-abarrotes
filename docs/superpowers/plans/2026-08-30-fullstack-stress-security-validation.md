@@ -16,7 +16,7 @@
 | ------------- | --------------------- |
 | Proyecto      | Tienda de Abarrotes   |
 | Código        | TDA-QA-PLAN-001       |
-| Versión       | v1.4                  |
+| Versión       | v1.5                  |
 | Estado        | SEC-001/002 remediados; SEC-003–005 pendientes de decisión |
 | Responsable   | ODCC / Codex          |
 | Fecha         | 2026-09-24            |
@@ -32,6 +32,7 @@
 | v1.2 | 2026-09-16 | Codex | Tarea 6 verificada y primer informe entregable; revisión pendiente | En ejecución |
 | v1.3 | 2026-09-24 | Codex | Tareas 8–11 documentadas; ZAP autenticado automatizado y priorización pendientes | En revisión |
 | v1.4 | 2026-09-24 | Codex | SEC-001/002 en commits separados; regresiones, Load y diff scan verificados | En revisión |
+| v1.5 | 2026-09-24 | Codex | Contexto autenticado en k6, etiquetas verificadas y nueva campaña Load posterior a suites | En revisión |
 
 ## 1. Decisión Técnica
 
@@ -185,7 +186,7 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 - [x] Crear sucursales, almacenes, cajas, usuarios y productos ficticios con IDs conocidos solo dentro del ambiente efímero.
 - [x] Separar datos por escenario para evitar contención accidental.
-- [ ] Implementar login de preparación, renovación de token y lectura de contexto. Login y renovación en `setup()` verificados; el harness usa el contexto fijo de fixtures, pero no hace una lectura explícita del contexto autenticado.
+- [x] Implementar login de preparación, renovación de token y lectura de contexto. `setup()` consulta con el JWT restringido las sucursales activas y exige que la única accesible sea PERF; la prueba `test-auth-context.cjs` falló antes del cambio y pasó después, junto con Smoke y Load reales.
 - [x] Definir checks compartidos para `status`, `code`, `reason`, `correlationId`, esquema y tiempo.
 - [x] Validar scripts con `k6 inspect` y ejecutar Smoke hasta obtener 100 % de checks.
 - [x] Commit: `test(performance): add deterministic load fixtures` (`c939495`).
@@ -194,7 +195,7 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 ### Tarea 3: Medir Línea Base
 
-- [ ] Ejecutar suites actuales de backend y Angular antes de aplicar carga. Angular pasó; Gradle informó `:test UP-TO-DATE` en ese momento. Los 341 tests backend se reejecutaron después, no antes.
+- [x] Ejecutar suites actuales de backend y Angular antes de aplicar carga. La nueva campaña `20260925T043338635Z` se inició después de reejecutar 345/345 pruebas backend y 152/152 Angular; sus tres corridas pasaron. En la serie histórica original, Gradle había informado `:test UP-TO-DATE` y la reejecución backend ocurrió después: esta revalidación no cambia esa cronología.
 - [x] Generar build Angular de producción y registrar tamaños.
 - [x] Registrar durante cinco minutos métricas ociosas de Actuator, Prometheus, Docker y PostgreSQL.
 - [x] Ejecutar 20 peticiones secuenciales por endpoint crítico para calentar JVM y caches.
@@ -210,7 +211,7 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 - [x] Crear primero checks que fallen cuando exista `5xx`, falta de correlation id o latencia fuera del umbral.
 - [x] Ejecutar Smoke y confirmar que detecta deliberadamente una URL inválida; restaurar la URL y confirmar verde.
 - [x] Implementar la mezcla de lectura/escritura con `setup()` para tokens y datos.
-- [ ] Etiquetar métricas por módulo, endpoint, operación y resultado funcional. Los tres primeros son etiquetas k6; el resultado funcional se conserva en checks/contadores, no como etiqueta estable.
+- [x] Etiquetar métricas por módulo, endpoint, operación y resultado funcional. `workload-metrics.js` ya emitía `functional_result=success|unexpected` en los contadores y tendencias personalizados; se verificaron dinámicamente ambos valores y las otras tres etiquetas. Esa etiqueta clasifica el estado HTTP esperado; esquema y estado de negocio se controlan además con checks y contadores, no con una etiqueta adicional.
 - [x] Ejecutar Load tres veces con un enfriamiento de cinco minutos.
 - [x] Conservar la mediana; no escoger la mejor ejecución.
 - [x] Commit: `test(performance): add backend load scenarios` (`22b0530`).
