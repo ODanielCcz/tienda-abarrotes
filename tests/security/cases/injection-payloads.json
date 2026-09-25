@@ -1,0 +1,7 @@
+{
+  "sqlSearch": "' OR 1=1--",
+  "xssSearch": "<svg/onload=alert(7)>",
+  "noHitSearch": "SECURITY_NO_HIT_73291",
+  "oversizedBytes": 1100000,
+  "syncDepth": 21
+}

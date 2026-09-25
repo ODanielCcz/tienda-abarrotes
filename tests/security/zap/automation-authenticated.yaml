@@ -1,0 +1,40 @@
+env:
+  contexts:
+    - name: api-readonly
+      urls:
+        - http://backend:8080/api/v1/
+      includePaths:
+        - ^http://backend:8080/api/v1/(organization/branches|catalog/products|inventory/stock|sales/orders)(\?.*)?$
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  - type: requestor
+    requests:
+      - name: sucursales
+        url: http://backend:8080/api/v1/organization/branches
+        method: GET
+        responseCode: 200
+      - name: productos
+        url: http://backend:8080/api/v1/catalog/products
+        method: GET
+        responseCode: 200
+      - name: stock
+        url: http://backend:8080/api/v1/inventory/stock
+        method: GET
+        responseCode: 200
+      - name: ventas
+        url: http://backend:8080/api/v1/sales/orders
+        method: GET
+        responseCode: 200
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 3
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/out
+      reportFile: zap-authenticated.json
+      reportTitle: Tienda perf - ZAP GET autenticado
+      displayReport: false

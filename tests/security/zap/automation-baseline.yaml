@@ -1,0 +1,38 @@
+env:
+  contexts:
+    - name: web-readonly
+      urls:
+        - http://web-performance/
+      includePaths:
+        - ^http://web-performance/.*$
+    - name: api-docs
+      urls:
+        - http://backend:8080/
+      includePaths:
+        - ^http://backend:8080/(v3/api-docs.*|api/v1/.*)$
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  - type: spider
+    parameters:
+      context: web-readonly
+      url: http://web-performance/
+      maxDuration: 1
+  - type: requestor
+    requests:
+      - name: openapi
+        url: http://backend:8080/v3/api-docs
+        method: GET
+        responseCode: 200
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 3
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/out
+      reportFile: zap-baseline.json
+      reportTitle: Tienda perf - ZAP pasivo
+      displayReport: false
