@@ -327,15 +327,17 @@ public class JdbcSalesReturnRepositoryAdapter implements SalesReturnRepositoryPo
     }
 
     private void ensureOpenCashSession(UUID cashSessionId, UUID branchId) {
-        Integer count = jdbc.queryForObject("""
-            SELECT COUNT(*)
+        List<UUID> sessions = jdbc.query("""
+            SELECT cs.cash_session_id
             FROM cash.cash_sessions cs
             JOIN organization.cash_registers cr ON cr.cash_register_id = cs.cash_register_id
             WHERE cs.cash_session_id = :cashSessionId
               AND cs.status = 'OPEN'
               AND cr.branch_id = :branchId
-            """, new MapSqlParameterSource().addValue("cashSessionId", cashSessionId).addValue("branchId", branchId), Integer.class);
-        if (count == null || count == 0) throw new SalesException("No existe una sesion de caja abierta para la sucursal de la venta");
+            FOR UPDATE OF cs
+            """, new MapSqlParameterSource().addValue("cashSessionId", cashSessionId).addValue("branchId", branchId),
+            (rs, rowNumber) -> rs.getObject("cash_session_id", UUID.class));
+        if (sessions.isEmpty()) throw new SalesException("No existe una sesion de caja abierta para la sucursal de la venta");
     }
 
     private boolean isFullReturn(UUID salesOrderId) {

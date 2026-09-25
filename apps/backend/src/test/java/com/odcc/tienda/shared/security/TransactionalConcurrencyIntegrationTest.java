@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -142,6 +143,154 @@ class TransactionalConcurrencyIntegrationTest {
         } finally {
             jdbcTemplate.execute("DROP TRIGGER pause_inventory_count_movement ON inventory.stock_movements");
             jdbcTemplate.execute("DROP FUNCTION public.pause_inventory_count_movement()");
+        }
+    }
+
+    @Test
+    void shouldNeverCaptureCashPaymentAfterItsSessionCloses() throws Exception {
+        Fixture fixture = createFixture();
+        String token = login(fixture.username(), "correct-password");
+        MvcResult opened = mockMvc.perform(post("/api/v1/cash/sessions/open")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"cashRegisterId":"%s","openingAmount":100.00}
+                    """.formatted(fixture.cashRegisterId())))
+            .andExpect(status().isCreated()).andReturn();
+        UUID sessionId = UUID.fromString(JsonPath.read(opened.getResponse().getContentAsString(), "$.data.cashSessionId"));
+
+        jdbcTemplate.execute("""
+            CREATE FUNCTION public.pause_cash_payment_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+              IF NEW.payment_method = 'CASH' THEN PERFORM pg_sleep(3); END IF;
+              RETURN NEW;
+            END $$
+            """);
+        jdbcTemplate.execute("""
+            CREATE TRIGGER pause_cash_payment_insert BEFORE INSERT ON sales.payments
+            FOR EACH ROW EXECUTE FUNCTION public.pause_cash_payment_insert()
+            """);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<MvcResult> payment = executor.submit(cashPaymentRequest(token, fixture.salesOrderId(), sessionId));
+            boolean paymentAtInsert = false;
+            for (int i = 0; i < 40; i++) {
+                Integer active = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM pg_stat_activity
+                    WHERE pid <> pg_backend_pid() AND state = 'active'
+                      AND query LIKE '%INSERT INTO sales.payments (%'
+                    """, Integer.class);
+                if (active != null && active > 0) {
+                    paymentAtInsert = true;
+                    break;
+                }
+                TimeUnit.MILLISECONDS.sleep(50);
+            }
+            assertTrue(paymentAtInsert, "El pago debe llegar al INSERT antes de iniciar el cierre");
+            MvcResult closed = closeRequest(token, sessionId).call();
+            MvcResult paid = payment.get(15, TimeUnit.SECONDS);
+            assertEquals(200, closed.getResponse().getStatus());
+            assertEquals(201, paid.getResponse().getStatus());
+            assertEquals(new BigDecimal("160.0000"), jdbcTemplate.queryForObject(
+                "SELECT expected_amount FROM cash.cash_sessions WHERE cash_session_id = ?",
+                BigDecimal.class, sessionId));
+            assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cash.cash_movements WHERE cash_session_id = ? AND movement_type = 'SALE' AND direction = 'IN'",
+                Integer.class, sessionId));
+        } finally {
+            executor.shutdownNow();
+            jdbcTemplate.execute("DROP TRIGGER pause_cash_payment_insert ON sales.payments");
+            jdbcTemplate.execute("DROP FUNCTION public.pause_cash_payment_insert()");
+        }
+    }
+
+    @Test
+    void shouldRejectCashPaymentWhenCloseAlreadyCommitted() throws Exception {
+        Fixture fixture = createFixture();
+        String token = login(fixture.username(), "correct-password");
+        MvcResult opened = mockMvc.perform(post("/api/v1/cash/sessions/open")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"cashRegisterId":"%s","openingAmount":100.00}
+                    """.formatted(fixture.cashRegisterId())))
+            .andExpect(status().isCreated()).andReturn();
+        UUID sessionId = UUID.fromString(JsonPath.read(opened.getResponse().getContentAsString(), "$.data.cashSessionId"));
+        assertEquals(200, closeRequest(token, sessionId).call().getResponse().getStatus());
+
+        MvcResult payment = cashPaymentRequest(token, fixture.salesOrderId(), sessionId).call();
+        assertEquals(400, payment.getResponse().getStatus());
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM cash.cash_movements WHERE cash_session_id = ? AND movement_type = 'SALE'",
+            Integer.class, sessionId));
+    }
+
+    @Test
+    void shouldIncludeCashRefundInCloseWhenReturnConfirmationWins() throws Exception {
+        Fixture fixture = createFixture();
+        ReturnFixture returnedOrder = createReturnFixture(fixture);
+        String token = login(fixture.username(), "correct-password");
+        jdbcTemplate.update("""
+            INSERT INTO sales.payments (payment_id, sales_order_id, payment_method, status, amount, idempotency_key, paid_at)
+            VALUES (?, ?, 'CASH', 'CAPTURED', 40, ?, clock_timestamp())
+            """, UUID.randomUUID(), returnedOrder.salesOrderId(), UUID.randomUUID());
+        UUID returnId = createReturnDraft(token, returnedOrder);
+        MvcResult opened = mockMvc.perform(post("/api/v1/cash/sessions/open")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"cashRegisterId":"%s","openingAmount":100.00}
+                    """.formatted(fixture.cashRegisterId())))
+            .andExpect(status().isCreated()).andReturn();
+        UUID sessionId = UUID.fromString(JsonPath.read(opened.getResponse().getContentAsString(), "$.data.cashSessionId"));
+
+        jdbcTemplate.execute("""
+            CREATE FUNCTION public.pause_cash_refund_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+              IF NEW.movement_type = 'REFUND' THEN PERFORM pg_sleep(3); END IF;
+              RETURN NEW;
+            END $$
+            """);
+        jdbcTemplate.execute("""
+            CREATE TRIGGER pause_cash_refund_insert BEFORE INSERT ON cash.cash_movements
+            FOR EACH ROW EXECUTE FUNCTION public.pause_cash_refund_insert()
+            """);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<MvcResult> confirmed = executor.submit(() -> mockMvc.perform(
+                post("/api/v1/sales/returns/{returnId}/confirm", returnId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"cashSessionId\":\"" + sessionId + "\"}")
+            ).andReturn());
+            boolean refundAtInsert = false;
+            for (int i = 0; i < 40; i++) {
+                Integer active = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM pg_stat_activity
+                    WHERE pid <> pg_backend_pid() AND state = 'active'
+                      AND query LIKE '%INSERT INTO cash.cash_movements (%'
+                    """, Integer.class);
+                if (active != null && active > 0) {
+                    refundAtInsert = true;
+                    break;
+                }
+                TimeUnit.MILLISECONDS.sleep(50);
+            }
+            assertTrue(refundAtInsert, "El reembolso debe llegar al INSERT antes de iniciar el cierre");
+            MvcResult closed = closeRequest(token, sessionId).call();
+            MvcResult refund = confirmed.get(15, TimeUnit.SECONDS);
+            assertEquals(200, closed.getResponse().getStatus());
+            assertEquals(200, refund.getResponse().getStatus());
+            assertEquals(new BigDecimal("60.0000"), jdbcTemplate.queryForObject(
+                "SELECT expected_amount FROM cash.cash_sessions WHERE cash_session_id = ?",
+                BigDecimal.class, sessionId));
+            assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cash.cash_movements WHERE cash_session_id = ? AND movement_type = 'REFUND' AND direction = 'OUT'",
+                Integer.class, sessionId));
+        } finally {
+            executor.shutdownNow();
+            jdbcTemplate.execute("DROP TRIGGER pause_cash_refund_insert ON cash.cash_movements");
+            jdbcTemplate.execute("DROP FUNCTION public.pause_cash_refund_insert()");
         }
     }
 
@@ -464,6 +613,18 @@ class TransactionalConcurrencyIntegrationTest {
                       "idempotencyKey": "%s"
                     }
                     """.formatted(cashSessionId, idempotencyKey))
+        ).andReturn();
+    }
+
+    private Callable<MvcResult> cashPaymentRequest(String token, UUID salesOrderId, UUID sessionId) {
+        return () -> mockMvc.perform(
+            post("/api/v1/sales/orders/{salesOrderId}/payments", salesOrderId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"cashSessionId":"%s","paymentMethod":"CASH","amount":60.00,
+                     "currencyCode":"MXN","reference":"SEC002","idempotencyKey":"%s"}
+                    """.formatted(sessionId, UUID.randomUUID()))
         ).andReturn();
     }
 
