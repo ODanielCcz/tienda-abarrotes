@@ -4,10 +4,10 @@
 |---|---|
 | Proyecto | Tienda de Abarrotes |
 | Código | TDA-QA-INF-001 |
-| Versión | v0.2 |
-| Estado | Rendimiento en revisión; seguridad pendiente |
+| Versión | v0.5 |
+| Estado | Rendimiento revisado; SEC-001 y SEC-002 remediados y verificados; SEC-003–005 pendientes de decisión |
 | Responsable | ODCC / Codex |
-| Fecha de actualización | 2026-09-16 |
+| Fecha de actualización | 2026-09-24 |
 | Clasificación | Interno |
 
 ## Control De Versiones
@@ -16,6 +16,9 @@
 |---|---|---|---|---|
 | v0.1 | 2026-09-05 | Codex | Resultados confirmados y pendientes explícitos | Borrador |
 | v0.2 | 2026-09-16 | Codex | Angular standalone/combinado, Lighthouse y suites verificadas | En revisión |
+| v0.3 | 2026-09-24 | Codex | Escaneo estático/SCA, ZAP pasivo, pruebas dirigidas y cinco hallazgos validados | Para priorización |
+| v0.4 | 2026-09-24 | Codex | ZAP autenticado, prueba fiscal sintética y remediación priorizada de SEC-001/002 | En verificación |
+| v0.5 | 2026-09-24 | Codex | Verificación del diff sin nuevos hallazgos, suite completa y cierre del laboratorio aislado | En revisión |
 
 ## Resumen Ejecutivo De Rendimiento
 
@@ -32,8 +35,26 @@ tablet/móvil y LCP superior a 4 s en dashboard y catálogo bajo Lighthouse móv
 simulado. Con 25 VU simultáneos, la navegación siguió por debajo de 200 ms p95;
 el crecimiento de memoria excedió el umbral en escritorio y tablet. No se
 registraron errores HTTP ni de consola durante los recorridos medidos.
-Las pruebas de vulnerabilidades de esta campaña no han comenzado; requieren
-revisión del informe de rendimiento completo.
+El usuario confirmó la lectura del primer informe y autorizó continuar con
+seguridad. La campaña produjo cinco hallazgos reproducibles: dos de
+severidad alta, dos media y uno baja. Tras la priorización aprobada, se corrigieron
+SEC-001 y SEC-002; los otros tres hallazgos siguen documentados sin cambios
+productivos en esta fase.
+
+## Resumen Ejecutivo De Seguridad
+
+El riesgo principal está en la integridad transaccional. Dos confirmaciones
+simultáneas del mismo conteo físico duplicaron movimiento y ajuste de stock;
+un pago concurrente con el cierre de caja quedó registrado en una sesión
+cerrada sin integrarse al monto esperado. Dos cambios simultáneos crearon un
+ciclo en categorías. Además, una venta de la sucursal B copió y expuso el costo
+de la sucursal PERF, y un usuario Sync no vinculado consumió la cuota del
+dispositivo ajeno. Los cinco hallazgos tienen confianza alta por reproducción
+local y trazabilidad al código. Las pruebas de carga previas no detectaron
+estas carreras concretas y no deben interpretarse como garantía de ausencia de
+fallas de concurrencia. SEC-001 y SEC-002 se reprodujeron antes del parche y
+pasaron después con pruebas deterministas; un escaneo formal del diff no encontró
+vulnerabilidades nuevas en los tres archivos productivos modificados.
 
 ## Alcance Y Condiciones
 
@@ -344,16 +365,279 @@ ajustarse si cambia Playwright. El procedimiento Load y las opciones de captura
 están en `tests/performance/README.md`; el detalle de emulación y autenticación
 Lighthouse está en `tests/performance/web/README.md`.
 
+## Campaña De Seguridad: Alcance Y Modelo De Amenazas
+
+Objetivo autorizado: sólo el proyecto Docker tienda-perf, API 127.0.0.1:58081,
+Angular 127.0.0.1:54201, PostgreSQL efímero y Redis interno. Código auditado:
+revisión da1d30618609371014ef0f849d468e4833e68353 (1.163 archivos
+versionados), con Angular, backend, SQL, Compose/Docker, CI, dependencias,
+logs y configuración. Las pruebas posteriores no tocaron producción ni datos
+personales reales. Los fixtures nuevos y vínculos temporales se descartaron
+o restauraron; el proyecto entero se destruye al cerrar el laboratorio.
+
+Activos: credenciales/JWT, datos fiscales y de clientes, inventario por
+sucursal y lote, cobros/caja, jerarquía de catálogo y operaciones de
+dispositivos Sync. Fronteras: anónimo→API, usuario→permisos, usuario→sucursal,
+dispositivo→titular, aplicación→PostgreSQL/Redis, build→imagen desplegada.
+Se consideraron las clases de acceso roto a objetos/funciones, agotamiento
+de recursos y configuración de la [OWASP API Security Top 10 2023](https://api-security.owasp.org/editions/2023/en/0x00-header/),
+y los controles de autenticación, autorización, validación y lógica de negocio
+de [OWASP ASVS 5.0](https://owasp.org/projects/asvs/).
+
+### Cobertura Y Herramientas
+
+| Control | Evidencia | Límite de interpretación |
+|---|---|---|
+| Codex Security estándar | Escaneo completo `d22e24a1-dea5-4cd4-9db1-f9e2f4b87399`: 16 superficies; cinco hallazgos validados contra fuente y laboratorio | Sin subagentes por instrucción vigente; una revisión principal sobre la revisión Git indicada |
+| Gitleaks, historial completo | 133 commits; dos coincidencias en idempotencyKey fijo de test histórico | Ambos falsos positivos, no credenciales |
+| npm audit | 0 vulnerabilidades runtime y 0 incluyendo desarrollo | Base de avisos distinta de Trivy |
+| Grafo Gradle runtime | Resuelto sin red; Spring Boot 4.1.1, Security 7.1.1, Tomcat 11.0.24, Jackson 3.1.5/2.21.5 y PostgreSQL 42.7.12 | Las CVE de paquetes se contrastaron con el escaneo de imagen; resolver el grafo no prueba ausencia de vulnerabilidades |
+| Trivy filesystem/configuración | 1 CVE media Angular y 2 avisos bajos HEALTHCHECK | Sin ruta explotable de Angular en el despliegue actual; Compose define healthchecks |
+| Trivy imagen backend | 39 coincidencias: 3 críticas, 9 altas, 9 medias, 18 bajas | Clasificación de paquete, no 39 explotaciones confirmadas |
+| Bundles Angular | 59 artefactos; sin source maps ni patrones de claves/URLs privadas buscados | Búsqueda de patrones, no prueba universal de ausencia |
+| ZAP web pasivo | 7 URL en baseline CLI; 8 tipos de aviso, principalmente cabeceras del Nginx de laboratorio | Sin escaneo activo ni navegación autenticada completa |
+| ZAP OpenAPI pasivo | 157 URL importadas; 1 aviso de cabecera CORP en /v3/api-docs | Modo seguro; no se enviaron payloads activos a las 157 rutas |
+| ZAP autenticado | Cuatro GET del operador restringido: plan automatizado completado con salida 0, respuestas esperadas 200 y cero alertas en el reporte JSON | No cubre escrituras ni navegación autenticada completa |
+| HTTP dirigido | Autorización, JWT, SQL/XSS de búsqueda, CORS, límites, Redis, concurrencia | Sólo los vectores y fixtures descritos |
+| Integración transaccional inicial | 9 tests reejecutados antes de la remediación, 0 fallos/errores/omitidos | No incluían las carreras SEC-001/002 |
+| Integración transaccional corregida | 12 tests de la clase de concurrencia, incluidos los tres nuevos casos de conteo, pago y devolución frente a cierre | PostgreSQL real mediante Testcontainers |
+
+Tras las correcciones se repitió `scripts/run-security-assessment.ps1` contra
+la imagen reconstruida. Pasaron el plan ZAP pasivo, la importación segura de
+157 rutas OpenAPI y los casos HTTP de autorización, inyección y límites. Los
+JSON locales están en `security-20260925T034908Z`: el baseline web tuvo cinco
+tipos de aviso y el OpenAPI cuatro (uno bajo por CORP y tres informativos,
+incluidos errores 4xx esperables al visitar rutas protegidas sin sesión).
+Este segundo barrido pasivo no prueba por sí mismo las carreras; las regresiones
+con PostgreSQL y barreras temporales son la evidencia de esas invariantes.
+
+La importación OpenAPI del plan Automation Framework falló por una etiqueta
+duplicada en la especificación; el escáner API en modo seguro importó 157 URL y
+terminó. El plan base se dejó en spider web + GET de /v3/api-docs, y el runner
+ejecuta aparte el escáner API. Tras autorización expresa del usuario, el plan
+autenticado se ejecutó con un JWT del operador sintético entregado sólo al
+contenedor ZAP aislado. El job `requestor` completó los cuatro GET esperados;
+el reporte `security-auth-20260925T033152Z/zap-authenticated.json` registró
+un sitio y cero alertas. El JWT no se guardó en el repositorio ni en el
+informe. No se ejecutó un escaneo activo ni se enviaron escrituras.
+
+Las cabeceras anti-clickjacking, nosniff, CSP, Permissions Policy y COEP/CORP
+faltantes que ZAP observó en la web corresponden al Nginx de rendimiento
+local; no se atribuyen automáticamente a un despliegue productivo no evaluado.
+El backend respondió con nosniff, anti-framing, no-store y correlation ID.
+
+### Dependencias Y Falsos Positivos
+
+Trivy marcó CVE-2026-88059 en @angular/common 22.1.0 (corrección 22.1.1).
+El [aviso de Angular](https://github.com/angular/angular/security/advisories/GHSA-p297-fm68-3q8c)
+requiere SSR/hydration, un cliente HTTP hijo con delegación al padre,
+interceptor de autenticación padre y caché HTML compartida. Esta app construye
+sólo navegador y no usa esas condiciones; se recomienda actualizar como
+mantenimiento, no presentarlo como explotación confirmada. npm audit devolvió
+cero vulnerabilidades con y sin dependencias de desarrollo.
+
+La imagen contiene Tomcat 11.0.24 con tres CVE que Trivy etiqueta críticas,
+además de OpenSSL, Expat y SQLite con avisos altos. La
+[evaluación oficial de Tomcat 11](https://tomcat.apache.org/security-11)
+califica esos casos en el contexto de security-constraints de contenedor,
+DIGEST o FORM; la app usa JWT stateless de Spring y no esas modalidades.
+Las CVE de SQLite requieren base/SQL malicioso según
+[SQLite](https://www.sqlite.org/cves.html), mientras la app usa PostgreSQL.
+La explotabilidad de los avisos restantes de la imagen no se demostró; se
+recomienda reconstruir con base actualizada y reescanear. Los dos avisos
+HEALTHCHECK son de Dockerfile, pero el Compose evaluado sí configura checks
+para backend y base. Gitleaks detectó dos valores de idempotencia sintéticos
+en un test histórico: no eran API keys, pese a la regla genérica aplicada.
+Las acciones CI están fijadas por SHA y el Dockerfile backend usa usuario
+no privilegiado.
+
+### Controles Dinámicos Que Funcionaron
+
+Anónimo 401; operador autorizado 200; lectura de usuarios sin permiso 403;
+JWT alterado, expirado o invalidado por cambio temporal de auth_version 401;
+nuevo token 200 y versión restaurada. Un operador de PERF obtuvo 403 para
+una segunda sucursal sintética, que tampoco apareció en su listado; el
+administrador sí obtuvo 200. La búsqueda SQL "' OR 1=1--" devolvió cero
+resultados, igual que una búsqueda sin coincidencias; la cadena XSS
+reflejada no apareció en respuesta. Un origen CORS no autorizado dio 403
+sin Access-Control-Allow-Origin; cuerpo de 1,1 MB dio 413 y payload Sync de
+profundidad 21 dio 400.
+
+Un objeto JSON con operador `$gt` enviado como cantidad numérica de venta
+recibió 400 `MALFORMED_JSON` (`sec-json-injection`). La asignación masiva de
+`branchId`, `status`, `paymentStatus`, `total`, `createdBy` y `unitCost`
+en una venta del operador (`sec-mass-assignment`) no sobreescribió los campos
+del servidor: respuesta 201 y fila SQL con sucursal PERF, estado CONFIRMED,
+pago PENDING y total 26,68. Se almacenó en una categoría sintética un
+marcador XSS HTML (`sec-stored-xss`); la API lo devolvió como JSON y Chromium
+lo mostró como texto escapado en la lista de categorías, sin crear imagen ni
+ejecutar JavaScript. Esta comprobación cubre esa vista, no todas las
+presentaciones posibles del valor.
+
+En el login distribuido, cinco contraseñas erróneas por par IP/cuenta dieron
+401 y la sexta 429. Diez fallos del mismo usuario ficticio repartidos entre
+dos IP dieron 401; el intento desde una tercera IP dio 429 por cuenta.
+Con nombres distintos desde una IP, el intento posterior al límite 20 dio
+429. Al detener sólo Redis de tienda-perf: readiness 503, liveness 200, login
+503 y un JWT previo siguió sirviendo GET 200. Redis se reinició y readiness
+volvió a 200. La inspección de logs del backend no encontró patrones JWT,
+cabeceras Bearer ni coincidencias exactas de contraseñas/secretos sintéticos.
+Además, se creó en la sucursal PERF un perfil emisor fiscal enteramente
+sintético (HTTP 201) con marcador único. En la ventana de esa operación, ni
+el marcador, ni el RFC sintético, ni el payload JSON completo, ni el JWT
+aparecieron en los logs de backend o PostgreSQL. Es una comprobación de esa
+ruta y ventana, no una prueba universal de ausencia de filtración. La
+configuración del laboratorio desactiva `pgaudit.log_parameter`.
+
+### Hallazgos Confirmados Y Prioridad
+
+| ID | Severidad / confianza | CWE / clase | Resultado | Esfuerzo preliminar | Prioridad |
+|---|---|---|---|---|---:|
+| SEC-001 | Alta / alta | CWE-362, integridad de operación | Conteo confirmado dos veces: stock +2 y dos movimientos | Medio | 1 |
+| SEC-002 | Alta / alta | CWE-367, estado de negocio | Pago entra en caja cerrada sin reflejarse en esperado | Medio | 2 |
+| SEC-003 | Media / alta | CWE-367, integridad de catálogo | Dos actualizaciones crean ciclo de categorías | Alto | 3 |
+| SEC-004 | Media / alta | CWE-862, aislamiento entre sucursales | Venta B usa y expone costo de PERF | Bajo–medio | 4 |
+| SEC-005 | Baja / alta | CWE-863, agotamiento de recursos | Usuario ajeno consume cuota Sync del titular | Bajo | 5 |
+
+La estimación es relativa y debe confirmarse al diseñar cada corrección; el
+orden prioriza impacto e integridad antes que menor esfuerzo. SEC-004 también
+se relaciona con la exposición de propiedades de objeto descrita por
+[OWASP API3:2023](https://api-security.owasp.org/editions/2023/en/0xa3-broken-object-property-level-authorization/).
+
+Reproducción mínima (siempre con JWT del rol indicado y objetos sintéticos):
+
+| ID | Solicitud de prueba | Respuesta y contraste |
+|---|---|---|
+| SEC-001 | Dos `POST /api/v1/inventory/counts/{id}/confirm` simultáneos, sin cuerpo, sobre un DRAFT con diferencia +1 | 200/200; dos movimientos y stock +2 |
+| SEC-002 | Sobre una venta CONFIRMED y caja OPEN: `POST /api/v1/cash/sessions/{id}/close` con `countedCashAmount:0` y `POST /api/v1/sales/orders/{id}/payments` con `paymentMethod:CASH`, `cashSessionId`, `amount:26.68`, `idempotencyKey` | 200/201; caja CLOSED con esperado 0 y pago de 26,68 |
+| SEC-003 | Dos `PUT /api/v1/catalog/categories/{id}` simultáneos con `code`, `name` y `parentCategoryId` cruzados A→B y B→A | 200/200; ambas referencias mutuas en SQL |
+| SEC-004 | Como usuario sólo de B, `POST /api/v1/sales/orders` con `warehouseId` de B, `idempotencyKey` nuevo e ítem de presentación compartida, cantidad 1 y precio vigente | 201; `unitCost=10` en vez del costo 99 de B; GET de PERF 403 |
+| SEC-005 | Como usuario no vinculado, 300 `POST /api/v1/sync/inbox` con `deviceId` ajeno, UUID nuevos, `deviceSequence`, `operationType:CART_UPSERT`, `aggregateType:CART`, `payload` y `clientCreatedAt` válidos | 409 en los intentos ajenos; luego 429 al titular |
+
+SEC-001 — Dos confirmaciones de un conteo. Precondición: permiso
+INVENTORY_COUNT_CONFIRM sobre un almacén autorizado y un conteo DRAFT con
+diferencia +1. Dos POST concurrentes a /api/v1/inventory/counts/{id}/confirm
+devolvieron 200 (correlation IDs `sec001-confirm-1` y
+`sec001-confirm-2`, conteo `58397cbe-668d-4b05-b23b-8a8e8830d61c`);
+stock 10.000→10.002 y dos movimientos INVENTORY_COUNT,
+cuando correspondían 10.001 y uno. La lectura DRAFT en
+apps/backend/src/main/java/com/odcc/tienda/modules/inventory/adapter/out/persistence/jdbc/JdbcAdvancedInventoryRepositoryAdapter.java:120
+no bloquea el conteo; el stock se ajusta antes de UPDATE, que sólo filtra por
+ID en la línea 149. Se restableció stock 10.000 y se retiraron los registros
+del conteo sintético. Recomendación: reclamar/bloquear el DRAFT antes del
+ajuste, transición condicional de una sola fila y unicidad del movimiento por
+conteo. Regresión: dos confirmaciones paralelas deben producir un único
+movimiento y un único incremento.
+
+SEC-002 — Pago frente a cierre de caja. Precondición: permisos de pago y
+cierre, venta confirmada y sesión OPEN de la misma sucursal. Se ordenó la
+carrera con un bloqueo SQL temporal del registro sintético. El cierre devolvió
+200 (`sec002-close`) y el pago CASH 201 (`sec002-payment`); después,
+la sesión `3305593b-ce9e-4999-9372-2617ea56fb9a` estaba CLOSED con
+expectedAmount 0 y diferencia 0, mientras la venta
+`cf81035b-f54c-4e10-b60f-9e2faea3d826` estaba PAID y había movimiento
+SALE IN por 26,68. La primera reproducción mostró el mismo desajuste por
+25,52. La lectura OPEN sin bloqueo en
+apps/backend/src/main/java/com/odcc/tienda/modules/sales/adapter/out/persistence/jdbc/JdbcSalesPaymentRepositoryAdapter.java:173
+precede a la inserción del movimiento en la línea 92. El cierre calcula el
+esperado y cambia estado bajo otro bloqueo en
+apps/backend/src/main/java/com/odcc/tienda/modules/cash/adapter/out/persistence/jdbc/JdbcCashSessionRepositoryAdapter.java:82.
+Recomendación: serializar pago y cierre sobre la misma fila de sesión,
+revalidando OPEN antes de persistir el movimiento. Regresión: pago incluido
+en el esperado o rechazado, nunca posterior al cierre.
+
+SEC-003 — Ciclo de categorías. Precondición: CATALOG_CATEGORY_UPDATE y dos
+categorías raíz sintéticas. Enviar a la vez PUT A.parent=B y PUT B.parent=A
+dio 200/200 (correlation IDs `sec003-a` y `sec003-b`); PostgreSQL conservó
+las dos referencias mutuas. El mismo orden
+secuencial dio 200/400. La consulta de ancestros en
+apps/backend/src/main/java/com/odcc/tienda/modules/catalog/application/usecase/UpdateCategoryService.java:46
+y el guardado en la línea 59 no comparten serialización del subárbol.
+Ambas referencias se devolvieron a NULL. Recomendación: bloqueo/serialización
+de cambios jerárquicos y comprobación del ciclo dentro de esa sección
+transaccional. Regresión: sólo uno de los dos cambios paralelos se acepta.
+
+SEC-004 — Costo entre sucursales. Precondición: presentación compartida con
+balance en dos almacenes, costos distintos y usuario con SALES_ORDER_CREATE
+sólo en B. La sucursal PERF tenía costo 10 y B costo 99. El usuario B obtuvo
+403 al leer PERF, pero creó ventas en B cuyo ítem mostró unitCost 10;
+la fila de venta persistió 10 mientras el balance del almacén B seguía en 99.
+La última venta devolvió 201 con correlation ID `sec004-cost-b`.
+La unión de stock por presentación omite warehouse_id y usa LIMIT 1 en
+apps/backend/src/main/java/com/odcc/tienda/modules/sales/adapter/out/persistence/jdbc/JdbcSalesOrderRepositoryAdapter.java:444.
+Impacto: margen/costo contable incorrecto y exposición de costo de otra
+sucursal en la respuesta. Recomendación: unir por warehouse_id de la venta,
+con pruebas de costos distintos por sucursal y de lectura acotada.
+
+SEC-005 — Cuota Sync ajena. Precondición: SYNC_INBOX_WRITE y UUID de un
+dispositivo no vinculado. El titular obtuvo checkpoint 200 y el emisor ajeno
+409. Trescientos POST ajenos al inbox dieron 409, pero el siguiente POST del
+titular recibió 429 (correlation ID
+a87f5c4a-1bba-4515-92a1-091f312a0549). En
+apps/backend/src/main/java/com/odcc/tienda/modules/sync/application/usecase/SyncService.java:60
+se consume la cuota por deviceId antes de la comprobación de vínculo de la
+línea 61. El vínculo temporal sintético fue restaurado. Impacto: bloqueo
+temporal de Sync sin acceso a los datos del dispositivo. Recomendación:
+autorizar primero y limitar intentos inválidos por actor/IP por separado.
+
+Las segundas reproducciones capturaron correlation IDs para SEC-001 a
+SEC-004; SEC-005 ya los tenía. Los UUID y contrastes SQL anteriores identifican
+los objetos sintéticos. No se informan como
+vulnerabilidades adicionales el error 5xx de Stress (causa desconocida),
+los avisos de cabeceras del Nginx local, los dos falsos positivos de Gitleaks
+ni las CVE sin ruta explotable demostrada.
+
+### Reproducción Y Estado De Cierre
+
+El runner versionado scripts/run-security-assessment.ps1 fija tienda-perf,
+ejecuta el baseline ZAP, el escaneo OpenAPI en modo seguro y los casos
+authorization-matrix.ps1/security-regression.ps1. La última ejecución pasó y
+guardó JSON pasivos fuera de OneDrive en
+%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts\security-20260924T054228Z.
+No hay contraseña ni JWT en el Markdown. El plan
+tests/security/zap/automation-authenticated.yaml se ejecutó después de la
+autorización expresa y quedó limitado a cuatro GET.
+No se escanearon activamente las 157 escrituras potenciales de OpenAPI.
+Las carreras se forzaron sólo en PostgreSQL sintético y no deben repetirse
+contra entornos compartidos o productivos.
+
+El usuario aprobó corregir primero SEC-001 y SEC-002. El plan separado está
+en `docs/superpowers/plans/2026-09-24-security-remediation-sec001-sec002.md`;
+SEC-003–005 permanecen documentados pero fuera de esta corrección. Las dos
+pruebas de regresión fallaron sobre el código previo: 200/200 en el conteo y
+esperado 100 frente a 160 tras un pago en efectivo. Después del parche,
+pasaron las dos regresiones y la clase completa de concurrencia, incluido un
+caso de devolución en efectivo que comparte la frontera de cierre. La suite
+backend final pasó con 345 pruebas, cero fallos y cero omitidas, incluido el
+control de pago posterior al cierre. Los commits `bc84eb4` y `a4d8f0c`
+separan ambos hallazgos. El escaneo formal del diff
+`da1d30618609371014ef0f849d468e4833e68353..a4d8f0c19184193ec865dcee75f97671f5f5bcc5`
+terminó con cobertura completa de los tres archivos productivos cambiados y
+cero hallazgos nuevos (scan `39d42195-80a6-442f-bed5-755f139a42ed`). El
+reporte canónico está bajo
+`%USERPROFILE%\.codex\state\plugins\codex-security\scans\tienda-abarrotes\a4d8f0c19184193ec865dcee75f97671f5f5bcc5_20260925T040947Z_h3c8md76\report.md`.
+La revisión cubre ese diff, no SEC-003–005 ni todo el repositorio.
+
+La repetición de Load con el backend corregido terminó `PASSED` en el manifiesto
+`load/20260925T035023696Z-campaign.json`: 154 874 solicitudes, p95 147,87 ms,
+p99 299,35 ms, tasa de errores HTTP 0, checks 100%, cero errores funcionales o
+5xx inesperados y todas las invariantes SQL en `PASS`. La línea base de tres
+corridas registró p95 210,57 / 98,13 / 92,53 ms y p99 373,36 / 187,78 /
+199,87 ms. La nueva cifra queda entre la corrida fría y las calientes; una sola
+repetición, con otros contenedores del equipo activos y una imagen PostgreSQL
+reconstruida, no permite atribuir una mejora o regresión causal a los bloqueos.
+
 ## Evidencia Y Pendientes
 
 Artefactos bajo `%LOCALAPPDATA%\TiendaAbarrotes\performance\artifacts`.
-El 16 de septiembre se cerró `tienda-perf`: contenedores y volúmenes del proyecto
-ausentes y `perf.env` eliminado. Se conserva la evidencia local para trazabilidad;
-no se publicó ni se incluyó en Git.
+El primer laboratorio se cerró el 16 de septiembre. El segundo laboratorio de
+seguridad se cerró el 24 de septiembre. El tercer laboratorio aislado
+se usó para ZAP autenticado, prueba fiscal y remediación y se cerró tras
+conservar la evidencia local para
+trazabilidad; no se publicó ni se incluyó en Git.
 `stress/20260905T061951941Z` se interrumpió antes de Soak: su manifiesto conserva
 `RUNNING`, pero el proceso terminó. No confundirlo con ejecución activa.
 
 - Si se requiere descartar fugas de largo plazo, ampliar duración y analizar memoria retenida/GC.
-- Revisar este primer análisis y sus adaptaciones metodológicas con el usuario.
-- Después: escaneo estático, dependencias y pruebas dinámicas autorizadas.
-- Correcciones de vulnerabilidades: acordarlas tras el informe de seguridad.
+- SEC-001/002 están verificados en el diff y en pruebas locales; mantener seguimiento de cualquier nueva regresión.
+- SEC-003–005 requieren una decisión de alcance posterior; no se corrigen en esta fase.

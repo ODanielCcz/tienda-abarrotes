@@ -16,10 +16,10 @@
 | ------------- | --------------------- |
 | Proyecto      | Tienda de Abarrotes   |
 | Código        | TDA-QA-PLAN-001       |
-| Versión       | v1.2                  |
-| Estado        | Aprobado en ejecución |
+| Versión       | v1.4                  |
+| Estado        | SEC-001/002 remediados; SEC-003–005 pendientes de decisión |
 | Responsable   | ODCC / Codex          |
-| Fecha         | 2026-08-30            |
+| Fecha         | 2026-09-24            |
 | Clasificación | Interno               |
 
 ## Control De Versiones
@@ -30,6 +30,8 @@
 | v1.0    | 2026-08-30 | ODCC / Codex | Aprobación e inicio de ejecución       | Aprobado                 |
 | v1.1    | 2026-08-30 | ODCC / Codex | Secretos y evidencia cruda fuera de OneDrive | En ejecución          |
 | v1.2 | 2026-09-16 | Codex | Tarea 6 verificada y primer informe entregable; revisión pendiente | En ejecución |
+| v1.3 | 2026-09-24 | Codex | Tareas 8–11 documentadas; ZAP autenticado automatizado y priorización pendientes | En revisión |
+| v1.4 | 2026-09-24 | Codex | SEC-001/002 en commits separados; regresiones, Load y diff scan verificados | En revisión |
 
 ## 1. Decisión Técnica
 
@@ -166,14 +168,14 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 **Archivos:** `.gitignore`, `tests/performance/compose.performance.yaml`, `scripts/perf-environment-up.ps1`, `scripts/perf-environment-down.ps1`.
 
-- [ ] Crear la rama `test/fullstack-stress-security` desde la revisión aprobada.
-- [ ] Verificar que el árbol esté limpio y registrar commit, Java, Node, npm, Docker, CPU y RAM.
-- [ ] Añadir `.performance/` y `artifacts/quality/` a `.gitignore`.
-- [ ] Crear el overlay Compose con puertos separados, volumen PostgreSQL exclusivo y servicios de herramientas fijados por versión/digest; nunca usar etiquetas `latest`.
-- [ ] Generar secretos aleatorios fuera de OneDrive sin imprimirlos en logs ni entregarlos completos a k6.
-- [ ] Construir `bootJar`, aplicar Flyway desde cero, cargar fixtures sintéticos y comprobar readiness.
-- [ ] Ejecutar `docker compose --project-name tienda-perf ... down -v` y confirmar que el ambiente habitual no cambió.
-- [ ] Commit: `test(performance): add isolated load test environment`.
+- [x] Crear la rama `test/fullstack-stress-security` desde la revisión aprobada.
+- [x] Verificar que el árbol esté limpio y registrar commit, Java, Node, npm, Docker, CPU y RAM.
+- [x] Añadir `.performance/` y `artifacts/quality/` a `.gitignore`.
+- [x] Crear el overlay Compose con puertos separados, volumen PostgreSQL exclusivo y servicios de herramientas fijados por versión/digest; nunca usar etiquetas `latest`.
+- [x] Generar secretos aleatorios fuera de OneDrive sin imprimirlos en logs ni entregarlos completos a k6.
+- [x] Construir `bootJar`, aplicar Flyway desde cero, cargar fixtures sintéticos y comprobar readiness.
+- [x] Ejecutar `docker compose --project-name tienda-perf ... down -v` y confirmar que el ambiente habitual no cambió.
+- [x] Commit: `test(performance): add isolated load test environment` (`ae4f847`).
 
 **Aceptación:** levantar y destruir `tienda-perf` dos veces produce el mismo esquema y no modifica los volúmenes habituales.
 
@@ -181,23 +183,23 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 **Archivos:** `database/seeds/performance/`, `tests/performance/k6/lib/` y `tests/performance/README.md`.
 
-- [ ] Crear sucursales, almacenes, cajas, usuarios y productos ficticios con IDs conocidos solo dentro del ambiente efímero.
-- [ ] Separar datos por escenario para evitar contención accidental.
-- [ ] Implementar login de preparación, renovación de token y lectura de contexto.
-- [ ] Definir checks compartidos para `status`, `code`, `reason`, `correlationId`, esquema y tiempo.
-- [ ] Validar scripts con `k6 inspect` y ejecutar Smoke hasta obtener 100 % de checks.
-- [ ] Commit: `test(performance): add deterministic load fixtures`.
+- [x] Crear sucursales, almacenes, cajas, usuarios y productos ficticios con IDs conocidos solo dentro del ambiente efímero.
+- [x] Separar datos por escenario para evitar contención accidental.
+- [ ] Implementar login de preparación, renovación de token y lectura de contexto. Login y renovación en `setup()` verificados; el harness usa el contexto fijo de fixtures, pero no hace una lectura explícita del contexto autenticado.
+- [x] Definir checks compartidos para `status`, `code`, `reason`, `correlationId`, esquema y tiempo.
+- [x] Validar scripts con `k6 inspect` y ejecutar Smoke hasta obtener 100 % de checks.
+- [x] Commit: `test(performance): add deterministic load fixtures` (`c939495`).
 
 **Aceptación:** Smoke puede repetirse tres veces sin conflictos de idempotencia ni crecimiento de datos inesperado.
 
 ### Tarea 3: Medir Línea Base
 
-- [ ] Ejecutar suites actuales de backend y Angular antes de aplicar carga.
-- [ ] Generar build Angular de producción y registrar tamaños.
-- [ ] Registrar durante cinco minutos métricas ociosas de Actuator, Prometheus, Docker y PostgreSQL.
-- [ ] Ejecutar 20 peticiones secuenciales por endpoint crítico para calentar JVM y caches.
-- [ ] Repetir la medición y guardar la mediana como línea base.
-- [ ] Añadir la configuración física y software al informe Markdown.
+- [ ] Ejecutar suites actuales de backend y Angular antes de aplicar carga. Angular pasó; Gradle informó `:test UP-TO-DATE` en ese momento. Los 341 tests backend se reejecutaron después, no antes.
+- [x] Generar build Angular de producción y registrar tamaños.
+- [x] Registrar durante cinco minutos métricas ociosas de Actuator, Prometheus, Docker y PostgreSQL.
+- [x] Ejecutar 20 peticiones secuenciales por endpoint crítico para calentar JVM y caches.
+- [x] Repetir la medición y guardar la mediana como línea base.
+- [x] Añadir la configuración física y software al informe Markdown.
 
 **Aceptación:** existe una línea base sin carga que permite distinguir problemas previos de los provocados por la campaña.
 
@@ -205,27 +207,27 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 **Archivos:** `tests/performance/k6/backend-smoke.js` y `backend-load.js`.
 
-- [ ] Crear primero checks que fallen cuando exista `5xx`, falta de correlation id o latencia fuera del umbral.
-- [ ] Ejecutar Smoke y confirmar que detecta deliberadamente una URL inválida; restaurar la URL y confirmar verde.
-- [ ] Implementar la mezcla de lectura/escritura con `setup()` para tokens y datos.
-- [ ] Etiquetar métricas por módulo, endpoint, operación y resultado funcional.
-- [ ] Ejecutar Load tres veces con un enfriamiento de cinco minutos.
-- [ ] Conservar la mediana; no escoger la mejor ejecución.
-- [ ] Commit: `test(performance): add backend load scenarios`.
+- [x] Crear primero checks que fallen cuando exista `5xx`, falta de correlation id o latencia fuera del umbral.
+- [x] Ejecutar Smoke y confirmar que detecta deliberadamente una URL inválida; restaurar la URL y confirmar verde.
+- [x] Implementar la mezcla de lectura/escritura con `setup()` para tokens y datos.
+- [ ] Etiquetar métricas por módulo, endpoint, operación y resultado funcional. Los tres primeros son etiquetas k6; el resultado funcional se conserva en checks/contadores, no como etiqueta estable.
+- [x] Ejecutar Load tres veces con un enfriamiento de cinco minutos.
+- [x] Conservar la mediana; no escoger la mejor ejecución.
+- [x] Commit: `test(performance): add backend load scenarios` (`22b0530`).
 
 **Aceptación:** las tres corridas terminan sin `5xx`, conservan invariantes y generan summaries JSON comparables.
 
 ### Tarea 5: Ejecutar Stress, Spike Y Soak
 
-**Archivos:** `backend-stress.js`, `backend-spike.js`, `backend-soak.js` y `scripts/run-fullstack-stress.ps1`.
+**Archivos:** `backend-stress.js`, `backend-spike.js`, `backend-soak.js` y `tests/performance/scripts/run-fullstack-stress.ps1`.
 
-- [ ] Automatizar captura de métricas antes, durante y después de cada perfil.
-- [ ] Ejecutar Stress hasta el primer umbral incumplido, sin elevar carga después de un criterio de parada.
-- [ ] Ejecutar Spike y medir tiempo de recuperación.
-- [ ] Reiniciar el ambiente para descartar contaminación.
-- [ ] Ejecutar Soak durante 30 minutos y comparar heap, conexiones y threads iniciales/finales.
-- [ ] Ejecutar consultas de integridad: stock negativo, pagos duplicados, idempotencia, secuencias Sync y movimientos huérfanos.
-- [ ] Commit: `test(performance): add stress spike and soak profiles`.
+- [x] Automatizar captura de métricas antes, durante y después de cada perfil.
+- [x] Ejecutar Stress hasta el primer umbral incumplido, sin elevar carga después de un criterio de parada.
+- [x] Ejecutar Spike y medir tiempo de recuperación.
+- [x] Reiniciar el ambiente para descartar contaminación.
+- [x] Ejecutar Soak durante 30 minutos y comparar heap, conexiones y threads iniciales/finales.
+- [x] Ejecutar consultas de integridad: stock negativo, pagos duplicados, idempotencia, secuencias Sync y movimientos huérfanos.
+- [x] Commit: `test(performance): add stress spike and soak profiles` (`f7d9f4d`).
 
 **Aceptación:** se identifica el último escalón estable y el sistema recupera readiness sin corrupción transaccional.
 
@@ -253,29 +255,29 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 - [x] Diferenciar cuello de botella del navegador, aplicación, JVM, pool, PostgreSQL y Redis.
 - [x] Clasificar cada observación como confirmada, hipótesis o limitación de laboratorio.
 - [x] Incluir evidencias reproducibles sin tokens, contraseñas ni datos sensibles.
-- [ ] Detenerse para revisión del usuario antes de iniciar pruebas ofensivas dinámicas.
+- [x] Detenerse para revisión del usuario antes de iniciar pruebas ofensivas dinámicas.
 
 **Aceptación:** el usuario puede leer un único Markdown y entender capacidad estable, punto de degradación, punto de quiebre y riesgos sin abrir los JSON crudos.
 
 ### Tarea 8: Definir Alcance De Seguridad Y Modelo De Amenazas
 
-- [ ] Confirmar por escrito que el único objetivo autorizado es el ambiente `tienda-perf` local.
-- [ ] Ejecutar un escaneo estándar Codex Security de repositorio completo con cobertura de Angular, backend, SQL, Docker, CI y configuración.
-- [ ] Modelar activos: JWT, credenciales, información fiscal, inventario, pagos, Sync y acceso por sucursal.
-- [ ] Enumerar fronteras de confianza y actores: anónimo, usuario autenticado, cajero, almacén, administrador y dispositivo.
-- [ ] Definir casos OWASP ASVS/API Top 10 aplicables y excluir pruebas destructivas externas.
+- [x] Confirmar por escrito que el único objetivo autorizado es el ambiente `tienda-perf` local.
+- [x] Ejecutar un escaneo estándar Codex Security de repositorio completo con cobertura de Angular, backend, SQL, Docker, CI y configuración.
+- [x] Modelar activos: JWT, credenciales, información fiscal, inventario, pagos, Sync y acceso por sucursal.
+- [x] Enumerar fronteras de confianza y actores: anónimo, usuario autenticado, cajero, almacén, administrador y dispositivo.
+- [x] Definir casos OWASP ASVS/API Top 10 aplicables y excluir pruebas destructivas externas.
 
 **Aceptación:** cada prueba posterior se vincula a un activo, frontera, amenaza y resultado esperado.
 
 ### Tarea 9: Ejecutar Análisis Estático Y De Cadena De Suministro
 
-- [ ] Ejecutar Gitleaks sobre historial completo.
-- [ ] Ejecutar Trivy sobre filesystem, configuración y la imagen backend construida.
-- [ ] Ejecutar `npm audit` y revisar dependencias runtime y desarrollo por separado.
-- [ ] Revisar el grafo Gradle y CVE de dependencias transitivas.
-- [ ] Revisar bundles Angular para secretos, URLs privadas y source maps no intencionales.
-- [ ] Revisar Dockerfiles, Compose, workflows, permisos de GitHub y acciones fijadas por SHA.
-- [ ] Validar manualmente cada candidato antes de declararlo hallazgo.
+- [x] Ejecutar Gitleaks sobre historial completo.
+- [x] Ejecutar Trivy sobre filesystem, configuración y la imagen backend construida.
+- [x] Ejecutar `npm audit` y revisar dependencias runtime y desarrollo por separado.
+- [x] Revisar el grafo Gradle y CVE de dependencias transitivas.
+- [x] Revisar bundles Angular para secretos, URLs privadas y source maps no intencionales.
+- [x] Revisar Dockerfiles, Compose, workflows, permisos de GitHub y acciones fijadas por SHA.
+- [x] Validar manualmente cada candidato antes de declararlo hallazgo.
 
 **Aceptación:** cada hallazgo conserva archivo/línea, causa raíz, impacto, severidad, confianza y evidencia; los falsos positivos quedan descartados explícitamente.
 
@@ -283,14 +285,14 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 **Archivos:** `tests/security/zap/` y `tests/security/cases/`.
 
-- [ ] Ejecutar ZAP baseline sobre Angular y OpenAPI sin autenticación.
-- [ ] Ejecutar ZAP autenticado con un usuario de privilegios mínimos contra la base efímera.
-- [ ] Probar manualmente `401`, `403`, acceso horizontal entre sucursales e IDOR con UUID ajenos.
-- [ ] Probar JWT alterado, expirado, revocado y con `auth_version` anterior.
-- [ ] Probar SQL/JSON injection, XSS reflejado/almacenado, mass assignment, CORS, headers, payloads grandes y profundidad Sync.
-- [ ] Probar rate limiting por IP/cuenta y caída controlada de Redis en el perfil distribuido.
-- [ ] Probar concurrencia ofensiva sobre ventas, pagos, devoluciones, cierre de caja, recepciones e idempotencia.
-- [ ] Confirmar que no se registran tokens, contraseñas ni payloads fiscales completos en logs.
+- [x] Ejecutar ZAP baseline sobre Angular y OpenAPI sin autenticación.
+- [x] Ejecutar ZAP autenticado con un usuario de privilegios mínimos contra la base efímera. Plan automatizado de cuatro GET pasivos completado con JWT sintético tras autorización expresa.
+- [x] Probar manualmente `401`, `403`, acceso horizontal entre sucursales e IDOR con UUID ajenos.
+- [x] Probar JWT alterado, expirado, revocado y con `auth_version` anterior.
+- [x] Probar SQL/JSON injection, XSS reflejado/almacenado, mass assignment, CORS, headers, payloads grandes y profundidad Sync.
+- [x] Probar rate limiting por IP/cuenta y caída controlada de Redis en el perfil distribuido.
+- [x] Probar concurrencia ofensiva sobre ventas, pagos, devoluciones, cierre de caja, recepciones e idempotencia.
+- [x] Confirmar que no se registran tokens, contraseñas ni payloads fiscales completos en los logs inspeccionados. Se creó un perfil fiscal sintético 201 y no aparecieron su marcador, RFC, payload completo ni JWT en logs de backend o PostgreSQL durante esa operación.
 
 **Aceptación:** las pruebas no escapan de localhost, no usan datos reales y toda vulnerabilidad reproducible cuenta con solicitud mínima, respuesta, correlation id e impacto demostrado de forma segura.
 
@@ -298,23 +300,23 @@ Los valores no se presentarán como capacidad productiva: describen el equipo y 
 
 **Archivo:** el mismo informe `docs/reports/quality/2026-08-30-fullstack-stress-security-analysis.md`.
 
-- [ ] Añadir resumen ejecutivo con conteo por severidad y confianza.
-- [ ] Documentar cobertura real y zonas no verificadas.
-- [ ] Para cada hallazgo incluir ID, CWE/OWASP, superficie, precondición, pasos de reproducción sanitizados, impacto, evidencia y recomendación.
-- [ ] Relacionar vulnerabilidades con comportamientos observados bajo estrés cuando aplique.
-- [ ] Ordenar remediación por criticidad, explotabilidad y costo.
-- [ ] No modificar código productivo durante esta tarea.
-- [ ] Presentar el informe al usuario y acordar qué hallazgos se corregirán primero.
+- [x] Añadir resumen ejecutivo con conteo por severidad y confianza.
+- [x] Documentar cobertura real y zonas no verificadas.
+- [x] Para cada hallazgo incluir ID, CWE/OWASP, superficie, precondición, pasos de reproducción sanitizados, impacto, evidencia y recomendación.
+- [x] Relacionar vulnerabilidades con comportamientos observados bajo estrés cuando aplique.
+- [x] Ordenar remediación por criticidad, explotabilidad y costo.
+- [x] No modificar código productivo durante esta tarea.
+- [x] Presentar el informe al usuario y acordar qué hallazgos se corregirán primero. El usuario confirmó SEC-001 y SEC-002 antes que SEC-003–005.
 
 **Aceptación:** no se reportan sospechas como vulnerabilidades confirmadas y el documento permite crear una tarea de corrección independiente por hallazgo.
 
 ### Tarea 12: Preparar La Fase De Corrección
 
-- [ ] Crear un plan separado de remediación únicamente para hallazgos validados y aprobados.
-- [ ] Escribir primero una prueba de regresión por vulnerabilidad.
-- [ ] Corregir en commits pequeños sin mezclar hallazgos.
-- [ ] Repetir el caso ofensivo, la suite del módulo y el escaneo de verificación.
-- [ ] Repetir Load si la corrección toca consultas, filtros, autenticación o transacciones.
+- [x] Crear un plan separado de remediación únicamente para hallazgos validados y aprobados: `2026-09-24-security-remediation-sec001-sec002.md`.
+- [x] Escribir primero una prueba de regresión por vulnerabilidad. SEC-001 y SEC-002 fallaron sobre el código previo; se añadió también la ruta de devolución en efectivo.
+- [x] Corregir en commits pequeños sin mezclar hallazgos. SEC-001: `bc84eb4`; SEC-002: `a4d8f0c`.
+- [x] Repetir el caso ofensivo, la suite del módulo y el escaneo de verificación. Las carreras y controles pasaron, la suite backend sumó 345 pruebas verdes y el diff scan `39d42195-80a6-442f-bed5-755f139a42ed` no encontró hallazgos nuevos en los tres archivos cambiados.
+- [x] Repetir Load si la corrección toca consultas, filtros, autenticación o transacciones. Una corrida aislada de 12 minutos pasó: 154 874 solicitudes, p95 147,87 ms, errores HTTP 0 e invariantes SQL PASS; comparación orientativa con tres corridas históricas.
 
 **Aceptación:** cada corrección demuestra que el ataque deja de funcionar sin romper la capacidad o funcionalidad existente.
 
@@ -374,15 +376,15 @@ Los comandos específicos de k6, Lighthouse y ZAP se incorporarán a los scripts
 
 La campaña se considera terminada únicamente cuando:
 
-- [ ] el entorno aislado puede crearse y destruirse de forma repetible;
-- [ ] los cinco perfiles de rendimiento tienen evidencia;
-- [ ] Angular fue medido con build de producción y navegador real;
-- [ ] se verificó integridad después de carga y concurrencia;
-- [ ] el escaneo estático y DAST cubrieron las superficies autorizadas;
-- [ ] cada hallazgo está validado o descartado;
-- [ ] el informe Markdown consolidado está completo y sanitizado;
-- [ ] el usuario revisó el informe antes de iniciar correcciones;
-- [ ] no quedaron servicios, volúmenes, credenciales ni artefactos sensibles activos.
+- [x] el entorno aislado puede crearse y destruirse de forma repetible;
+- [x] los cinco perfiles de rendimiento tienen evidencia;
+- [x] Angular fue medido con build de producción y navegador real;
+- [x] se verificó integridad después de carga y concurrencia;
+- [x] el escaneo estático y DAST cubrieron las superficies autorizadas; ZAP se limitó al modo pasivo y a cuatro GET autenticados, sin escaneo activo ni escrituras;
+- [x] cada hallazgo está validado o descartado;
+- [x] el informe Markdown consolidado está completo y sanitizado;
+- [x] el usuario confirmó la lectura del informe y priorizó SEC-001/002 antes de iniciar correcciones;
+- [x] no quedaron servicios, volúmenes, credenciales ni artefactos sensibles activos.
 
 ## 11. Commits Recomendados
 
