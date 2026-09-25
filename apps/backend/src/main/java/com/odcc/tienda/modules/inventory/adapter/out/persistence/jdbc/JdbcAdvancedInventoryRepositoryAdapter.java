@@ -117,7 +117,7 @@ public class JdbcAdvancedInventoryRepositoryAdapter implements AdvancedInventory
 
     @Override
     public InventoryCountView confirmCount(ConfirmInventoryCountCommand command) {
-        InventoryCountView count = findCount(command.inventoryCountId());
+        InventoryCountView count = findCountForUpdate(command.inventoryCountId());
         if (!"DRAFT".equals(count.status())) throw new InventoryReceiptException("Solo se pueden confirmar conteos en borrador");
         WarehouseRow warehouse = findWarehouse(count.warehouseId());
         UUID movementId = UUID.randomUUID();
@@ -143,11 +143,12 @@ public class JdbcAdvancedInventoryRepositoryAdapter implements AdvancedInventory
         if (!hasDifferences) {
             jdbc.update("DELETE FROM inventory.stock_movements WHERE stock_movement_id = :id", new MapSqlParameterSource("id", movementId));
         }
-        jdbc.update("""
+        int updated = jdbc.update("""
             UPDATE inventory.inventory_counts
             SET status = 'CONFIRMED', confirmed_by = :confirmedBy, confirmed_at = clock_timestamp()
-            WHERE inventory_count_id = :id
+            WHERE inventory_count_id = :id AND status = 'DRAFT'
             """, new MapSqlParameterSource().addValue("id", count.inventoryCountId()).addValue("confirmedBy", command.confirmedBy()));
+        if (updated != 1) throw new InventoryReceiptException("Solo se pueden confirmar conteos en borrador");
         return findCount(count.inventoryCountId());
     }
 
@@ -396,6 +397,18 @@ public class JdbcAdvancedInventoryRepositoryAdapter implements AdvancedInventory
             ORDER BY smi.created_at, smi.stock_movement_item_id
             """, new MapSqlParameterSource("id", movement.stockMovementId()), this::mapMovementItem);
         return new StockMovementView(movement.stockMovementId(), movement.branchId(), movement.warehouseId(), movement.movementType(), movement.status(), movement.sourceType(), movement.sourceId(), movement.reason(), movement.idempotencyKey(), movement.createdAt(), movement.confirmedAt(), items);
+    }
+
+    private InventoryCountView findCountForUpdate(UUID countId) {
+        try {
+            jdbc.queryForObject("""
+                SELECT inventory_count_id FROM inventory.inventory_counts
+                WHERE inventory_count_id = :id FOR UPDATE
+                """, new MapSqlParameterSource("id", countId), UUID.class);
+        } catch (EmptyResultDataAccessException exception) {
+            throw new InventoryResourceNotFoundException("un conteo de inventario", countId);
+        }
+        return findCount(countId);
     }
 
     private InventoryCountView findCount(UUID countId) {

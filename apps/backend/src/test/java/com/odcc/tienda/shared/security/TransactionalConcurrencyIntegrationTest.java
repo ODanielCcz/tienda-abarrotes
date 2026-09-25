@@ -100,6 +100,52 @@ class TransactionalConcurrencyIntegrationTest {
     }
 
     @Test
+    void shouldApplyAConcurrentInventoryCountOnlyOnce() throws Exception {
+        Fixture fixture = createFixture();
+        ReturnFixture product = createReturnFixture(fixture);
+        String token = login(fixture.username(), "correct-password");
+        MvcResult draft = mockMvc.perform(
+                post("/api/v1/inventory/counts")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"warehouseId":"%s","items":[{"productPresentationId":"%s","countedQuantity":4}]}
+                        """.formatted(fixture.warehouseId(), product.presentationId()))
+            ).andExpect(status().isCreated()).andReturn();
+        UUID countId = UUID.fromString(JsonPath.read(draft.getResponse().getContentAsString(), "$.data.inventoryCountId"));
+
+        jdbcTemplate.execute("""
+            CREATE FUNCTION public.pause_inventory_count_movement() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+              IF NEW.source_type = 'INVENTORY_COUNT' THEN PERFORM pg_sleep(1); END IF;
+              RETURN NEW;
+            END $$
+            """);
+        jdbcTemplate.execute("""
+            CREATE TRIGGER pause_inventory_count_movement BEFORE INSERT ON inventory.stock_movements
+            FOR EACH ROW EXECUTE FUNCTION public.pause_inventory_count_movement()
+            """);
+        try {
+            List<Integer> statuses = runConcurrently(
+                () -> mockMvc.perform(post("/api/v1/inventory/counts/{inventoryCountId}/confirm", countId)
+                    .header("Authorization", "Bearer " + token)).andReturn(),
+                () -> mockMvc.perform(post("/api/v1/inventory/counts/{inventoryCountId}/confirm", countId)
+                    .header("Authorization", "Bearer " + token)).andReturn()
+            );
+            assertEquals(List.of(200, 400), statuses);
+            assertEquals(new BigDecimal("4.000"), jdbcTemplate.queryForObject(
+                "SELECT on_hand_quantity FROM inventory.stock_balances WHERE warehouse_id = ? AND product_presentation_id = ?",
+                BigDecimal.class, fixture.warehouseId(), product.presentationId()));
+            assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM inventory.stock_movements WHERE source_type = 'INVENTORY_COUNT' AND source_id = ?",
+                Integer.class, countId));
+        } finally {
+            jdbcTemplate.execute("DROP TRIGGER pause_inventory_count_movement ON inventory.stock_movements");
+            jdbcTemplate.execute("DROP FUNCTION public.pause_inventory_count_movement()");
+        }
+    }
+
+    @Test
     void shouldConfirmAConcurrentSalesReturnOnlyOnce() throws Exception {
         Fixture fixture = createFixture();
         String token = login(fixture.username(), "correct-password");
